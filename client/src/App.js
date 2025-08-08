@@ -1,7 +1,7 @@
 import logo from './logo.svg';
 import './App.css';
 import io from "socket.io-client"
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, HashRouter } from 'react-router-dom';
 import StartScreen from './pages/startMenu';
 
 // Correct socket connection string
@@ -27,7 +27,7 @@ function Home() {
 
 function App() {
   return (
-    <Router basename="/DnM">
+    <Router>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/start" element={<StartScreen />} />
