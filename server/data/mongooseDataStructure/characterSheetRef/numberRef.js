@@ -5,4 +5,4 @@ const numberRef = new mongoose.Schema({
   permMods: { type: Map, of: Number, default: {} },
   tempMods: { type: Map, of: Number, default: {} },
 });
-module.exports = mongoose.model("NumberRef", numberRef);
+module.exports = numberRef;

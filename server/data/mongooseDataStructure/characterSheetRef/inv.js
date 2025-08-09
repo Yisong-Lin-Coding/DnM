@@ -24,4 +24,4 @@ const invSchema = new mongoose.Schema({
 
 })
 
-module.exports = mongoose.model("Inventory", invSchema);
+module.exports = invSchema;
