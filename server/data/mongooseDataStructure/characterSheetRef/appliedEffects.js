@@ -7,4 +7,4 @@ const appliedEffectSchema = new mongoose.Schema({
     source: { type: mongoose.Schema.Types.ObjectId, ref: 'Character', required: true },
 })
 
-module.exports = mongoose.model("AppliedEffect", appliedEffectSchema);
+module.exports = appliedEffectSchema;

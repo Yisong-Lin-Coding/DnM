@@ -19,4 +19,4 @@ const ARSchema = new mongoose.Schema({
     psychic: {type:numberRef, default: { total: 0, permMods: {base:0}, tempMods: {} }}
     
 })
-module.exports = mongoose.model("AR", ARSchema);
+module.exports = ARSchema;
