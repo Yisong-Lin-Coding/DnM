@@ -8,3 +8,4 @@ const skillsSchema = new mongoose.Schema({
     mastary: { type: Map, of: String, default: {} },
     languages: { type: Map, of: String, default: {} },
 })
+module.exports = mongoose.model("Skills", skillsSchema);

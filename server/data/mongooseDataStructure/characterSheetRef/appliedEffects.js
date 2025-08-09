@@ -6,3 +6,5 @@ const appliedEffectSchema = new mongoose.Schema({
     appliedAt: { type: Date, default: Date.now },
     source: { type: mongoose.Schema.Types.ObjectId, ref: 'Character', required: true },
 })
+
+module.exports = mongoose.model("AppliedEffect", appliedEffectSchema);
