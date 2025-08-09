@@ -23,7 +23,7 @@ return(
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         />
-        <button onClick={handleLogin()}>Log In</button>
+        <button onClick={handleLogin}>Log In</button>
     </div>
 )
 }
