@@ -1,14 +1,22 @@
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, HashRouter } from 'react-router-dom';
-function StartScreen() {
-  const navigate = useNavigate();
+import React, { useState, useContext } from "react";
+import { SocketContext } from '../socket.io/context';
 
-  const Signup = () => {
-    const socket = useContext(SocketContext);
+ 
+
+  
+  
+  const SignupScreen = () =>{
+
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+     
+    const Signup = () => {
+    const socket = useContext(SocketContext);
+    const navigate = useNavigate();
 
     socket.emit("signup", { username, password }, (response) => {
-      if (response.success) {
+      if (response.success == true) {
         console.log("Signup successful, user ID:", response.userId);
         navigate("/home");
       } else {
@@ -16,7 +24,7 @@ function StartScreen() {
         alert("Signup failed: " + response.error);
       }
     });
-  };
+  }
 
   return (
     <div className="App">
@@ -38,4 +46,6 @@ function StartScreen() {
   );
 }
 
-export default StartScreen;
+
+
+export default SignupScreen;

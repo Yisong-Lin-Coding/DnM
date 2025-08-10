@@ -12,6 +12,8 @@ import SignUp from './pages/signUp';
 import { SocketContext, socket } from './socket.io/context';
 
 
+
+
 function App() {
   return (
     <SocketContext.Provider value={socket}>
