@@ -15,7 +15,7 @@ import { SocketContext, socket } from './socket.io/context';
 function App() {
   return (
     <SocketContext.Provider value={socket}>
-      <Router basename="/DnM">
+      <Router>
         <Routes>
           <Route path="/" element={<StartScreen />} />
           <Route path="/login" element={<Login />} />
