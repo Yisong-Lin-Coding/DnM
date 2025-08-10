@@ -10,7 +10,7 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "https://yisong-lin-coding.github.io/",
+    origin: "https://yisong-lin-coding.github.io",
     methods: ["GET", "POST"],
   },
 });
@@ -23,8 +23,13 @@ mongoose.connect(process.env.MONGO_URI, {
   useUnifiedTopology: true,
 });
 
-server.listen(3001, ()=>{
-    console.log("server On")
-})
+
+
+io.on("connection", (socket) => {
+  console.log("A user connected:", socket.id);
+
+  
+
+});
 
 

@@ -1,11 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
+import { SocketContext } from '../socket.io/context';
 
 function Login() {
+    const socket = useContext(SocketContext);
+    const navigate = useNavigate();
+    
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     function handleLogin() {
-        console.log("Username:", username);
-        console.log("Password:", password);
+        socket.emit("login", { username, password }, (response) => {
+            if (response.success) {
+                console.log("Login successful, user ID:", response.userId);
+                navigate("/home");
+            } else {
+                console.error("Login failed:", response.error);
+                alert("Login failed: " + response.error);
+            }
+        })
 
     }
 return( 

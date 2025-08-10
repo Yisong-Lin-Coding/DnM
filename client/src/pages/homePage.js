@@ -1,19 +1,19 @@
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, HashRouter } from 'react-router-dom';
-function StartScreen() {
+function HomePage() {
   const navigate = useNavigate();
 
-  const handleStart = () => {
-    navigate('/login'); // Use route path, not file path
-  };
+  chacterSelect = () => {
+    navigate('/characterSelection'); 
+}
 
   return (
     <div className="App">
-      <h1>Welcome to the D&D Game</h1>
-      <button onClick={handleStart}>Start</button>
-      <button>Settings</button>
+      <h1></h1>
+      <button>Add New Chacter</button>
+      <button onClick={chacterSelect}>Chacter Selection</button>
       <button>Exit</button>
     </div>
   );
 }
 
-export default StartScreen;
+export default HomePage;
