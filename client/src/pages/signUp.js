@@ -2,16 +2,38 @@ import { BrowserRouter as Router, Routes, Route, Link, useNavigate, HashRouter }
 function StartScreen() {
   const navigate = useNavigate();
 
-  const handleStart = () => {
-    navigate('/login'); // Use route path, not file path
+  const Signup = () => {
+    const socket = useContext(SocketContext);
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+
+    socket.emit("signup", { username, password }, (response) => {
+      if (response.success) {
+        console.log("Signup successful, user ID:", response.userId);
+        navigate("/home");
+      } else {
+        console.error("Signup failed:", response.error);
+        alert("Signup failed: " + response.error);
+      }
+    });
   };
 
   return (
     <div className="App">
-      <h1>Welcome to the D&D Game</h1>
-      <button onClick={handleStart}>Start</button>
-      <button>Settings</button>
-      <button>Exit</button>
+      <h1>Sign-Up</h1>
+      <input
+      placeholder="Username..."
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+         />
+      <input
+        type="password"
+        placeholder="Password..."
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <button onClick={Signup}>Sign-Up</button>
+       <p>Already have an account? <Link to="/login">Login here</Link>.</p>
     </div>
   );
 }

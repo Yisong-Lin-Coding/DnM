@@ -35,6 +35,8 @@ return(
         onChange={(e) => setPassword(e.target.value)}
         />
         <button onClick={handleLogin}>Log In</button>
+        <p>Don't have an account? <Link to="/signup">Sign up here</Link>.</p>
+        
     </div>
 )
 }

@@ -2,16 +2,25 @@ const express = require("express");
 const router = express.Router();
 const Player = require("../data/mongooseDataStructure/player");
 
-router.post("/api/login", async (req, res) => {
-  const { username, password } = req.body;
-  const user = await Player.findOne({ username });
-  if (!user) return res.status(401).json({ error: "User not found" });
+module.exports = (socket) => {
+    socket.on("login", async (data, callback) => {
+        const { username, password } = data;
 
-  // In production, use bcrypt to compare hashed passwords!
-  if (user.password !== password) {
-    return res.status(401).json({ error: "Invalid password" });
-  }
-  res.json({ success: true, userId: user._id });
-});
+        try {
+            const player = await Player.findOne({ username, password });
+            if (player) {
+                // Successful login
+                socket.join(player._id.toString()); // Join the player room
+                callback({ success: true, userId: player._id });
+            } else {
+                // Login failed
+                callback({ success: false, error: "Invalid username or password" });
+            }
+        }
+        catch (error) {
+            console.error("Login error:", error);
+            callback({ success: false, error: "An error occurred during login" });
+        }
 
-module.exports = router;
+    })
+}

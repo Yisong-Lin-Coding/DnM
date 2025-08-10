@@ -4,6 +4,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const APIHandler = require("./handlers/apiHandler");
 require("dotenv").config();
 
 app.use(cors());
@@ -28,8 +29,17 @@ mongoose.connect(process.env.MONGO_URI, {
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
-  
+  APIHandler(socket);
 
 });
+
+server.listen(process.env.PORT || 3001, () => {
+  console.log(`Server is running on port ${process.env.PORT || 3001}`);
+});
+
+io.on("disconnect", (socket) => {
+  console.log("A user disconnected:", socket.id);
+});
+
 
 
