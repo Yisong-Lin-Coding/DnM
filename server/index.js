@@ -11,7 +11,7 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "https://yisong-lin-coding.github.io",
+    origin: "*",
     methods: ["GET", "POST"],
   },
 });
@@ -31,14 +31,14 @@ io.on("connection", (socket) => {
 
   APIHandler(socket);
 
-});
+  socket.on("disconnect", () => {
+    console.log("A user disconnected:", socket.id);
+  })
 
-server.listen(process.env.PORT || 3001, () => {
-  console.log(`Server is running on port ${process.env.PORT || 3001}`);
 });
-
-io.on("disconnect", (socket) => {
-  console.log("A user disconnected:", socket.id);
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
 
 
