@@ -16,10 +16,7 @@ const io = new Server(server, {
   },
 });
 
-const PORT = process.env.PORT || 3001; // 3001 is only for local dev
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+
 
 app.use(express.json());
 app.use(require("./api/login"));
@@ -43,7 +40,7 @@ const dataBase = new MongoClient(process.env.MONGO_URI, {
     console.error("Error connecting to MongoDB:", err);
   }
   }
-  runDB()
+
 
 
 
@@ -60,6 +57,16 @@ io.on("connection", (socket) => {
 });
 
 
+const PORT = process.env.PORT || 3001; // 3001 is only for local dev
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+
+
+
+
+  runDB()
 
 
 

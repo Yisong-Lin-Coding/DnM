@@ -23,7 +23,6 @@ function App() {
     console.log("Connected with ID:", socket.id);
   });
 
-
   return () => {
     socket.off("connect");
   };
