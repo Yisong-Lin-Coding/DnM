@@ -7,13 +7,15 @@ import { SocketContext } from '../socket.io/context';
 
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-    
+
     const socket = useContext(SocketContext);
     const navigate = useNavigate();
 
      
     const Signup = () => {
     
+      console.log("Attempting to sign up with username:", username);
+      console.log("Attempting to sign up with password:", password);
     socket.emit("signup", { username, password }, (response) => {
       if (response.success == true) {
         console.log("Signup successful, user ID:", response.userId);

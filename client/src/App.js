@@ -9,6 +9,10 @@ import CharacterSelection from './pages/characterSelection';
 import Game from './pages/game';
 import HomePage from './pages/homePage';
 import SignUp from './pages/signUp';
+import Lobby from './pages/lobby';
+import LobbyCreation from './pages/lobbyCreation';
+import LoreRule from './pages/loreRule';
+
 import { SocketContext, socket } from './socket.io/context';
 import React, { useEffect } from 'react';
 
@@ -46,6 +50,10 @@ function App() {
           <Route path="/game" element={<Game socket={socket} />} />
           <Route path="/home" element={<HomePage />} />
           <Route path="/signup" element={<SignUp />} />
+          <Route path="/lobby" element={<Lobby />} />
+          <Route path="/lobby-creation" element={<LobbyCreation />} />
+          <Route path="/lore-rule" element={<LoreRule />} />
+          
 
         </Routes>
       </Router>
