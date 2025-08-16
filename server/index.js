@@ -21,6 +21,7 @@ const PORT = process.env.PORT || 3001; // 3001 is only for local dev
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`TESTING 80`);
+  console.log("Node version:", process.version);
 });
 
 app.get("/", (req, res) => {
@@ -37,6 +38,7 @@ const dataBase = new MongoClient(process.env.MONGO_URI, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
+    tls: true
   }})
 
   async function runDB() {
