@@ -25,7 +25,7 @@ const admin = () => {
     socket.emit("admin", { message: "Admin action triggered" }, (response) => {
         console.log("Admin response:", response);
     });
-    if (response.success) {
+    if (response.success == true) {
         console.log("Admin action successful");
         adminPermission = true;
     } else {
@@ -38,11 +38,9 @@ const admin = () => {
   return (
     <div className="App">
       <h1></h1>
-
-
-        
+       
       <div>
-      {admin() = true && (
+      {admin() == true && (
         <button>Admin Panel</button>
       )}
       <button onClick={ ChacterCreation }>Join new lobby</button>
