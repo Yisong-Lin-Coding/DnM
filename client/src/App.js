@@ -20,7 +20,11 @@ function App() {
 
   socket.on("connect", () => {
     console.log("Connected with ID:", socket.id);
-    console.log("try 1");
+    console.log("try 2");
+  });
+
+  socket.on("welcome", (data) => {
+    console.log("Server says:", data.message);
   });
 
  socket.on("connect_error", (err) => {

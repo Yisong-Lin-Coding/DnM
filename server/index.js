@@ -17,13 +17,14 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3001; // 3001 is only for local dev
+
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server is running on port ${PORT}`);
-
-
 });
 
-
+app.get("/", (req, res) => {
+  res.send("Backend is running!");
+});
 
 
 app.use(express.json());
@@ -50,9 +51,7 @@ const dataBase = new MongoClient(process.env.MONGO_URI, {
   }
 
 
-app.get("/", (req, res) => {
-  res.send("Backend is running!");
-});
+
 
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
