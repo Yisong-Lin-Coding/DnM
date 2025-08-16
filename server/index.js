@@ -16,9 +16,8 @@ const io = new Server(server, {
   },
 });
 
-const PORT = process.env.PORT || 10000;
-
-server.listen(PORT, () => {
+const PORT = process.env.PORT || 3001; // 3001 is only for local dev
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
@@ -32,7 +31,7 @@ const dataBase = new MongoClient(process.env.MONGO_URI, {
     deprecationErrors: true,
   }})
 
-  async function run() {
+  async function runDB() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await dataBase.connect();
@@ -44,7 +43,7 @@ const dataBase = new MongoClient(process.env.MONGO_URI, {
     console.error("Error connecting to MongoDB:", err);
   }
   }
-  run().catch(console.dir);
+  runDB()
 
 
 
