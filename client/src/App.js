@@ -10,21 +10,25 @@ import Game from './pages/game';
 import HomePage from './pages/homePage';
 import SignUp from './pages/signUp';
 import { SocketContext, socket } from './socket.io/context';
+import React, { useEffect } from 'react';
 
-useEffect(() => {
-  // Run once when the component mounts
+
+
+
+function App() {
+
+  useEffect(() => {
+
   socket.on("connect", () => {
     console.log("Connected with ID:", socket.id);
   });
 
-  // Cleanup when component unmounts
+
   return () => {
     socket.off("connect");
   };
 }, []);
 
-
-function App() {
   return (
     <SocketContext.Provider value={socket}>
       <Router>
