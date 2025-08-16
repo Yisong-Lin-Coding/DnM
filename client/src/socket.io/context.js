@@ -4,4 +4,5 @@ import { io } from "socket.io-client";
 export const socket = io("https://dnm-m84a.onrender.com", {
   transports: ["websocket", "polling"],
 });
+
 export const SocketContext = React.createContext(socket);

@@ -16,6 +16,12 @@ const io = new Server(server, {
   },
 });
 
+const PORT = process.env.PORT || 3001;
+
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
 app.use(express.json());
 app.use(require("./api/login"));
 
@@ -33,18 +39,19 @@ const dataBase = new MongoClient(process.env.MONGO_URI, {
     // Send a ping to confirm a successful connection
     await dataBase.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
-    // Ensures that the client will close when you finish/error
-    await dataBase.close();
+  } 
+  catch (err) {
+    console.error("Error connecting to MongoDB:", err);
   }
   }
-
   run().catch(console.dir);
+
 
 
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
+  socket.emit("welcome", { message: "Welcome to the server!" });
   APIHandler(socket);
 
   socket.on("disconnect", () => {
@@ -52,10 +59,9 @@ io.on("connection", (socket) => {
   })
 
 });
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+
+
+
 
 
 
