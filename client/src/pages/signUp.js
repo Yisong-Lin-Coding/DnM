@@ -2,19 +2,18 @@ import { BrowserRouter as Router, Routes, Route, Link, useNavigate, HashRouter }
 import React, { useState, useContext } from "react";
 import { SocketContext } from '../socket.io/context';
 
- 
 
-  
-  
   const SignupScreen = () =>{
 
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-     
-    const Signup = () => {
+    
     const socket = useContext(SocketContext);
     const navigate = useNavigate();
 
+     
+    const Signup = () => {
+    
     socket.emit("signup", { username, password }, (response) => {
       if (response.success == true) {
         console.log("Signup successful, user ID:", response.userId);
