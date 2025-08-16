@@ -14,15 +14,18 @@ import React, { useEffect } from 'react';
 
 
 
-
 function App() {
 
   useEffect(() => {
 
   socket.on("connect", () => {
     console.log("Connected with ID:", socket.id);
+    console.log("try 1");
   });
 
+ socket.on("connect_error", (err) => {
+    console.error("Socket connection error:", err);
+  });
   return () => {
     socket.off("connect");
   };
