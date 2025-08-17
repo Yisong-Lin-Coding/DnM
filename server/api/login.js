@@ -12,7 +12,7 @@ module.exports = (socket) => {
                 // Successful login
                 socket.join(player._id.toString()); // Join the player room
                 callback({ success: true, userId: player._id });
-                sessionStorage.setItem("player_ID", Json.stringify(player._id));
+                
             } else {
                 // Login failed
                 callback({ success: false, error: "Invalid username or password" });

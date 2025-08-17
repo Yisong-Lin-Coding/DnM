@@ -12,6 +12,7 @@ function Login() {
         socket.emit("login", { username, password }, (response) => {
             if (response.success) {
                 console.log("Login successful, user ID:", response.userId);
+                sessionStorage.setItem("player_ID", JSON.stringify(response.userId));
                 navigate("/home");
             } else {
                 console.error("Login failed:", response.error);

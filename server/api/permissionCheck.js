@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 module.export = (socket) => {
-    socket.on("admin", async (data, callback) => {
+    socket.on("permissionCheck", async (data, callback) => {
         const player_ID = sessionStorage.getItem("player_ID");
 
         try {
@@ -15,7 +15,7 @@ module.export = (socket) => {
             }
             else{
                 console.log(player.name + " has admin permissions");
-                callback({ success: true, message: "Admin action successful" });
+                callback({ success: true, message: `${player.name} has admin permissions` });
             }}
         catch (error) {
             console.error("Admin action error:", error);
