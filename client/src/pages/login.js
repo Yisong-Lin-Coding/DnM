@@ -13,6 +13,7 @@ function Login() {
             if (response.success) {
                 console.log("Login successful, user ID:", response.userId);
                 sessionStorage.setItem("player_ID", JSON.stringify(response.userId));
+                console.log(sessionStorage.getItem("player_ID"));
                 navigate("/home");
             } else {
                 console.error("Login failed:", response.error);

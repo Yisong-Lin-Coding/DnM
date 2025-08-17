@@ -15,7 +15,7 @@ module.export = (socket) => {
             }
             else{
                 console.log(player.name + " has admin permissions");
-                callback({ success: true, message: `${player.name} has admin permissions` });
+                return callback({ success: true, message: `${player.name} has admin permissions` });
             }}
         catch (error) {
             console.error("Admin action error:", error);
