@@ -16,6 +16,8 @@ import LoreRule from './pages/loreRule';
 import { SocketContext, socket } from './socket.io/context';
 import React, { useEffect } from 'react';
 
+import OneCCCustomize from './pages/chacterCreatorSubfolder/1_CC_Custoumize';
+
 
 
 function App() {
@@ -34,6 +36,14 @@ function App() {
  socket.on("connect_error", (err) => {
     console.error("Socket connection error:", err);
   });
+
+
+sessionStorage.setItem("socket_ID", JSON.stringify(socket.id));
+  console.log("Socket ID stored in sessionStorage:", sessionStorage.getItem("socket_ID"));
+
+
+
+
   return () => {
     socket.off("connect");
   };
@@ -53,6 +63,7 @@ function App() {
           <Route path="/lobby" element={<Lobby />} />
           <Route path="/lobby-creation" element={<LobbyCreation />} />
           <Route path="/lore-rule" element={<LoreRule />} />
+          <Route path="/character-creation/customize" element={<OneCCCustomize />} />
           
 
         </Routes>
