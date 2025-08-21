@@ -1,7 +1,6 @@
 import logo from './logo.svg';
 import './App.css';
 import { HashRouter  as Router, Routes, Route } from 'react-router-dom';
-import useSessionCheck from './handlers/sessionID';
 import ProtectedRoute from './handlers/protectedRoutes';
 
 import Login from './pages/login';
@@ -16,7 +15,7 @@ import LobbyCreation from './pages/lobbyCreation';
 import LoreRule from './pages/loreRule';
 
 import { SocketContext, socket } from './socket.io/context';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 
 import OneCCCustomize from './pages/chacterCreatorSubfolder/1_CC_Custoumize';
 
@@ -44,9 +43,6 @@ function App() {
   };
 }, []);
 
-
-const sessionID = JSON.parse(sessionStorage.getItem("session_ID") || "null")
-const sessionCheckval = useSessionCheck().result
 
   return (
     <SocketContext.Provider value={socket}>

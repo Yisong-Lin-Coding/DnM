@@ -40,8 +40,8 @@ function Login() {
     useEffect(()=>{
 
         function autoLogin() {
-        const playerID = JSON.stringify(localStorage.getItem("player_ID"))
-        const sessionID = JSON.stringify(sessionStorage.getItem("session_ID"))
+        const playerID = localStorage.getItem("player_ID").toString()
+        const sessionID = sessionStorage.getItem("session_ID").toString()
         socket.emit("login_validityCheck", { playerID, sessionID}, (response) =>{
             if(response.success = true){
                 navigate(`/ISK/${sessionID}/home`)

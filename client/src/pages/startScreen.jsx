@@ -3,8 +3,6 @@ import { SocketContext } from '../socket.io/context';
 
 
 function StartScreen() {
-  const sessionID = JSON.parse(sessionStorage.getItem("session_ID") || "null")
-  const socket = useContext(SocketContext);
   const navigate = useNavigate();
   const handleStart = () => {
     navigate (`/login`); // Use route path, not file path
