@@ -2,7 +2,7 @@ const Player = require(`../data/mongooseDataStructure/player`)
 
 module.exports = (socket)=> {
 
-    socket.on("validityCheck_login", async (data, callback) => {
+    socket.on("login_validityCheck", async (data, callback) => {
         const {playerID, sessionID} = data
 
         try{

@@ -17,6 +17,14 @@ function Login() {
                     console.log("Login successful, user ID:", response.userId);
                     localStorage.setItem("player_ID", JSON.stringify(response.userId));
                     console.log(localStorage.getItem("player_ID"));
+
+                    const playerID = JSON.stringify(response.userID)
+                    const sessionID = JSON.stringify(sessionStorage.getItem("session_ID"))
+                    socket.emit("login_tokenSave",{playerID, sessionID}, (response) =>{
+
+                    })
+
+
                     navigate(`/ISK/${JSON.stringify(sessionStorage.getItem(`session_ID`))}/home`);
                 } 
                 else {
@@ -34,7 +42,7 @@ function Login() {
         function autoLogin() {
         const playerID = JSON.stringify(localStorage.getItem("player_ID"))
         const sessionID = JSON.stringify(sessionStorage.getItem("session_ID"))
-        socket.emit("validityCheck_login", { playerID, sessionID}, (response) =>{
+        socket.emit("login_validityCheck", { playerID, sessionID}, (response) =>{
             if(response.success = true){
                 navigate(`/ISK/${sessionID}/home`)
             }
