@@ -14,16 +14,15 @@ function Login() {
         
             socket.emit("login", { username, password }, (response) => {
                 if (response.success) {
-                    console.log("Login successful, user ID:", response.userId);
-                    localStorage.setItem("player_ID", response.userId.toString());
+                    console.log("Login successful, user ID:", response.userID);
+                    localStorage.setItem("player_ID", response.userID.toString());
                     console.log(localStorage.getItem("player_ID"));
 
                     const playerID = response.userID.toString()
                     const sessionID = sessionStorage.getItem("session_ID")
-                    socket.emit("login_tokenSave",{playerID, sessionID}, (response) =>{
-
+                    socket.emit("login_tokenSave",{ playerID , sessionID}, (response) =>{
+                        console.log(response.message)
                     })
-
 
                     navigate(`/ISK/${JSON.stringify(sessionStorage.getItem(`session_ID`))}/home`);
                 } 

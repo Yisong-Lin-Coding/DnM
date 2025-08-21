@@ -9,9 +9,9 @@ module.exports = (socket) => {
         try {
             const player = await Player.findOne({ username, password });
             if (player) {
-                // Successful login
-                socket.join(player._id.toString()); // Join the player room
-                callback({ success: true, userId: player._id });
+            
+                console.log(player._id.toString())
+                callback({ success: true, userID: player._id.toString() });
                 
             } else {
                 // Login failed

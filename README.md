@@ -14,4 +14,5 @@ For any committe members that wish to actually try and play the game here is a s
 1. Make a fork of this repo on your own account. 
 2. Set up github pages for the client folder
 3. Make a render account (or another server hosting site)
-4. Set up 
+4. Set up a new webservice on render and connect it to your github repo
+5. Make a MongoDB account 
