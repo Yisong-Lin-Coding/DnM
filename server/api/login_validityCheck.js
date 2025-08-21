@@ -7,7 +7,7 @@ module.exports = (socket)=> {
 
         try{
             const player = await Player.findById(playerID)
-            if(player._id.toString() == playerID & player.sessionID == sessionID){
+            if(player._id.toString() == playerID && player.sessionID == sessionID){
                 console.log(`Success\nPlayerID: ${playerID}\nSessionID: ${sessionID}`)
                 callback({sucess:true, message:`This player has been validated`})
             }
