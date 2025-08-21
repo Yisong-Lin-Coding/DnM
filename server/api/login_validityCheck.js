@@ -16,7 +16,7 @@ module.exports = (socket)=> {
             }
 
         }
-        catch(error){
+        catch (error){
             console.error(`Validity Error:${error}`) 
             callback({success:false, error:"An error has occured "})
         }

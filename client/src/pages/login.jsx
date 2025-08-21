@@ -36,30 +36,22 @@ function Login() {
         
     }
 
-    useEffect(()=>{
-
-        function autoLogin() {
-
+useEffect(() => {
+    function autoLogin() {
         const playerID = (localStorage.getItem("player_ID") || "").toString();
         const sessionID = (sessionStorage.getItem("session_ID") || "").toString();
         
-        socket.emit("login_validityCheck", { playerID, sessionID}, (response) =>{
-            if(response.success){
-                navigate(`/ISK/${sessionID}/home`)
+        socket.emit("login_validityCheck", { playerID, sessionID }, (response) => {
+            if (response.success) {
+                navigate(`/ISK/${sessionID}/home`);
+            } else {
+                console.log(response.error || response.message);
             }
-            else{
-                console.log(response.error || response.message)
-                return
-            }
-
-
-        }, [])
+        });
     }
     
-    autoLogin()
-
-
-    })
+    autoLogin();
+}, []);
 
 return( 
 
