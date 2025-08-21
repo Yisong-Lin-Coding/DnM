@@ -6,7 +6,7 @@ module.exports = (socket)=> {
         const {playerID, sessionID} = data
 
         try {
-            const player = await Player.findByID(playerID)
+            const player = await Player.findById(playerID)
 
             if (!player) {
                 callback ({success:false, error:"Player not found"});
@@ -15,7 +15,7 @@ module.exports = (socket)=> {
 
             player.sessionID = sessionID
             await player.save()
-            const updatedplayer = await Player.findByID(playerID)
+            const updatedplayer = await Player.findById(playerID)
             callback ({success:true, message:`session token saved ${updatedplayer.sessionID}`})
         }
         catch(error){
