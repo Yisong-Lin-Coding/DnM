@@ -28,7 +28,7 @@ function App() {
 
   socket.on("connect", () => {
     console.log("Connected with ID:", socket.id);
-    sessionStorage.setItem("session_ID", JSON.stringify(socket.id));
+    sessionStorage.setItem("session_ID", socket.id.toString());
   });
 
   socket.on("welcome", (data) => {
@@ -62,7 +62,7 @@ const sessionCheckval = useSessionCheck().result
             <Route path="character-selection" element={<CharacterSelection />} />
             <Route path="character-creation" element={<CharacterCreation />} />
 
-            
+
             <Route path="character-creation/customize" element={<OneCCCustomize />} />
             <Route path="game" element={<Game socket={socket} />} />
             <Route path="lobby" element={<Lobby />} />

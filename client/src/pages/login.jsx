@@ -15,11 +15,11 @@ function Login() {
             socket.emit("login", { username, password }, (response) => {
                 if (response.success) {
                     console.log("Login successful, user ID:", response.userId);
-                    localStorage.setItem("player_ID", JSON.stringify(response.userId));
+                    localStorage.setItem("player_ID", response.userId.toString());
                     console.log(localStorage.getItem("player_ID"));
 
-                    const playerID = JSON.stringify(response.userID)
-                    const sessionID = JSON.stringify(sessionStorage.getItem("session_ID"))
+                    const playerID = response.userID.toString()
+                    const sessionID = sessionStorage.getItem("session_ID")
                     socket.emit("login_tokenSave",{playerID, sessionID}, (response) =>{
 
                     })
@@ -52,7 +52,7 @@ function Login() {
             }
 
 
-        })
+        }, [])
     }
     
     autoLogin()
