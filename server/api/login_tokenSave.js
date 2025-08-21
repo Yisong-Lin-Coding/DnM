@@ -18,7 +18,7 @@ module.exports = (socket)=> {
             const updatedplayer = await Player.findByID(playerID)
             callback ({success:true, message:`session token saved ${updatedplayer.sessionID}`})
         }
-        catch{
+        catch(error){
             callback ({success:false, error:`An error was found\n${error}`})
         }
 
