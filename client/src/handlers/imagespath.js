@@ -1,35 +1,10 @@
-import placeholder from "../images/website/placeholder/empty_pfp.jpg"
-import pfp from "../images/website/placeholder/empty_pfp.jpg";
+images = require.context("../images", true, /\.(png|jpe?g|svg)$/);
 
 
-const fs = require ('fs-plus');
+export default function getImage(imageName) {
 
-module.exports = (filename) => {
-    
-    const images = fs.readdirSync('./client/src/images/website/placeholder');
+ const keys = images.keys();
+  const match = keys.find(key => key.endsWith(imageName));
+  return match ? images(match) : null;
 
-
-    const imagePaths = images.map(image => `../images/website/placeholder/${image}`);
-    const imagePath = imagePaths.find(path => path.includes(filename));
-
-    if (imagePath.isArray && imagePath.length > 1) {
-        console.log(`Multiple images found: ${imagePath.join(', ')}`);
-
-    }
-
-    if (imagePath.isArray && imagePath.length === 1) {
-        console.log(`Image found: ${imagePath[0]}`);
-
-
-        return imagePath[0]; 
-    } 
-
-    if (imagePath) {
-        console.log(`Image found: ${imagePath}`);
-        return imagePath; 
-    } 
-    else{
-        console.warn(`Image not found: ${filename}. Using placeholder.`);
-        return pfp; // Return a default placeholder image if not found
-    }
 }

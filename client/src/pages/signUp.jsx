@@ -19,7 +19,7 @@ import { SocketContext } from '../socket.io/context';
     socket.emit("signup", { username, password }, (response) => {
       if (response.success == true) {
         console.log("Signup successful, user ID:", response.userId);
-        navigate("/home");
+        navigate(`/ISK/${JSON.stringify(sessionStorage.getItem("session_ID"))}/home`);
       } else {
         console.error("Signup failed:", response.error);
         alert("Signup failed: " + response.error);

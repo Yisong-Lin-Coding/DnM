@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, HashRouter } from 'react-router-dom';
 import React, { useContext } from "react";
 import '../../Pages.css'
-const image = require('../../handlers/imagespath');
+
 
 
 

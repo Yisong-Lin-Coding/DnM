@@ -1,6 +1,8 @@
 import logo from './logo.svg';
 import './App.css';
-import { HashRouter  as Router, Routes, Route, Link, useNavigate, HashRouter } from 'react-router-dom';
+import { HashRouter  as Router, Routes, Route } from 'react-router-dom';
+import useSessionCheck from './handlers/sessionID';
+import ProtectedRoute from './handlers/protectedRoutes';
 
 import Login from './pages/login';
 import StartScreen from './pages/startScreen';
@@ -26,7 +28,7 @@ function App() {
 
   socket.on("connect", () => {
     console.log("Connected with ID:", socket.id);
-    console.log("try 2");
+    sessionStorage.setItem("session_ID", JSON.stringify(socket.id));
   });
 
   socket.on("welcome", (data) => {
@@ -37,17 +39,14 @@ function App() {
     console.error("Socket connection error:", err);
   });
 
-
-sessionStorage.setItem("socket_ID", JSON.stringify(socket.id));
-  console.log("Socket ID stored in sessionStorage:", sessionStorage.getItem("socket_ID"));
-
-
-
-
   return () => {
     socket.off("connect");
   };
 }, []);
+
+
+const sessionID = JSON.parse(sessionStorage.getItem("session_ID") || "null")
+const sessionCheckval = useSessionCheck().result
 
   return (
     <SocketContext.Provider value={socket}>
@@ -55,15 +54,21 @@ sessionStorage.setItem("socket_ID", JSON.stringify(socket.id));
         <Routes>
           <Route path="/" element={<StartScreen />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/character-creation" element={<CharacterCreation />} />
-          <Route path="/character-selection" element={<CharacterSelection />} />
-          <Route path="/game" element={<Game socket={socket} />} />
-          <Route path="/home" element={<HomePage />} />
           <Route path="/signup" element={<SignUp />} />
-          <Route path="/lobby" element={<Lobby />} />
-          <Route path="/lobby-creation" element={<LobbyCreation />} />
-          <Route path="/lore-rule" element={<LoreRule />} />
-          <Route path="/character-creation/customize" element={<OneCCCustomize />} />
+          <Route path ="/ISK/:sessionID" element={<ProtectedRoute />}> 
+
+            <Route path="home" element={<HomePage />} />
+            <Route path="lore-rule" element={<LoreRule />} />
+            <Route path="character-selection" element={<CharacterSelection />} />
+            <Route path="character-creation" element={<CharacterCreation />} />
+
+            
+            <Route path="character-creation/customize" element={<OneCCCustomize />} />
+            <Route path="game" element={<Game socket={socket} />} />
+            <Route path="lobby" element={<Lobby />} />
+            <Route path="lobby-creation" element={<LobbyCreation />} />
+          </Route>
+          
           
 
         </Routes>
