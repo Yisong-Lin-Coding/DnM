@@ -44,7 +44,8 @@ useEffect(() => {
         socket.emit("login_validityCheck", { playerID, sessionID }, (response) => {
             if (response.success) {
                 navigate(`/ISK/${sessionID}/home`);
-            } else {
+            } 
+            else {
                 console.log(response.error || response.message);
             }
         });

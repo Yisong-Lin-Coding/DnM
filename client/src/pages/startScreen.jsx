@@ -1,11 +1,9 @@
-import { BrowserRouter as useContext, useNavigate } from 'react-router-dom';
-import { SocketContext } from '../socket.io/context';
-
+import { BrowserRouter as useNavigate } from 'react-router-dom';
 
 function StartScreen() {
   const navigate = useNavigate();
   const handleStart = () => {
-    navigate (`/login`); // Use route path, not file path
+    navigate (`/login`);
   };
 
   return (

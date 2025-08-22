@@ -1,7 +1,7 @@
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, HashRouter } from 'react-router-dom';
+import { BrowserRouter as Link, useNavigate } from 'react-router-dom';
 import '../Pages.css'
 import { SocketContext } from '../socket.io/context';
-import React, { useState, useContext } from "react";
+import {  useContext } from "react";
 
 
 function HomePage() {
@@ -19,12 +19,32 @@ const ChacterCreation = () => {
     navigate('/character-creation'); 
 }
 
-socket.on("connect", () => {
-    console.log("Connected to the server");})
+const Home = () =>{
+  navigate(`/`)
+}
+  let adminPermission = sessionStorage.getItem("adminPermission")
 
-  let adminPermission = false
 
+    useEffect(()=>{
 
+      const playerID = localStorage.getItem(player_ID)
+      function adminPermissionCheck(){
+        socket.emit(`login_adminPermissionCheck`, {playerID}, (response) =>{
+          if(response.success){
+            sessionStorage.setItem(`adminPermission`, true)
+            console.log(`adminPermission set to true`)
+          }
+          else{
+            sessionStorage.setItem(`adminPermission`, false)
+            console.log(`adminPermission set to false`)
+          }
+
+        })
+
+      }
+      adminPermissionCheck()
+
+    },[])
 
 
   return (
@@ -34,12 +54,9 @@ socket.on("connect", () => {
       <h1></h1>
        
       <div>
-      {adminPermission == true && (
-        <button>Admin Panel</button>
-      )}
       <button onClick={ ChacterCreation }>Join new lobby</button>
       <button onClick={ ChacterSelect } >Chacter Selection</button>
-      <button>Exit</button>
+      <button onClick={ Home } >Exit</button>
       </div>
     </div>
   );

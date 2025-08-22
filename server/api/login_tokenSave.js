@@ -10,7 +10,6 @@ module.exports = (socket)=> {
 
             if (!player) {
                 callback ({success:false, error:"Player not found"});
-                return
             }
 
             player.sessionID = sessionID

@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, HashRouter } from 'react-router-dom';
-import React, { useState, useContext } from "react";
+import { BrowserRouter as  Link, useNavigate } from 'react-router-dom';
+import { useState, useContext } from "react";
 import { SocketContext } from '../socket.io/context';
 
 
@@ -16,16 +16,20 @@ import { SocketContext } from '../socket.io/context';
     
       console.log("Attempting to sign up with username:", username);
       console.log("Attempting to sign up with password:", password);
+
     socket.emit("signup", { username, password }, (response) => {
       if (response.success == true) {
         console.log("Signup successful, user ID:", response.userId);
-        navigate(`/ISK/${JSON.stringify(sessionStorage.getItem("session_ID"))}/home`);
+        navigate(`/ISK/${sessionStorage.getItem("session_ID")}/home`);
       } else {
         console.error("Signup failed:", response.error);
         alert("Signup failed: " + response.error);
       }
     });
   }
+
+
+  
 
   return (
     <div className="App">
