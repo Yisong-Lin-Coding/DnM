@@ -24,7 +24,7 @@ function Login() {
                         console.log(response.message)
                     })
 
-                    navigate(`/ISK/${JSON.stringify(sessionStorage.getItem(`session_ID`))}/home`);
+                    navigate(`/ISK/${sessionStorage.getItem(`session_ID`)}/home`);
                 } 
                 else {
                     console.log(`Login Failed: ${response.message}`)
@@ -38,8 +38,8 @@ function Login() {
 
 useEffect(() => {
     function autoLogin() {
-        const playerID = (localStorage.getItem("player_ID") || "").toString();
-        const sessionID = (sessionStorage.getItem("session_ID") || "").toString();
+        const playerID = (localStorage.getItem("player_ID") || "");
+        const sessionID = (sessionStorage.getItem("session_ID") || "")
         
         socket.emit("login_validityCheck", { playerID, sessionID }, (response) => {
             if (response.success) {
