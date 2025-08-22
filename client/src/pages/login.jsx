@@ -47,6 +47,7 @@ useEffect(() => {
             } 
             else {
                 console.log(response.error || response.message);
+                console.log("Error with autologin")
             }
         });
     }
