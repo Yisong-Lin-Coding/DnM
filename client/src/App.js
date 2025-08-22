@@ -13,7 +13,7 @@ import SignUp from './pages/signUp';
 import Lobby from './pages/lobby';
 import LobbyCreation from './pages/lobbyCreation';
 import LoreRule from './pages/loreRule';
-import Test from `./pages/test`
+import Test from './pages/test'
 
 import { SocketContext, socket } from './socket.io/context';
 import { useEffect } from 'react';

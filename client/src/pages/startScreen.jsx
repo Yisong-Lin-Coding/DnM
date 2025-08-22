@@ -1,4 +1,4 @@
-import { BrowserRouter as useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 function StartScreen() {
   const navigate = useNavigate();

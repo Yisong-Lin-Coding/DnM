@@ -1,7 +1,7 @@
 import { BrowserRouter as Link, useNavigate } from 'react-router-dom';
 import '../Pages.css'
 import { SocketContext } from '../socket.io/context';
-import {  useContext } from "react";
+import {  useContext, useEffect } from "react";
 
 
 function HomePage() {
@@ -27,7 +27,7 @@ const Home = () =>{
 
     useEffect(()=>{
 
-      const playerID = localStorage.getItem(player_ID)
+      const playerID = localStorage.getItem("player_ID")
       function adminPermissionCheck(){
         socket.emit(`login_adminPermissionCheck`, {playerID}, (response) =>{
           if(response.success){
