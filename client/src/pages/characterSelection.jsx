@@ -7,11 +7,19 @@ function StartScreen() {
   };
 
   return (
-    <div className="App">
-      <h1>Welcome to the D&D Game</h1>
-      <button onClick={handleStart}>Start</button>
-      <button>Settings</button>
-      <button>Exit</button>
+    <div>
+      <div>
+        top div
+      </div>
+
+      <div>
+        Mid dev
+      </div>
+
+      <div>
+        Optional lower Div
+      </div>
+
     </div>
   );
 }

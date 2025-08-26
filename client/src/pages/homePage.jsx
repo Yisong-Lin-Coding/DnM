@@ -24,6 +24,11 @@ const Home = () =>{
 }
   let adminPermission = sessionStorage.getItem("adminPermission")
 
+  const AdminLoad = ()=>{
+    const sessionID = sessionStorage.getItem("session_ID")
+    navigate(`/ISK/${sessionID}/admin`)
+
+  }
 
     useEffect(()=>{
 
@@ -54,6 +59,11 @@ const Home = () =>{
       <h1></h1>
        
       <div>
+        {sessionStorage.getItem("adminPermission") === "true" && (
+        <button onClick={ AdminLoad }>
+          Admin Page
+        </button>
+      )}
       <button onClick={ ChacterCreation }>Join new lobby</button>
       <button onClick={ ChacterSelect } >Chacter Selection</button>
       <button onClick={ Home } >Exit</button>
