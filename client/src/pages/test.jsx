@@ -7,8 +7,10 @@ function StartScreen() {
 
   return (
     <Skeleton>
-
+      <div className='bg-red-300 min-h-screen w-screen'>
       
+      </div>
+
     </Skeleton>
   );
 }

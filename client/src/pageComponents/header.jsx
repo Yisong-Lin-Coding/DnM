@@ -5,12 +5,13 @@ export default function Header() {
 
     const [menuisPinned, setmenuIsPinned] = useState(false);
     const [profileIsPinned, setprofileIsPinned] = useState(false)
+    const [mailIsPinned, setmailIsPinned] = useState(false)
     
       const locate = useLocation()
     
 
     return(
-        <div class="bg-black w-full h-full text-white text-center flex justify-between p-0 item-stretch">
+        <div class="bg-black w-full h-full text-white text-center flex justify-between p-0 item-stretch sticky top-0">
             <div className="relative inline-block group">
                 <div className="p-4 text-white cursor-pointer" onClick={() => setmenuIsPinned(!menuisPinned)}>
                        Menu
@@ -79,9 +80,21 @@ export default function Header() {
                     <div>
                         Mail
                     </div>
-                    <div className="relative inline-block group">
-                        PFP
+
+                    <div className="group">
+                        <div className="text-white cursor-pointer" onClick={() => setprofileIsPinned(!profileIsPinned)}>
+                            pfp
+                        </div>
+                        <div 
+                        className={`absolute top-full left-0 p-4 bg-black shadow-lg transition-opacity duration-200 w-[140px] text-left flex flex-col space-y-8
+                        ${profileIsPinned ? "opacity-100 visible" : "invisible opacity-0 group-hover:visible group-hover:opacity-100"}`}>
+                            <div>
+                                Hello
+                            </div>
+                        </div>
+                        
                     </div>
+
                     <div>
                         Setting
                     </div>
