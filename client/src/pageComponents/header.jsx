@@ -11,13 +11,13 @@ export default function Header() {
     
 
     return(
-        <div class="bg-black w-full h-full text-white text-center flex justify-between p-0 item-stretch sticky top-0">
+        <div class="bg-black w-full h-full text-white text-center flex justify-between p-0 item-stretch sticky top-0 border-white border-b">
             <div className="relative inline-block group">
                 <div className="p-4 text-white cursor-pointer" onClick={() => setmenuIsPinned(!menuisPinned)}>
                        Menu
                 </div>
                 <div 
-                    className={`absolute top-full left-0 p-4 bg-black shadow-lg transition-opacity duration-200 w-[140px] text-left flex flex-col space-y-8
+                    className={`absolute top-full left-0 p-4 bg-black shadow-lg transition-opacity duration-200 w-[140px] text-left flex flex-col space-y-8 border-r border-b border-white
                     ${menuisPinned ? "opacity-100 visible" : "invisible opacity-0 group-hover:visible group-hover:opacity-100"}`}>
                     <div>
                         Lookup

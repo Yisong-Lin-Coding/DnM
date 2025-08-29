@@ -45,5 +45,24 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    function({ addUtilities }) {
+    addUtilities({
+      '.scrollbar-transparent': {
+        'scrollbar-width': 'thin',       // Firefox
+      },
+      '.scrollbar-transparent::-webkit-scrollbar': {
+        width: '6px',                   // Chrome/Edge
+        background: 'transparent',      // make track transparent
+      },
+      '.scrollbar-transparent::-webkit-scrollbar-track': {
+        background: 'transparent',      // transparent track
+      },
+      '.scrollbar-transparent::-webkit-scrollbar-thumb': {
+        background: 'rgba(255,255,255,0.2)', // semi-transparent thumb
+        'border-radius': '9999px',
+      },
+    });
+  }
+  ],
 }

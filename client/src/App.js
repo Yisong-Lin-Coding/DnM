@@ -49,28 +49,22 @@ function App() {
     <SocketContext.Provider value={socket}>
       <Router>
         <Routes>
-          <Route path="/" element={<StartScreen />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path ="/test" element={<Test />}    />
-          <Route path ="/ISK/:sessionID" element={<ProtectedRoute />}> 
-
-            <Route path="home" element={<HomePage />} />
-            <Route path="lore-rule" element={<LoreRule />} />
-            <Route path="character-selection" element={<CharacterSelection />} />
-            <Route path="character-creation" element={<CharacterCreation />} />
-
-
-            <Route path="character-creation/customize" element={<OneCCCustomize />} />
-            <Route path="game" element={<Game socket={socket} />} />
-            <Route path="lobby" element={<Lobby />} />
-            <Route path="lobby-creation" element={<LobbyCreation />} />
-          </Route>
-          
-          
-
-        </Routes>
-      </Router>
+        <Route path="/" element={<StartScreen />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/test" element={<Test />} />
+        <Route path="/ISK/:sessionID" element={<ProtectedRoute />}> 
+          <Route path="home" element={<HomePage />} />
+          <Route path="lore-rule" element={<LoreRule />} />
+          <Route path="character-selection" element={<CharacterSelection />} />
+          <Route path="character-creation" element={<CharacterCreation />} />
+          <Route path="character-creation/customize" element={<OneCCCustomize />} />
+          <Route path="game" element={<Game socket={socket} />} />
+          <Route path="lobby" element={<Lobby />} />
+          <Route path="lobby-creation" element={<LobbyCreation />} />
+        </Route>
+      </Routes>
+    </Router>
     </SocketContext.Provider>
   );
 }
