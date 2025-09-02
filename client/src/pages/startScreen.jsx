@@ -15,8 +15,7 @@ function StartScreen() {
         style={{ backgroundImage: `url(${getImage("startpage_background")})` }}
       />
 
-
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60" />
+     <div className="absolute inset-0 bg-gradient-to-t from-black/40" />
 
 
       <div className="relative z-10 grid grid-rows-[25vh_75vh] grid-cols-[1fr_3fr_1fr] items-center justify-center w-full text-center text-white p-5 h-screen">

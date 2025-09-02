@@ -2,6 +2,9 @@ import { BrowserRouter as Link, useNavigate } from 'react-router-dom';
 import '../Pages.css'
 import { SocketContext } from '../socket.io/context';
 import {  useContext, useEffect } from "react";
+import getImage from '../handlers/getImage';
+import Skeleton from '../pageComponents/skeleton';
+import Header from '../pageComponents/header'
 
 
 function HomePage() {
@@ -53,10 +56,11 @@ const Home = () =>{
 
 
   return (
-    
-    <div className="App">
-      <div></div>
-      <h1></h1>
+    <div className="relative min-h-screen w-full">
+             <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{ backgroundImage: `url(${getImage("homepage_background")})` }}
+                  />
        
       <div>
         {sessionStorage.getItem("adminPermission") === "true" && (
@@ -69,6 +73,7 @@ const Home = () =>{
       <button onClick={ Home } >Exit</button>
       </div>
     </div>
+   
   );
 }
 

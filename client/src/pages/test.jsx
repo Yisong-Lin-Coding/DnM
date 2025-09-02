@@ -21,6 +21,7 @@ function StartScreen() {
           <div className='bg-green-100'>
           HS
           </div>
+          
         </BodySkeleton>
 
     </Skeleton>
