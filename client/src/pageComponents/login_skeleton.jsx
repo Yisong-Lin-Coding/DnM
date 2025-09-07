@@ -1,10 +1,7 @@
-import getImage from "../handlers/getImage"
-
-
-export default function Login_skeleton({childern}){
+export default function Login_skeleton({ children }) {
+  return (
     <div>
-
+      {children}
     </div>
-
-
+  );
 }

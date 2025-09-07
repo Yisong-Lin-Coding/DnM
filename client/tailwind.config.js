@@ -8,10 +8,16 @@ module.exports = {
           DEFAULT: '#d4c2a1',
           dark: '#b8a07f',
         },
+        website: {
+          base:'#121313',
+          pur_highlight1:"#BC13FE",
+          pur_highlight2:"#BF00FF",
+          pur_highlight3:"#BB1EEA"
+        },
         action: {
           light: '#e0f7fa',
           DEFAULT: '#b2ebf2',
-          dark: '#80deea',
+          dark: '#80deea', 
         },
         adventure: {
           light: '#e8f5e9',
