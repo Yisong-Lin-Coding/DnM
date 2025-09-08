@@ -4,6 +4,7 @@ import getImage from "../handlers/getImage";
 import Header_Menu from "./header_menu";
 import Header_Mail from "./header_mail";
 import Header_PFP from "./header_pfp";
+import { Menu, Mail, CircleUserRound   } from 'lucide-react';
 
 /**
  * Header
@@ -75,7 +76,7 @@ export default function Header() {
   return (
     <div
       ref={headerRef}
-      className="bg-black w-full h-full text-white text-center flex justify-between p-0 items-stretch sticky top-0 border-white border-b z-50"
+      className="bg-website-default-900 w-full h-full text-white text-center flex justify-between p-0 items-stretch sticky top-0 border-website-specials-400 border-b z-50"
     >
       {/* Left: Menu */}
       <div className="relative inline-block group">
@@ -88,7 +89,7 @@ export default function Header() {
           aria-controls="menu-popover"
           onClick={() => togglePanel("menu")}
         >
-          <img src={getImage("header_menu")} alt="Open navigation menu" className="h-6" />
+          <Menu />
           <span className="sr-only">{isMenuOpen ? "Close menu" : "Open menu"}</span>
         </button>
 
@@ -121,7 +122,7 @@ export default function Header() {
               aria-controls="mail-popover"
               onClick={() => togglePanel("mail")}
             >
-              <img src={getImage("header_email")} alt="Open inbox" className="h-6" />
+              <Mail />
               <div className="h-4 w-4 bg-red-600 rounded-full absolute -bottom-1 -right-1 text-[10px] leading-4 text-center">
                 99+
               </div>
@@ -149,7 +150,7 @@ export default function Header() {
               aria-controls="profile-popover"
               onClick={() => togglePanel("profile")}
             >
-              <img src={getImage("header_pfp")} alt="Open profile menu" className="h-6" />
+              <CircleUserRound />
               <span className="sr-only">{isProfileOpen ? "Close profile menu" : "Open profile menu"}</span>
             </button>
 

@@ -4,7 +4,7 @@ client/build/
 server/.env
 client/.env
 node_modules/
-
+.qodo/
 /node_modules
 
 newsletter.jsx
