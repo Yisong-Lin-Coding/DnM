@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const itemSchema = new mongoose.Schema({
     name: { type: String, required: true },
     itemId: { type: String, required: true, unique: true },
+    durability: { type: Number, default: 100 },
     description: { type: String, required: true },
     tags: { type: [String], default: [] },
     rarity: { type: String, enum: ['common', 'uncommon', 'rare', 'epic', 'legendary'], default: 'common' },

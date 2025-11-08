@@ -2,12 +2,13 @@ const mongoose = require("mongoose");
 
 const invSchema = new mongoose.Schema({
     gp: { type: Number, default: 0 },
-    items: { 
-        itemname:{
-            type: [mongoose.Schema.Types.ObjectId], 
-            ref: 'Item', 
-            default: {}},
-        quantity: { type: Number, default: 0 }
+    items: {
+        type: Map,
+        of: new mongoose.Schema({
+            quantity: { type: Number, default: 1 },
+            durability: { type: Number, default: 100 },
+            equipped: { type: Boolean, default: false }
+        }, { _id: false })
     },
     equipment: {
         head: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },

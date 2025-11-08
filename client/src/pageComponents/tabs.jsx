@@ -55,6 +55,39 @@ Tabs.Tab = function Tab({ children, index, disabled = false, completed = false, 
   );
 };
 
+// Prev/Next Controls
+Tabs.Prev = function TabPrev({ min = 0, className = "", disabled: disabledProp, children }) {
+  const { activeTab, setActiveTab } = useContext(TabContext);
+  const disabled = disabledProp ?? (activeTab <= min);
+  return (
+    <button
+      type="button"
+      aria-label="Previous tab"
+      disabled={disabled}
+      onClick={() => !disabled && setActiveTab(Math.max(min, activeTab - 1))}
+      className={`p-2 rounded-full border border-website-specials-500 bg-website-default-800/80 text-website-default-100 hover:bg-website-default-700 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    >
+      {children ?? '<'}
+    </button>
+  );
+};
+
+Tabs.Next = function TabNext({ max, className = "", disabled: disabledProp, children }) {
+  const { activeTab, setActiveTab } = useContext(TabContext);
+  const disabled = disabledProp ?? (typeof max === 'number' ? activeTab >= max : true);
+  return (
+    <button
+      type="button"
+      aria-label="Next tab"
+      disabled={disabled}
+      onClick={() => !disabled && setActiveTab(Math.min(max, activeTab + 1))}
+      className={`p-2 rounded-full border border-website-specials-500 bg-website-default-800/80 text-website-default-100 hover:bg-website-default-700 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    >
+      {children ?? '>'}
+    </button>
+  );
+};
+
 // Tab Content Panels
 Tabs.Panels = function TabPanels({ children, className = "" }) {
   return (

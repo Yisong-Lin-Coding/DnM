@@ -8,22 +8,48 @@ const effectsAppliedSchema = require('./characterSheetRef/appliedEffects');
 const characterSchema   = new mongoose.Schema({
     playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', required: true },
     characterId: { type: String, required: true, unique: true },
+
     name: { type: String, required: true },
     class: { type: mongoose.Schema.Types.ObjectId,ref:'Class', required: true },
+    subclass: { type: mongoose.Schema.Types.ObjectId, ref: 'Subclass', default: null },
     race: { type: mongoose.Schema.Types.ObjectId, ref: 'Race', required: true },
     background: { type: mongoose.Schema.Types.ObjectId, ref: 'Background', required: true },
-    age: { type: Number, default: 18 },
-    sex: { type: String, required: true},
-    height: { type: String, required: true },
-    weight: { type: Number, required: true },
-    alignment: { type: String, required: true },
     level: { type: Number, default: 1 },
     experience: {current: { type: Number, default: 0 }, nextLevel: { type: Number, default: 300 }},
+
+    age: { years:{type:Number, required:true}, months:{type:Number, required:true}, days:{type:String, required:true} },
+    gender: { type: String, required: true},
+    model:{size: {type: String, required: true}, height: {type: String, required: true}, weight: {type: Number, required: true}},
+    alignment: { type: String, required: true },
+
+    customization: {
+      skinColor: { type: String, required: true},  
+      eyeColor: { type: String, required: true},
+      hairColor: { type: String, required: true},
+    },
+
+    stories: { 
+        longStory:{type:String, default: ""}, 
+        personality: {type:[String], default: []}, 
+        ideals: {type:[String], default: []}, 
+        flaws: {type:[String], default: []}, 
+        relationships: {
+            type:Map, 
+            of: new mongoose.Schema({
+                        relationship: { type: String, default: 'Friend' },
+                        description: { type: String, default: "Burger Owner" }
+                    }, { _id: false })
+                    ,  default: {}
+                }},
+    
     HP:{ current: {type:Number, default: 10}, max: {type:Number, default:10} },
     STA:{ current: {type:Number, default: 10}, max: {type:Number, default:10} },
     MP:{ current: {type:Number, default: 10}, max: {type:Number, default:10} },
+
     water: { current: {type:Number, default: 0}, max: {type:Number, default:8} },
     food:{ current: {type:Number, default: 0}, max: {type:Number, default:12}, },
+    
+
     stats: statSchema,
     AR:ARSchema,
     inv:invSchema,

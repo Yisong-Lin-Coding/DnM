@@ -14,6 +14,7 @@ import Lobby from './pages/lobby';
 import LobbyCreation from './pages/lobbyCreation';
 import LoreRule from './pages/loreRule';
 import Test from './pages/test'
+import Test2 from './pages/test2'
 
 import { SocketContext, socket } from './socket.io/context';
 import { useEffect } from 'react';
@@ -53,6 +54,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/test" element={<Test />} />
+        <Route path="/test2" element={<Test2 />} />
         <Route path="/ISK/:sessionID" element={<ProtectedRoute />}> 
           <Route path="home" element={<HomePage />} />
           <Route path="lore-rule" element={<LoreRule />} />

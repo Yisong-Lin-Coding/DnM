@@ -1,10 +1,7 @@
 import React, { useState, createContext, useContext } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
-// Context for sharing card state between components
 const CardContext = createContext();
-
-// Main Card Component (like your Skeleton)
 export function Card({ children, className = "", defaultOpen = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   
@@ -16,8 +13,6 @@ export function Card({ children, className = "", defaultOpen = false }) {
     </CardContext.Provider>
   );
 }
-
-// Card Header Component
 Card.Header = function CardHeader({ children, className = "" }) {
   const { isOpen, setIsOpen } = useContext(CardContext);
   
@@ -35,8 +30,6 @@ Card.Header = function CardHeader({ children, className = "" }) {
     </div>
   );
 };
-
-// Card Content Component
 Card.Content = function CardContent({ children, className = "" }) {
   const { isOpen } = useContext(CardContext);
   
@@ -48,8 +41,6 @@ Card.Content = function CardContent({ children, className = "" }) {
     </div>
   );
 };
-
-// Card Title Component (optional, for consistent styling)
 Card.Title = function CardTitle({ children, className = "" }) {
   return (
     <h3 className={`font-semibold text-website-default-100 text-lg ${className}`}>
@@ -65,8 +56,6 @@ Card.Description = function CardDescription({ children, className = "" }) {
     </h3>
   );
 };
-
-// Card Actions Component (for buttons in header)
 Card.Actions = function CardActions({ children, className = "" }) {
   return (
     <div className={`flex gap-2 ml-4 ${className}`} onClick={(e) => e.stopPropagation()}>

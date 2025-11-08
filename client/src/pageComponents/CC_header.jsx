@@ -341,16 +341,17 @@ export default function CC_Header(){
                       </Card.Description>
                     </Card.Header>
                     <Card.Content>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         <div className='flex flex-col'>
                           <label className="text-website-default-300 text-sm">Size Scale</label>
                         <select 
                         name="Size" 
                         id="size" 
+                        value={character.model.size || ""} 
                         onChange={(e) => updateCharacter('model', { ...character.model, size: e.target.value })
                                   }
                         className='rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400'>
-                          <option value="" disabled>Select size</option>
+                          <option value="" disabled>Select size</option>ase
                           <option value="tiny">Tiny (1ft-2ft)</option>
                           <option value="small">Small (2ft-4ft)</option>
                           <option value="medium">Medium (4ft-8ft)</option>
