@@ -1,5 +1,7 @@
 import Skeleton from "../pageComponents/skeleton"
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createDefaultCharacter } from '../data/characterDefaults';
+import { genderOptions } from "../data/genderOptions";
 import { Tabs } from '../pageComponents/tabs'
 import { CircleUser, Shuffle, ArrowBigLeftDash, ArrowBigRightDash  } from 'lucide-react';
 import { Card } from "../pageComponents/card";
@@ -11,60 +13,9 @@ export default function Test2(){
   const [isEditingHeight, setIsEditingHeight] = useState(false);
   const [heightDraft, setHeightDraft] = useState('');
 
-  const genderOptions = useMemo(() => ([
-    'Male',
-    'Female',
-    'Non-binary',
-    'Agender',
-    'Genderfluid',
-    'Femboy',
-    'Filipino',
-    'Stickman',
-    'Fruit tart',
-    'Fucked up Rubik cube',
-    'Prefer not to say'
-  ]), []);
+  const genderOptionsList = genderOptions;
 
-  const [character, setCharacterState] = useState({
-    name: '',
-    age: { years: '', month: '', day: '' },
-    gender: '',
-    model: { size:'', height:'', weight:''},
-    alignment: '',
-
-    customization: {
-      skinColor: '',  
-      eyeColor: '',
-      hairColor: '',},
-    
-    stories: { longStory:"", personality: [], ideals: [], flaws: [], relationships: {}},
-    
-    race: '',
-    class: '',
-    subclass: '',
-    background: '',
-    
-    stats:{str:"", dex:"", con:"", int:"", wis:"", cha:"", luck:""},
-
-    inv:{
-      gp:0,
-       items:{}, 
-       equipment:{
-        head:[], body:[], legs:[], feet:[], arms:[], hands:[], weapon:[], fingers:[], neck:[], trinkets:[]
-      }
-    },
-
-    skills:{
-      active:{},
-      passive:{},
-      proficiencies:{},
-      expertise:{},
-      mastary:{},
-      languages:{}
-    },
-    effects:{},
-    level: 1
-  });
+  const [character, setCharacterState] = useState(() => createDefaultCharacter());
 
   const setCharacter = (pathOrUpdater, value) => {
     if (typeof pathOrUpdater === 'function') {
@@ -86,9 +37,9 @@ export default function Test2(){
   };
 
   const randomizeGender = () => {
-    if (!genderOptions.length) return;
-    const idx = Math.floor(Math.random() * genderOptions.length);
-    setCharacter('gender', genderOptions[idx]);
+    if (!genderOptionsList.length) return;
+    const idx = Math.floor(Math.random() * genderOptionsList.length);
+    setCharacter('gender', genderOptionsList[idx]);
   };
 
   const birthYear = useMemo(() => {
@@ -160,10 +111,10 @@ export default function Test2(){
     return dobDate.toLocaleDateString(undefined, { weekday: 'long' });
   }, [dobDate]);
 
-  const genderSelectValue = useMemo(() => {
+  const genderSelectValue = () => {
     if (!character.gender) return '';
-    return genderOptions.includes(character.gender) ? character.gender : 'Custom';
-  }, [character.gender, genderOptions]);
+    return genderOptionsList.includes(character.gender) ? character.gender : 'Custom';
+  }, [character.gender]; 
 
   const formatHeight = (inches) => {
     const n = parseInt(inches, 10);
@@ -366,7 +317,7 @@ export default function Test2(){
                                 className="rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400"
                               >
                                 <option value="" disabled>Select gender</option>
-                                {genderOptions.map((g) => (
+                                {genderOptionsList.map((g) => (
                                   <option key={g} value={g}>{g}</option>
                                 ))}
                                 <option value="Custom">Custom</option>
