@@ -34,13 +34,32 @@ export default function Test2(){
     newPersonalityTraits[index] = value;
     setPersonalityTraits(newPersonalityTraits);
   };
+
+  const removeRelationship = (id) =>{
+    const updated = delete relationships[id];
+    setRelationships(prev=>{
+      const updated = { ...prev };
+    delete updated[id];
+    return updated;
+    })
+  }
   
   const addPersonalityTraits = () => {
     setPersonalityTraits([...personalityTraits, ""]);
   };
 
+const addRelationship = () =>{
+  const id = Date.now().toString();
+  setRelationships(prev=>{
+    const updated={
+      ...prev,
+      [id]:{}
+    }
+    return updated
+  })
 
-  // Optional: Remove an input
+}
+
   const removePersonalityTraits = (index) => {
     setPersonalityTraits(personalityTraits.filter((_, i) => i !== index));
   };
@@ -731,7 +750,7 @@ const relationshipFormatting = (relationshipsObj) => {
                                         value={value}
                                         onChange={(e) => {
                                           handleChange(index, e.target.value)
-                                          setCharacter('stories.personalityTraits', personalityTraits)
+                                          setCharacter('stories.personality', personalityTraits)
                                         }}
                                         onBlur={()=>setCharacter('stories.personality', personalityTraits)}
                                         placeholder={`Trait #${index + 1}`}
@@ -806,8 +825,9 @@ const relationshipFormatting = (relationshipsObj) => {
                               </Card.Description>
                             </Card.Header>
                             <Card.Content>
-                                <div className="space-y-4 w-full">
+                                <div className="space-y-2 w-full flex flex-col justify-center">
                                   {Object.entries(relationships).map(([key, value],id) => (
+                                    <div className="grid grid-cols-[1fr_auto] gap-4 pb-4" key={key}>
                                     <div key={id} className="grid grid-rows-[auto_1fr] grid-cols-1 md:grid-cols-2 items-center gap-x-4">
                                       <div className="flex flex-col">
                                         <label className="text-sm text-website-default-300 mb-1">Relationship Name</label>
@@ -825,6 +845,7 @@ const relationshipFormatting = (relationshipsObj) => {
                                         <input 
                                         className="w-full flex-1 px-3 py-2 border border-website-specials-500 rounded bg-website-default-900 focus:outline-none focus:ring-2 focus:ring-website-highlights-400"
                                         value={value.relationship || ''}
+                                        placeholder="Friend, Sibling, Rival..."
                                         onChange={(e)=>{
                                           changeRelationships(key, 'relationship', e.target.value)
                                         }}
@@ -835,15 +856,35 @@ const relationshipFormatting = (relationshipsObj) => {
                                         <textarea 
                                         className="flex-1 px-3 py-2 h-full border border-website-specials-500 rounded bg-website-default-900 focus:outline-none focus:ring-2 focus:ring-website-highlights-400"
                                         value={value.description || ''}
+                                        placeholder="He works at the local tavern as a bartender..."
                                         onChange={(e)=>{
                                           changeRelationships(key, 'description', e.target.value)
                                         }}
                                         />
                                        </div>
                                     </div>
+                                    { Object.keys(relationships).length > 1 &&( 
+                                    <button
+                                      onClick={()=>{
+                                        removeRelationship(key)
+                                      }}
+                                      className="mt-8 px-2 py-1 text-white bg-website-default-500 rounded hover:bg-website-specials-500 transition"
+                                    >
+                                      X
+                                    </button>
+                                    )}
+                                    </div>
 
+                                    
                                   ))}
-                                        
+                                      <button
+                                        className="mt-8 px-2 py-1 text-white bg-website-specials-500 rounded hover:bg-website-specials-700 transition"
+                                      onClick={()=>{
+                                        addRelationship()
+                                      }}
+                                      >
+                                        Add Relationship
+                                        </button>  
                                   </div>
                                     
                             </Card.Content>
