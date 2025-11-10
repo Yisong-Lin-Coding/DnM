@@ -6,15 +6,17 @@ import getImage from '../handlers/getImage';
 import Skeleton from '../pageComponents/skeleton';
 import Header from '../pageComponents/header'
 
+ const sessionID=() => sessionStorage.getItem("session_ID")
+
 
 function HomePage() {
   const socket = useContext(SocketContext);
 
 
   const navigate = useNavigate();
-  const ChacterSelect = () => {
+  const CharacterMenu = () => {
     
-    navigate('/character-selection'); 
+    navigate(`/ISK/${sessionID()}/character-menu`); 
 } 
 
 const ChacterCreation = () => {
@@ -27,11 +29,6 @@ const Home = () =>{
 }
   let adminPermission = sessionStorage.getItem("adminPermission")
 
-  const AdminLoad = ()=>{
-    const sessionID = sessionStorage.getItem("session_ID")
-    navigate(`/ISK/${sessionID}/admin`)
-
-  }
 
     useEffect(()=>{
 
@@ -60,19 +57,23 @@ const Home = () =>{
              <div
                     className="absolute inset-0 bg-cover bg-center"
                     style={{ backgroundImage: `url(${getImage("homepage_background")})` }}
-                  />
-       
-      <div>
-        {sessionStorage.getItem("adminPermission") === "true" && (
-        <button onClick={ AdminLoad }>
-          Admin Page
-        </button>
-      )}
-      <button onClick={ ChacterCreation }>Join new lobby</button>
-      <button onClick={ ChacterSelect } >Chacter Selection</button>
-      <button onClick={ Home } >Exit</button>
+                  >
+       <div className="relative z-10 grid grid-rows-[25vh_75vh] grid-cols-[1fr_3fr_1fr] items-center justify-center w-full text-center text-white p-5 h-screen">
+
+
+
+
+        <div className="col-start-2 row-start-2 self-start w-[40%] mx-auto h-[55%] flex flex-col justify-between items-center p-8 space-y-4 rounded-lg bg-black/60 text-lg"> 
+          <button onClick={CharacterMenu}>Lore</button> 
+          <button onClick={CharacterMenu}>Campaign</button> 
+          <button onClick={CharacterMenu}>Characters</button>
+          <button>Exit</button>
+        </div>
+      
       </div>
-    </div>
+      </div>
+      </div>
+
    
   );
 }

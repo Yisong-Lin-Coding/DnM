@@ -6,15 +6,8 @@ import Header_Mail from "./header_mail";
 import Header_PFP from "./header_pfp";
 import { Menu, Mail, CircleUserRound   } from 'lucide-react';
 
-/**
- * Header
- * - Consolidates panel state into one `openPanel` value: 'menu' | 'mail' | 'profile' | null
- * - Accessible triggers (buttons) with aria-expanded/controls/haspopup
- * - Closes on outside click, Escape key, and on route change
- * - Uses className instead of class; adds pointer-events handling on hidden popovers
- * - Derives a robust title from the current URL
- */
-export default function Header() {
+
+export default function Header({ className = "" }) {
   // 'menu' | 'mail' | 'profile' | null
   const [openPanel, setOpenPanel] = useState(null);
   const locate = useLocation();
@@ -76,7 +69,7 @@ export default function Header() {
   return (
     <div
       ref={headerRef}
-      className="bg-website-default-900 w-full h-full text-white text-center flex justify-between p-0 items-stretch sticky top-0 border-website-specials-400 border-b z-50"
+      className={`bg-website-default-900 w-full h-full text-white text-center flex justify-between p-0 items-stretch sticky top-0 border-website-specials-400 border-b z-50 ${className}`}
     >
       {/* Left: Menu */}
       <div className="relative inline-block group">

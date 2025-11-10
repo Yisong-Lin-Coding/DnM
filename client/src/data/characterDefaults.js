@@ -8,6 +8,7 @@ export const defaultCharacter = {
     skinColor: '',
     eyeColor: '',
     hairColor: '',
+    additionalTraits: '',
   },
   stories: { longStory: '', personality: [], ideals: [], flaws: [], relationships: {} },
   race: '',

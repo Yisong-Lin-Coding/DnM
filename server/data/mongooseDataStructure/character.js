@@ -42,7 +42,7 @@ const characterSchema   = new mongoose.Schema({
                     ,  default: {}
                 }},
     
-    HP:{ current: {type:Number, default: 10}, max: {type:Number, default:10} },
+    HP:{ current: {type:Number, default: 10}, max: {type:Number, default:10}, temp: {type:Number, default:0} },
     STA:{ current: {type:Number, default: 10}, max: {type:Number, default:10} },
     MP:{ current: {type:Number, default: 10}, max: {type:Number, default:10} },
 

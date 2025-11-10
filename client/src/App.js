@@ -5,21 +5,14 @@ import ProtectedRoute from './handlers/protectedRoutes';
 
 import Login from './pages/login';
 import StartScreen from './pages/startScreen';
-import CharacterCreation from './pages/characterCreation';
-import CharacterSelection from './pages/characterSelection';
-import Game from './pages/game';
 import HomePage from './pages/homePage';
 import SignUp from './pages/signUp';
-import Lobby from './pages/lobby';
-import LobbyCreation from './pages/lobbyCreation';
-import LoreRule from './pages/loreRule';
 import Test from './pages/test'
 import Test2 from './pages/test2'
+import CharacterMenu from './pages/characters/characterMenu';
 
 import { SocketContext, socket } from './socket.io/context';
 import { useEffect } from 'react';
-
-import OneCCCustomize from './pages/chacterCreatorSubfolder/1_CC_Custoumize';
 
 
 
@@ -57,13 +50,7 @@ function App() {
         <Route path="/test2" element={<Test2 />} />
         <Route path="/ISK/:sessionID" element={<ProtectedRoute />}> 
           <Route path="home" element={<HomePage />} />
-          <Route path="lore-rule" element={<LoreRule />} />
-          <Route path="character-selection" element={<CharacterSelection />} />
-          <Route path="character-creation" element={<CharacterCreation />} />
-          <Route path="character-creation/customize" element={<OneCCCustomize />} />
-          <Route path="game" element={<Game socket={socket} />} />
-          <Route path="lobby" element={<Lobby />} />
-          <Route path="lobby-creation" element={<LobbyCreation />} />
+          <Route path="character-menu" element={<CharacterMenu />} />
         </Route>
       </Routes>
     </Router>
