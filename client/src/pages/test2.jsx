@@ -912,6 +912,32 @@ const relationshipFormatting = (relationshipsObj) => {
                     />
                   </div>
                 </div>
+
+                <div className='space-y-8 flex flex-col text-left'>
+                  <div>
+                <h1 className="text-2xl font-semibold mb-4">Base Class</h1>
+                      <div className="grid grid-cols-1 gap-6">
+                      <Card className='bg-website-default-800 border-website-specials-500'>
+                            <Card.Header className=''>
+                              <Card.Title className='text-website-default-100'>
+                                      Class
+                              </Card.Title>
+                              <Card.Description className='text-website-default-300'>
+                                  What class is your character?
+                              </Card.Description>
+                            </Card.Header>
+                            <Card.Content>
+
+
+                            </Card.Content>
+                    </Card>
+                    </div>
+
+
+                    </div>
+                    </div>
+
+
                 </div>
             </Tabs.Panel>
             <Tabs.Panel index={2} className='bg-website-default-900 min-h-screen grid grid-cols-[1fr_2fr_1fr]'>
@@ -930,6 +956,21 @@ const relationshipFormatting = (relationshipsObj) => {
                     />
                   </div>
                 </div>
+                    <Card className='bg-website-default-800 border-website-specials-500'>
+                            <Card.Header className=''>
+                              <Card.Title className='text-website-default-100'>
+                                      
+                              </Card.Title>
+                              <Card.Description className='text-website-default-300'>
+                                
+                              </Card.Description>
+                            </Card.Header>
+                            <Card.Content>
+
+
+                            </Card.Content>
+                    </Card>
+
 
                 </div>
             </Tabs.Panel>
@@ -949,6 +990,21 @@ const relationshipFormatting = (relationshipsObj) => {
                     />
                   </div>
                 </div>
+
+                <Card className='bg-website-default-800 border-website-specials-500'>
+                            <Card.Header className=''>
+                              <Card.Title className='text-website-default-100'>
+                                      
+                              </Card.Title>
+                              <Card.Description className='text-website-default-300'>
+                                
+                              </Card.Description>
+                            </Card.Header>
+                            <Card.Content>
+
+
+                            </Card.Content>
+                    </Card>
                 </div>
             </Tabs.Panel>
             <Tabs.Panel index={4} className='bg-website-default-900 min-h-screen grid grid-cols-[1fr_2fr_1fr]'>
@@ -967,6 +1023,21 @@ const relationshipFormatting = (relationshipsObj) => {
                     />
                   </div>
                 </div>
+
+                <Card className='bg-website-default-800 border-website-specials-500'>
+                            <Card.Header className=''>
+                              <Card.Title className='text-website-default-100'>
+                                      
+                              </Card.Title>
+                              <Card.Description className='text-website-default-300'>
+                                
+                              </Card.Description>
+                            </Card.Header>
+                            <Card.Content>
+
+
+                            </Card.Content>
+                    </Card>
                 </div>
             </Tabs.Panel>
             <Tabs.Panel index={5} className='bg-website-default-900 min-h-screen grid grid-cols-[1fr_2fr_1fr]'>
@@ -985,6 +1056,21 @@ const relationshipFormatting = (relationshipsObj) => {
                     />
                   </div>
                 </div>
+
+                <Card className='bg-website-default-800 border-website-specials-500'>
+                            <Card.Header className=''>
+                              <Card.Title className='text-website-default-100'>
+                                      
+                              </Card.Title>
+                              <Card.Description className='text-website-default-300'>
+                                
+                              </Card.Description>
+                            </Card.Header>
+                            <Card.Content>
+
+
+                            </Card.Content>
+                    </Card>
                 </div>
             </Tabs.Panel>
             <Tabs.Panel index={6} className='bg-website-default-900 min-h-screen grid grid-cols-[1fr_2fr_1fr]'>
@@ -1006,6 +1092,22 @@ const relationshipFormatting = (relationshipsObj) => {
                   Print Character
                   </button>
                 </div>
+
+
+                <Card className='bg-website-default-800 border-website-specials-500'>
+                            <Card.Header className=''>
+                              <Card.Title className='text-website-default-100'>
+                                      
+                              </Card.Title>
+                              <Card.Description className='text-website-default-300'>
+                                
+                              </Card.Description>
+                            </Card.Header>
+                            <Card.Content>
+
+
+                            </Card.Content>
+                    </Card>
                 </div>
             </Tabs.Panel>
           </Tabs.Panels>
