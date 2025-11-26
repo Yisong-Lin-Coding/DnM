@@ -36,9 +36,18 @@ export default function Test2(){
     newPersonalityTraits[index] = value;
     setPersonalityTraits(newPersonalityTraits);
   };
+
+
+  const playerID = localStorage.getItem("player_ID")
+
   const characterCreation = ()=>{
-    socket.emit("playerData_saveCharacter",{character}, (response) =>{
-                        console.log(response.message)})
+    socket.emit("playerData_saveCharacter",{character,playerID}, (response) =>{
+        if(!response){
+            console.log("no response :(")
+        }
+        console.log(response.message)
+        console.log(response)
+    })
   }
 
   const removeRelationship = (id) =>{

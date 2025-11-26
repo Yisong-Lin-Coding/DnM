@@ -7,17 +7,15 @@ const effectsAppliedSchema = require('./characterSheetRef/appliedEffects');
 
 const characterSchema   = new mongoose.Schema({
     playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', required: true },
-    characterId: { type: String, required: true, unique: true },
-
     name: { type: String, required: true },
-    class: { type: mongoose.Schema.Types.ObjectId,ref:'Class', required: true },
+    class: { type: mongoose.Schema.Types.ObjectId,ref:'Class', default: null },
     subclass: { type: mongoose.Schema.Types.ObjectId, ref: 'Subclass', default: null },
-    race: { type: mongoose.Schema.Types.ObjectId, ref: 'Race', required: true },
-    background: { type: mongoose.Schema.Types.ObjectId, ref: 'Background', required: true },
+    race: { type: mongoose.Schema.Types.ObjectId, ref: 'Race', default: null },
+    background: { type: mongoose.Schema.Types.ObjectId, ref: 'Background', default: null },
     level: { type: Number, default: 1 },
     experience: {current: { type: Number, default: 0 }, nextLevel: { type: Number, default: 300 }},
 
-    age: { years:{type:Number, required:true}, months:{type:Number, required:true}, days:{type:String, required:true} },
+    age: { years:{type:Number, required:true}, month:{type:Number, required:true}, day:{type:String, required:true} },
     gender: { type: String, required: true},
     model:{size: {type: String, required: true}, height: {type: String, required: true}, weight: {type: Number, required: true}},
     alignment: { type: String, required: true },

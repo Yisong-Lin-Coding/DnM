@@ -1,4 +1,3 @@
-const Player = require(`../data/mongooseDataStructure/player`)
 const Character = require(`../data/mongooseDataStructure/character`)
 const path = require("path");
 
@@ -13,7 +12,7 @@ module.exports = (socket) => {
         }
         catch(ERR){
             console.log(`ERROR @ ${__filename} ${Date.Now} : ${ERR}`)
-            callback({success:false, error:ERR})
+            callback({success:false, message:ERR})
         }
     })
 
