@@ -9,7 +9,9 @@ import HomePage from './pages/homePage';
 import SignUp from './pages/signUp';
 import Test from './pages/test'
 import Test2 from './pages/test2'
+
 import CharacterMenu from './pages/characters/characterMenu';
+import CharacterCreation from './pages/characters/characterCreation'
 
 import { SocketContext, socket } from './socket.io/context';
 import { useEffect } from 'react';
@@ -51,6 +53,7 @@ function App() {
         <Route path="/ISK/:sessionID" element={<ProtectedRoute />}> 
           <Route path="home" element={<HomePage />} />
           <Route path="character-menu" element={<CharacterMenu />} />
+          <Route path="character-creation" element ={<CharacterCreation />} />
         </Route>
       </Routes>
     </Router>

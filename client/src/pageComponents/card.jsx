@@ -51,7 +51,7 @@ Card.Title = function CardTitle({ children, className = "" }) {
 
 Card.Description = function CardDescription({ children, className = "" }) {
   return (
-    <h3 className={`text-website-default-100 text-xs ${className}`}>
+    <h3 className={`text-website-default-300 text-xs ${className}`}>
       {children}
     </h3>
   );
