@@ -41,6 +41,7 @@ export default function Test2(){
   const playerID = localStorage.getItem("player_ID")
 
   const characterCreation = ()=>{
+    console.log({character,playerID})
     socket.emit("playerData_saveCharacter",{character,playerID}, (response) =>{
         if(!response){
             console.log("no response :(")
@@ -504,12 +505,12 @@ const relationshipFormatting = (relationshipsObj) => {
                                             let val = Number(e.target.value);
                                           if (val < minHeightIn) 
                                             {val = minHeightIn
-                                              console.log(val)
+                                              
                                             }
                                 
                                           else if (val > maxHeightIn) 
                                             {val = maxHeightIn
-                                              console.log(val)
+                                              
                                             }
                                           setIsEditingHeight(false);
                                           setCharacter('model.height', val);

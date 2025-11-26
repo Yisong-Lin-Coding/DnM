@@ -1,5 +1,6 @@
 export const defaultCharacter = {
   name: '',
+  _id:"",
   age: { years: '', month: '', day: '' },
   gender: '',
   model: { size: '', height: '', weight: '' },
@@ -42,6 +43,7 @@ export const defaultCharacter = {
   },
   effects: {},
   level: 1,
+  editing:"true"
 };
 
 export function createDefaultCharacter() {

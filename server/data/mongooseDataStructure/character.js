@@ -7,7 +7,8 @@ const effectsAppliedSchema = require('./characterSheetRef/appliedEffects');
 
 const characterSchema   = new mongoose.Schema({
     playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', required: true },
-    name: { type: String, required: true },
+    characterId: {type: mongoose.Schema.Types.ObjectId, required:true},
+    name: { type: String, default: null },
     class: { type: mongoose.Schema.Types.ObjectId,ref:'Class', default: null },
     subclass: { type: mongoose.Schema.Types.ObjectId, ref: 'Subclass', default: null },
     race: { type: mongoose.Schema.Types.ObjectId, ref: 'Race', default: null },
@@ -15,15 +16,15 @@ const characterSchema   = new mongoose.Schema({
     level: { type: Number, default: 1 },
     experience: {current: { type: Number, default: 0 }, nextLevel: { type: Number, default: 300 }},
 
-    age: { years:{type:Number, required:true}, month:{type:Number, required:true}, day:{type:String, required:true} },
-    gender: { type: String, required: true},
-    model:{size: {type: String, required: true}, height: {type: String, required: true}, weight: {type: Number, required: true}},
-    alignment: { type: String, required: true },
+    age: { years:{type:Number, default: null}, month:{type:Number, default: null}, day:{type:String, default: null} },
+    gender: { type: String, default: null},
+    model:{size: {type: String, default: null}, height: {type: String, default: null}, weight: {type: Number, default: null}},
+    alignment: { type: String, default: null },
 
     customization: {
-      skinColor: { type: String, required: true},  
-      eyeColor: { type: String, required: true},
-      hairColor: { type: String, required: true},
+      skinColor: { type: String, default: null},  
+      eyeColor: { type: String, default: null},
+      hairColor: { type: String, default: null},
     },
 
     stories: { 
