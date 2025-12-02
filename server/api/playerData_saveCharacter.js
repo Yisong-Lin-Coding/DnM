@@ -2,7 +2,6 @@ const Character = require(`../data/mongooseDataStructure/character`)
 const Player = require('../data/mongooseDataStructure/player')
 const path = require("path");
 const mongoose = require("mongoose")
-const mongooseDB = require(`mongooseDB`)
 
 module.exports = (socket) => {
 
