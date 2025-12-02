@@ -19,7 +19,7 @@ const invSchema = new mongoose.Schema({
         hands: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
         weapon: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
         fingers: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
-        neck: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', default: [] },
+        neck: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
         trinkets: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
     }
 

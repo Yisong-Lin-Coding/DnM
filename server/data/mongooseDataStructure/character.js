@@ -7,7 +7,6 @@ const effectsAppliedSchema = require('./characterSheetRef/appliedEffects');
 
 const characterSchema   = new mongoose.Schema({
     playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', required: true },
-    characterId: {type: mongoose.Schema.Types.ObjectId, required:true},
     name: { type: String, default: null },
     class: { type: mongoose.Schema.Types.ObjectId,ref:'Class', default: null },
     subclass: { type: mongoose.Schema.Types.ObjectId, ref: 'Subclass', default: null },

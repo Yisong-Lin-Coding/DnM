@@ -14,11 +14,50 @@ module.exports = (socket) => {
             }
 
             const hasId = character._id && mongoose.isValidObjectId(character._id);
+
+            character.playerID = playerID
+            
+            let characterCleaner = (obj) =>{
+
+                if(Array.isArray(obj)){
+                    return obj
+                    .map(attribute => characterCleaner(attribute))
+                    .filter(attribute => attribute !== null)
+
+                }
+                if (obj !== null && typeof obj === "object") {
+                    const result = {};
+                    for (const key in obj) {
+                    const value = cleanObject(obj[key]); // recurse into sub-objects
+
+                    // Delete if empty string
+                    if (value === "") continue;
+
+                    // Delete empty array
+                    if (Array.isArray(value) && value.length === 0) continue;
+
+                    // Delete empty object
+                    if (typeof value === "object" && value !== null && Object.keys(value).length === 0)
+                        continue;
+
+                    result[key] = value;
+                    }
+                    return result;
+                }
+
+                // Base case: return the value as-is
+                return obj;
+
+            }
+
+            characterCleaner(character)
+
             let savedCharacter;
 
             if (hasId) {
                 // --- Character Exists? ---
                 const exists = await Character.findById(character._id);
+                
 
                 if (exists) {
                     // --- Update Existing Character ---
