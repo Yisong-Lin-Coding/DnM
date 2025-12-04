@@ -50,7 +50,7 @@ module.exports = (socket) => {
 
             }
 
-            characterCleaner(character)
+            const cleanedCharacter = characterCleaner(character)
 
             let savedCharacter;
 
@@ -62,17 +62,17 @@ module.exports = (socket) => {
                 if (exists) {
                     // --- Update Existing Character ---
                     savedCharacter = await Character.findByIdAndUpdate(
-                        character._id,
-                        character,
+                        cleanedCharacter._id,
+                        cleanedCharacter,
                         { new: true }
                     );
                 } else {
                     // --- ID provided but not found → create new ---
-                    savedCharacter = await Character.create(character);
+                    savedCharacter = await Character.create(cleanedCharacter);
                 }
             } else {
                 // --- No ID Provided → create new ---
-                savedCharacter = await Character.create(character);
+                savedCharacter = await Character.create(cleanedCharacter);
             }
 
             callback({ success: true, character: savedCharacter });
