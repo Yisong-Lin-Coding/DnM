@@ -51,6 +51,7 @@ module.exports = (socket) => {
             }
 
             const cleanedCharacter = characterCleaner(character)
+            cleanedCharacter.playerId = playerID;
 
             let savedCharacter;
 
