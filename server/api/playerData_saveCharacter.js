@@ -28,7 +28,7 @@ module.exports = (socket) => {
                 if (obj !== null && typeof obj === "object") {
                     const result = {};
                     for (const key in obj) {
-                    const value = cleanObject(obj[key]); // recurse into sub-objects
+                    const value = characterCleaner(obj[key]); // recurse into sub-objects
 
                     // Delete if empty string
                     if (value === "") continue;
