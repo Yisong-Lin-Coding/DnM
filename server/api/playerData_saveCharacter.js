@@ -50,10 +50,15 @@ socket.on("playerData_saveCharacter", async (data, callback) => {
         }
 
         // --- Add character to player's characters array ---
-        await Player.findByIdAndUpdate(
+        try{await Player.findByIdAndUpdate(
             playerID,
             { $addToSet: { characters: savedCharacter._id } }
-        );
+        )}
+        catch(err){
+                   console.error("ERROR SAVING PLAYER CHARACTER DATA:", err);
+                 callback({ success: false, message: err.message || "Server error" });
+
+        }
 
         // --- Respond to client ---
         callback({ success: true, character: savedCharacter });
