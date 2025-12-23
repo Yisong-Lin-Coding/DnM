@@ -1,3 +1,10 @@
+const Character = require(`../data/mongooseDataStructure/character`)
+const Player = require('../data/mongooseDataStructure/player')
+const path = require("path");
+const mongoose = require("mongoose")
+
+
+module.exports = (socket) => {
 socket.on("playerData_saveCharacter", async (data, callback) => {
     const { character, playerID } = data;
 
@@ -68,3 +75,4 @@ socket.on("playerData_saveCharacter", async (data, callback) => {
         callback({ success: false, message: err.message || "Server error" });
     }
 });
+}
