@@ -13,10 +13,7 @@ module.exports = (socket) => {
                 return callback({ success: false, message: "Player not found" });
             }
 
-            await Player.findByIdAndUpdate(
-                playerID,
-                { $addToSet: { characters: savedCharacter._id } }
-                );
+      
 
             const hasId = character._id && mongoose.isValidObjectId(character._id);
 
@@ -87,6 +84,15 @@ module.exports = (socket) => {
             console.log("ERROR saving character:", ERR);
             callback({ success: false, message: "Server error", error: ERR });
         }
+
+
+
+      await Player.findByIdAndUpdate(
+                playerID,
+                { $addToSet: { characters: savedCharacter._id } }
+                );
+
+
     })
 
 
