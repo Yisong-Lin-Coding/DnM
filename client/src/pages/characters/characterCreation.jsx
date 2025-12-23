@@ -1104,7 +1104,7 @@ const relationshipFormatting = (relationshipsObj) => {
                       onChange={(e) => setCharacter('name', e.target.value)}
                     />
                   </div>
-                  <button onClick={ characterCreation()} >
+                  <button onClick={ characterCreation} >
                   Save Character
                   </button>
                 </div>

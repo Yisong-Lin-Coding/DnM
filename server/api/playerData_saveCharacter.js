@@ -13,6 +13,11 @@ module.exports = (socket) => {
                 return callback({ success: false, message: "Player not found" });
             }
 
+            await Player.findByIdAndUpdate(
+                playerID,
+                { $addToSet: { characters: savedCharacter._id } }
+                );
+
             const hasId = character._id && mongoose.isValidObjectId(character._id);
 
             character.playerID = playerID

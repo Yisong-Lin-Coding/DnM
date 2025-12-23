@@ -1,6 +1,5 @@
 export const defaultCharacter = {
   name: '',
-  _id:"",
   age: { years: '', month: '', day: '' },
   gender: '',
   model: { size: '', height: '', weight: '' },
