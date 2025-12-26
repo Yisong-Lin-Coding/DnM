@@ -8,7 +8,7 @@ socket.on("playerData_logOn", async (data) => {
     if(data && data.playerID){
         await Player.findByIdAndUpdate(data.playerID, {
             isActive: true,
-            lastLogOn: new Date()
+            lastLogin: new Date()
         });
     }
 });
