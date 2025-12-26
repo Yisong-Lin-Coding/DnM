@@ -36,6 +36,11 @@ function App() {
   });
 
   return () => {
+
+    if(localStorage.getItem("player_ID")){
+      socket.emit("playerData_logOff", { playerID: localStorage.getItem("player_ID") });
+    }
+
     socket.off("connect");
   };
 }, []);

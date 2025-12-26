@@ -18,6 +18,7 @@ function Login() {
                     console.log("Login successful, user ID:", response.userID);
                     localStorage.setItem("player_ID", response.userID.toString());
                     console.log(localStorage.getItem("player_ID"));
+                    socket.emit("playerData_logOn", { playerID: localStorage.getItem("player_ID") });
 
                     const playerID = response.userID.toString()
                     const sessionID = sessionStorage.getItem("session_ID")
