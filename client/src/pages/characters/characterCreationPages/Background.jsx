@@ -1,13 +1,31 @@
 import React from 'react';
 import { Card } from '../../../pageComponents/card';
+import { useContext, useEffect, useState } from "react";
+import { SocketContext } from "../../../socket.io/context";
 
 export function Background({ values, onChange }) {
-  const BACKGROUNDS = [
-    { id: 'acolyte', name: 'Acolyte' },
-    { id: 'soldier', name: 'Soldier' },
-    { id: 'outlander', name: 'Outlander' },
-    { id: 'sage', name: 'Sage' },
-  ];
+
+
+
+
+    const socket = useContext(SocketContext);
+    const [background, setBackground] = useState([]);
+  
+  useEffect(() => {
+    socket.emit(
+      'database_query',
+      {
+        collection: 'classes',
+        operation: 'findAll',
+      },
+      (response) => {
+        if (response.success) {
+          setClasses(response.data);
+        }
+      }
+    );
+  }, []);
+  
 
   const selected = values?.background || '';
   const emit = (partial) => { if (typeof onChange === 'function') onChange(partial); };

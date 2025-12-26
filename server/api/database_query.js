@@ -3,6 +3,7 @@ const Class = require('../data/mongooseDataStructure/class');
 const Race = require('../data/mongooseDataStructure/race');
 const Player = require('../data/mongooseDataStructure/player');
 const Character = require('../data/mongooseDataStructure/character');
+const Background = require('../data/mongooseDataStructure/background');
 
 // Define all available models here - just add new ones to this array
 const MODELS = {
@@ -11,6 +12,7 @@ const MODELS = {
     'races': Race,
     'players': Player,
     'characters': Character,
+    'backgrounds': Background,
     // Add new models here as you expand:
     // 'spells': Spell,
     // 'monsters': Monster,

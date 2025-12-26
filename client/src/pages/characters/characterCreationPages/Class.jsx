@@ -1,13 +1,28 @@
 import React from 'react';
 import { Card } from '../../../pageComponents/card';
+import { useContext, useEffect, useState } from "react";
+import { SocketContext } from "../../../socket.io/context";
 
 export function Class({ values, onChange }) {
-  const CLASSES = [
-    { id: 'fighter', name: 'Fighter' },
-    { id: 'wizard', name: 'Wizard' },
-    { id: 'rogue', name: 'Rogue' },
-    { id: 'cleric', name: 'Cleric' },
-  ];
+
+
+  const socket = useContext(SocketContext);
+  const [classes, setClasses] = useState([]);
+
+useEffect(() => {
+  socket.emit(
+    'database_query',
+    {
+      collection: 'classes',
+      operation: 'findAll',
+    },
+    (response) => {
+      if (response.success) {
+        setClasses(response.data);
+      }
+    }
+  );
+}, []);
 
   const selected = values?.class || '';
   const emit = (partial) => { if (typeof onChange === 'function') onChange(partial); };
@@ -30,7 +45,7 @@ export function Class({ values, onChange }) {
                 onChange={(e) => emit({ class: e.target.value })}
               >
                 <option value='' disabled>Select class</option>
-                {CLASSES.map(c => (
+                {classes.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>

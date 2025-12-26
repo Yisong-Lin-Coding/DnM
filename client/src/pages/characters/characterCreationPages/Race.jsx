@@ -1,17 +1,32 @@
 import React from 'react';
 import { Card } from '../../../pageComponents/card';
-
+import { useContext, useEffect, useState } from "react";
+import { SocketContext } from "../../../socket.io/context";
 // Minimal, controlled Race selection component
 // Props:
 // - values: the parent-held character draft object
 // - onChange: function(partial) to merge updates into the parent draft
 export function Race({ values, onChange }) {
-  const RACES = [
-    { id: 'human', name: 'Human' },
-    { id: 'elf', name: 'Elf' },
-    { id: 'dwarf', name: 'Dwarf' },
-    { id: 'halfling', name: 'Halfling' },
-  ];
+
+
+
+  const socket = useContext(SocketContext);
+  const [classes, setClasses] = useState([]);
+
+useEffect(() => {
+  socket.emit(
+    'database_query',
+    {
+      collection: 'classes',
+      operation: 'findAll',
+    },
+    (response) => {
+      if (response.success) {
+        setClasses(response.data);
+      }
+    }
+  );
+}, []);
 
   const selectedRace = values?.race || '';
   const emit = (partial) => {
