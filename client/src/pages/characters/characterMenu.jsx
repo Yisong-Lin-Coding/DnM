@@ -1,27 +1,28 @@
 import Body from "../../pageComponents/bodySkeleton";
 import Header from "../../pageComponents/header";
 import IndexCardFolder from "../../pageComponents/indexCard";
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { SocketContext } from "../../socket.io/context";
 import { Plus } from "lucide-react"
 
 
 export default function CharacterMenu(){
 
-    let playerID = localStorage.getItem("player_ID")
     const socket = useContext(SocketContext);
-    let characters = []
+    const [characters, setCharacters] = useState([]);
+    const playerID = localStorage.getItem("player_ID");
 
-    socket.emit("playeData_getCharacter", { playerID }, (response) => {
-            if (!response.success){
-                console.log(`ERROR ${response.error}`)
-                alert ('Data retrival failed')
-                return
+    useEffect(() => {
+        if (!socket || !playerID) return;
+
+        socket.emit("playerData_getCharacter", { playerID }, (response) => {
+            if (!response || !response.success) {
+                console.error('Character fetch failed', response && response.message);
+                return;
             }
-
-            characters.push(...response.characters)
-                                        
-            })
+            setCharacters(response.characters || []);
+        });
+    }, [socket, playerID]);
 
 
     return(

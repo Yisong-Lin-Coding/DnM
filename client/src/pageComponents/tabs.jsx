@@ -91,7 +91,7 @@ Tabs.Next = function TabNext({ max, className = "", disabled: disabledProp, chil
 // Tab Content Panels
 Tabs.Panels = function TabPanels({ children, className = "" }) {
   return (
-    <div className={`bg-white ${className}`}>
+    <div className={`bg-website-default-900 ${className}`}>
       {children}
     </div>
   );
