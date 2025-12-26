@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-module.export = (socket) => {
+module.exports = (socket) => {
     socket.on("permissionCheck", async (data, callback) => {
         const player_ID = sessionStorage.getItem("player_ID");
 

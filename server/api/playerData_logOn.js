@@ -4,13 +4,12 @@ const mongoose = require("mongoose")
 
 
 module.exports = (socket) => {
-socket.on("playerData_logOn", async (data, callback) => {
+socket.on("playerData_logOn", async (data) => {
     if(data && data.playerID){
         await Player.findByIdAndUpdate(data.playerID, {
             isActive: true,
             lastLogOn: new Date()
         });
     }
-    callback({ success: true });
 });
 }
