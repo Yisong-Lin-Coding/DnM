@@ -3,10 +3,10 @@ import { Card } from '../../../pageComponents/card';
 
 export function Class({ values, onChange }) {
   const CLASSES = [
-    { id: 'class:fighter', name: 'Fighter' },
-    { id: 'class:wizard', name: 'Wizard' },
-    { id: 'class:rogue', name: 'Rogue' },
-    { id: 'class:cleric', name: 'Cleric' },
+    { id: 'fighter', name: 'Fighter' },
+    { id: 'wizard', name: 'Wizard' },
+    { id: 'rogue', name: 'Rogue' },
+    { id: 'cleric', name: 'Cleric' },
   ];
 
   const selected = values?.class || '';

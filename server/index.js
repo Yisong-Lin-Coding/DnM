@@ -3,8 +3,9 @@ const app = express();
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
-const mongoose = require("mongoose"); // Use mongoose for simplicity
+const mongoose = require("mongoose");
 const APIHandler = require("./handlers/apiHandler");
+const { loadItems } = require("./handlers/itemLoader");
 require("dotenv").config();
 
 app.use(cors());
@@ -20,16 +21,18 @@ app.get("/", (req, res) => {
 // MongoDB connection
 const MONGO_URI = process.env.MONGO_URI;
 
-// Use Mongoose with TLS enabled
 mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  tls: true, // required for Atlas
+  tls: true,
 })
-.then(() => {
+.then(async () => {
   console.log("MongoDB connected!");
 
-  // Only start server and Socket.IO after DB is ready
+  // Load game data from database
+  await loadItems();
+
+  // Start server and Socket.IO after DB is ready
   const PORT = process.env.PORT || 3001;
   const server = http.createServer(app);
   const io = new Server(server, {

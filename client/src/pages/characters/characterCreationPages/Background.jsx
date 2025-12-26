@@ -3,10 +3,10 @@ import { Card } from '../../../pageComponents/card';
 
 export function Background({ values, onChange }) {
   const BACKGROUNDS = [
-    { id: 'bg:acolyte', name: 'Acolyte' },
-    { id: 'bg:soldier', name: 'Soldier' },
-    { id: 'bg:outlander', name: 'Outlander' },
-    { id: 'bg:sage', name: 'Sage' },
+    { id: 'acolyte', name: 'Acolyte' },
+    { id: 'soldier', name: 'Soldier' },
+    { id: 'outlander', name: 'Outlander' },
+    { id: 'sage', name: 'Sage' },
   ];
 
   const selected = values?.background || '';

@@ -324,14 +324,14 @@ gameLogicHub.init();
 // ============================================================
 
 // All events automatically include:
-{
+exampleEvent = {
   eventName: 'spell:cast',      // The event name
   timestamp: 1703116800000,     // When it happened
   // ... plus your custom data
 }
 
 // Spell Cast Example:
-{
+exampleSpellCastEvent = {
   eventName: 'spell:cast',
   category: 'spell',
   action: 'cast',
@@ -344,7 +344,7 @@ gameLogicHub.init();
 }
 
 // Combat Damage Example:
-{
+exampleCombatDamageEvent = {
   eventName: 'combat:damage',
   category: 'combat',
   action: 'damage',

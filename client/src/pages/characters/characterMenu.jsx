@@ -10,18 +10,39 @@ export default function CharacterMenu(){
 
     const socket = useContext(SocketContext);
     const [characters, setCharacters] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const playerID = localStorage.getItem("player_ID");
 
     useEffect(() => {
-        if (!socket || !playerID) return;
+        if (!socket || !playerID) {
+            console.log('CharacterMenu: missing socket or playerID', { socketReady: !!socket, playerID });
+            setLoading(false);
+            return;
+        }
+
+        console.log('CharacterMenu: fetching characters', { socketConnected: socket.connected, playerID });
+
+        const onConnect = () => console.log('CharacterMenu socket connected', socket.id);
+        socket.on('connect', onConnect);
+
+        setLoading(true);
+        setError(null);
 
         socket.emit("playerData_getCharacter", { playerID }, (response) => {
+            console.log('playerData_getCharacter response', response);
             if (!response || !response.success) {
                 console.error('Character fetch failed', response && response.message);
+                setError(response?.message || 'Failed to fetch characters');
+                setCharacters([]);
+                setLoading(false);
                 return;
             }
             setCharacters(response.characters || []);
+            setLoading(false);
         });
+
+        return () => socket.off('connect', onConnect);
     }, [socket, playerID]);
 
 
@@ -37,11 +58,14 @@ export default function CharacterMenu(){
 
                 <IndexCardFolder>
 
-                    {characters && characters.map(character => (
+                    {loading && <div>Loading characters...</div>}
+                    {error && <div className="text-red-400">Error: {error}</div>}
+                    {!loading && !error && characters && characters.map(character => (
 
                     <div key={character.id}>
 
-                        {character.name}
+                        hello there {character.name}
+                        
                         
                     </div>
                     ))}

@@ -1,0 +1,1607 @@
+[
+  {
+    "name": "Aarakocra",
+    "race_id": "aarakocra",
+    "description": "You have a flying speed of 50 feet. To use this speed, you can't be wearing medium or heavy armor....",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "auran"
+    ],
+    "traits": [
+      "flight",
+      "talons"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Genasi (Air)",
+    "race_id": "genasi_air",
+    "description": "You can hold your breath indefinitely while you're not incapacitated....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "con": 2,
+      "dex": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "primordial"
+    ],
+    "traits": [
+      "unending_breath",
+      "mingle_with_the_wind"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Elf (Drow)",
+    "race_id": "elf_drow",
+    "description": "Accustomed to the depths of the Underdark, you have superior vision in dark and dim conditions. You can see in dim light within 120 feet of you as if it were bright light, and in darkness as if it wer...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "superior_darkvision",
+      "keen_senses",
+      "fey_ancestry",
+      "trance",
+      "sunlight_sensitivity",
+      "drow_magic",
+      "drow_weapon_training"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Gnome (Deep)",
+    "race_id": "gnome_deep",
+    "description": "Accustomed to life underground, you have superior vision in dark and dim conditions. You can see in dim light within 120 feet of you as if it were bright light, and in darkness as if it were dim light...",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "int": 2,
+      "dex": 1
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "gnomish",
+      "undercommon"
+    ],
+    "traits": [
+      "superior_darkvision",
+      "gnome_cunning",
+      "stone_camouflage"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Dragonborn",
+    "race_id": "dragonborn",
+    "description": "You have draconic ancestry. Choose one type of dragon from the Draconic Ancestry table. Your breath weapon and damage resistance are determined by the dragon type, as shown in the table. (Player's Han...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 2,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "draconic"
+    ],
+    "traits": [
+      "draconic_ancestry",
+      "breath_weapon",
+      "damage_resistance"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Genasi (Earth)",
+    "race_id": "genasi_earth",
+    "description": "You can move across difficult terrain made of earth or stone without expending extra movement....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "con": 2,
+      "str": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "primordial"
+    ],
+    "traits": [
+      "earth_walk",
+      "merge_with_stone"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Elf (Eladrin)",
+    "race_id": "elf_eladrin",
+    "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "int": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "keen_senses",
+      "fey_ancestry",
+      "trance",
+      "elf_weapon_training",
+      "fey_step"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Genasi (Fire)",
+    "race_id": "genasi_fire",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. Your ties to the Elemental Plane of Fire make your darkvision unusual: everything yo...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "con": 2,
+      "int": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "primordial"
+    ],
+    "traits": [
+      "darkvision",
+      "fire_resistance",
+      "reach_to_the_blaze"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Gnome (Forest)",
+    "race_id": "gnome_forest",
+    "description": "Accustomed to life underground, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light....",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "int": 2,
+      "dex": 1
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "dwarvish",
+      "gnomish"
+    ],
+    "traits": [
+      "darkvision",
+      "gnome_cunning",
+      "natural_illusionist",
+      "speak_with_small_beasts"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Goliath",
+    "race_id": "goliath",
+    "description": "Elemental Evil Player's Companion",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 2,
+      "con": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "giant"
+    ],
+    "traits": [
+      "natural_athlete",
+      "stones_endurance",
+      "powerful_build",
+      "mountain_born"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Half-Elf",
+    "race_id": "halfelf",
+    "description": "Two different ability scores of your choice increase by 1....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "fey_ancestry",
+      "skill_versatility"
+    ],
+    "choices": {
+      "ability_scores": "Cha 2 Choose 2 1"
+    }
+  },
+  {
+    "name": "Half-Orc",
+    "race_id": "halforc",
+    "description": "Thanks to your orc blood, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You c...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 2,
+      "con": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "dwarvish",
+      "orc"
+    ],
+    "traits": [
+      "darkvision",
+      "menacing",
+      "relentless_endurance",
+      "savage_attacks"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Elf (High)",
+    "race_id": "elf_high",
+    "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "int": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "keen_senses",
+      "fey_ancestry",
+      "trance",
+      "elf_weapon_training",
+      "cantrip"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Dwarf (Hill)",
+    "race_id": "dwarf_hill",
+    "description": "Player's Handbook",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "con": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "dwarvish"
+    ],
+    "traits": [
+      "speed",
+      "darkvision",
+      "dwarven_resilience",
+      "dwarven_combat_training",
+      "tool_proficiency",
+      "stonecunning",
+      "dwarven_toughness"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Human",
+    "race_id": "human",
+    "description": "You can speak, read, and write Common and one extra language of your choice. Humans typically learn the languages of other peoples they deal with, including obscure dialects. They are fond of sprinkli...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 1,
+      "dex": 1,
+      "con": 1,
+      "int": 1,
+      "wis": 1,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish",
+      "dwarvish",
+      "orc"
+    ],
+    "traits": [],
+    "choices": {}
+  },
+  {
+    "name": "Human (Variant)",
+    "race_id": "human_variant",
+    "description": "Two different ability scores of your choice increase by 1....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "choose": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish",
+      "dwarvish",
+      "orc"
+    ],
+    "traits": [
+      "skills",
+      "feat"
+    ],
+    "choices": {
+      "ability_scores": "Choose 2 1"
+    }
+  },
+  {
+    "name": "Halfling (Lightfoot)",
+    "race_id": "halfling_lightfoot",
+    "description": "When you roll a 1 on an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll....",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "cha": 1
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "halfling"
+    ],
+    "traits": [
+      "lucky",
+      "brave",
+      "halfling_nimbleness",
+      "naturally_stealthy"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Dwarf (Mountain)",
+    "race_id": "dwarf_mountain",
+    "description": "Player's Handbook",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "con": 2,
+      "str": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "dwarvish"
+    ],
+    "traits": [
+      "speed",
+      "darkvision",
+      "dwarven_resilience",
+      "dwarven_combat_training",
+      "tool_proficiency",
+      "stonecunning",
+      "dwarven_armor_training"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Shifter (Razorclaw)",
+    "race_id": "shifter_razorclaw",
+    "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "sylvan"
+    ],
+    "traits": [
+      "darkvision",
+      "shifting",
+      "shifting_feature"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Gnome (Rock)",
+    "race_id": "gnome_rock",
+    "description": "Accustomed to life underground, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light....",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "int": 2,
+      "con": 1
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "dwarvish",
+      "gnomish"
+    ],
+    "traits": [
+      "darkvision",
+      "gnome_cunning",
+      "artificers_lore",
+      "tinker"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Halfling (Stout)",
+    "race_id": "halfling_stout",
+    "description": "When you roll a 1 on an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll....",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "con": 1
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "halfling"
+    ],
+    "traits": [
+      "lucky",
+      "brave",
+      "halfling_nimbleness",
+      "stout_resilience"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Tiefling (Infernal)",
+    "race_id": "tiefling_infernal",
+    "description": "Thanks to your infernal heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim ligh...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2,
+      "int": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "infernal"
+    ],
+    "traits": [
+      "darkvision",
+      "hellish_resistance",
+      "infernal_legacy",
+      "feral_variant",
+      "variant_features_choose_1",
+      "appearance_variant"
+    ],
+    "choices": {
+      "traits": [
+        {
+          "name": "feral_variant",
+          "description": "Your Intelligence score increases by 1, and your Dexterity score increases by 2. This replaces the Ability Score Increase trait."
+        },
+        {
+          "name": "variant_features_choose_1",
+          "description": "Devil's Tongue. You know the vicious mockery cantrip. When your reach 3rd level, you can cast the charm person spell as a 2nd-level spell once with this trait. When you reach 5th level, you can cast the enthrall spell once with this trait. You must finish a long rest to cast these spells once again with this trait. Charisma is your spellcasting ability for them. This trait replaces the Infernal Legacy trait.  Hellfire. Once you reach 3rd level, you can cast the burning hands spell once per day as a 2nd-level spell. This trait replaces the hellish rebuke spell of the Infernal Legacy trait.  Winged. You have bat-like wings sprouting form on your shoulder blades. You have a flying speed of 30 feet. This trait replaces the Infernal Legacy trait."
+        },
+        {
+          "name": "appearance_variant",
+          "description": "Your tiefling might not look like other tieflings. Rather than having the physical characteristics described in the Player's Handbook, choose 1d4 + 1 of the following features: small horns; fangs or sharp teeth; a forked tongue; catlike eyes; six fingers on each hand; goatlike legs; cloven hoofs; a forked tail; leathery or scaly skin; red or dark blue skin; cast no shadow or reflection; exude a smell of brimstone"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Genasi (Water)",
+    "race_id": "genasi_water",
+    "description": "Elemental Evil Player's Companion",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "con": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "primordial"
+    ],
+    "traits": [
+      "acid_resistance",
+      "amphibious",
+      "swim",
+      "call_to_the_wave"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Shifter (Wildhunt)",
+    "race_id": "shifter_wildhunt",
+    "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 1,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "sylvan"
+    ],
+    "traits": [
+      "darkvision",
+      "shifting",
+      "shifting_feature"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Elf (Wood)",
+    "race_id": "elf_wood",
+    "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
+    "speed": 35,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "keen_senses",
+      "fey_ancestry",
+      "trance",
+      "elf_weapon_training",
+      "fleet_of_foot",
+      "mask_of_the_wild"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Dwarf (Duergar)",
+    "race_id": "dwarf_duergar",
+    "description": "Sword Coast Adventurer's Guide",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "con": 2,
+      "str": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "dwarvish",
+      "undercommon"
+    ],
+    "traits": [
+      "speed",
+      "superior_darkvision",
+      "duergar_resilience",
+      "dwarven_combat_training",
+      "tool_proficiency",
+      "stonecunning",
+      "duergar_magic",
+      "sunlight_sensitivity"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Half-Elf (Wood Elf Descent)",
+    "race_id": "halfelf_wood_elf_descent",
+    "description": "Two different ability scores of your choice increase by 1....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "fey_ancestry",
+      "variant_feature_choose_1"
+    ],
+    "choices": {
+      "traits": [
+        {
+          "name": "variant_feature_choose_1",
+          "description": "Keen Senses You have proficiency in the Perception skill  Elf Weapon Training You have proficiency with the longsword, shortsword, shortbow, and longbow.  Fleet of Foot Your base walking speed increases to 35 feet.  Mask of the Wild You can attempt to hide even when you are only lightly obscured by foliage, heavy rain, falling snow, mist, and other natural phenomena."
+        }
+      ]
+    }
+  },
+  {
+    "name": "Half-Elf (Moon Elf or Sun Elf Descent)",
+    "race_id": "halfelf_moon_elf_or_sun_elf_descent",
+    "description": "Two different ability scores of your choice increase by 1....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "fey_ancestry",
+      "variant_feature_choose_1"
+    ],
+    "choices": {
+      "traits": [
+        {
+          "name": "variant_feature_choose_1",
+          "description": "Keen Senses You have proficiency in the Perception skill  Elf Weapon Training You have proficiency with the longsword, shortsword, shortbow, and longbow.  Cantrip You know one cantrip of your choice from the wizard spell list. Intelligence is your spellcasting ability for it."
+        }
+      ]
+    }
+  },
+  {
+    "name": "Half-Elf (Drow Descent)",
+    "race_id": "halfelf_drow_descent",
+    "description": "Two different ability scores of your choice increase by 1....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "fey_ancestry",
+      "variant_feature_choose_1"
+    ],
+    "choices": {
+      "traits": [
+        {
+          "name": "variant_feature_choose_1",
+          "description": "Keen Senses You have proficiency in the Perception skill  Drow Magic You know the dancing lights cantrip. When you reach 3rd level, you can cast the faerie fire spell once per day; you must finish a long rest in order to cast the spell again using this trait. When you reach 5th level, you can also cast the darkness spell once per day; you must finish a long rest in order to cast the spell again using this trait. Charisma is your spellcasting ability for these spells."
+        }
+      ]
+    }
+  },
+  {
+    "name": "Half-Elf (Aquatic Elf Descent)",
+    "race_id": "halfelf_aquatic_elf_descent",
+    "description": "Two different ability scores of your choice increase by 1....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "fey_ancestry",
+      "variant_feature_choose_1"
+    ],
+    "choices": {
+      "traits": [
+        {
+          "name": "variant_feature_choose_1",
+          "description": "Keen Senses You have proficiency in the Perception skill  Swim You gain a swimming speed of 30. "
+        }
+      ]
+    }
+  },
+  {
+    "name": "Halfling (Ghostwise)",
+    "race_id": "halfling_ghostwise",
+    "description": "When you roll a 1 on an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll....",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "wis": 1
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "halfling"
+    ],
+    "traits": [
+      "lucky",
+      "brave",
+      "halfling_nimbleness",
+      "silent_speech"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Bugbear",
+    "race_id": "bugbear",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 2,
+      "dex": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "goblin"
+    ],
+    "traits": [
+      "darkvision",
+      "longlimbed",
+      "powerful_build",
+      "sneaky",
+      "surprise_attack"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Aasimar (Fallen)",
+    "race_id": "aasimar_fallen",
+    "description": "Blessed with a radiant soul, your vision can easily cut through darkness. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't ...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2,
+      "str": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "celestial"
+    ],
+    "traits": [
+      "darkvision",
+      "celestial_resistance",
+      "healing_hands",
+      "light_bearer",
+      "necrotic_shroud"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Aasimar (Protector)",
+    "race_id": "aasimar_protector",
+    "description": "Blessed with a radiant soul, your vision can easily cut through darkness. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't ...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "celestial"
+    ],
+    "traits": [
+      "darkvision",
+      "celestial_resistance",
+      "healing_hands",
+      "light_bearer",
+      "radiant_soul"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Aasimar (Scourge)",
+    "race_id": "aasimar_scourge",
+    "description": "Blessed with a radiant soul, your vision can easily cut through darkness. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't ...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2,
+      "con": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "celestial"
+    ],
+    "traits": [
+      "darkvision",
+      "celestial_resistance",
+      "healing_hands",
+      "light_bearer",
+      "radiant_consumption"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Firbolg",
+    "race_id": "firbolg",
+    "description": "You can cast detect magic and disguise self with this trait, using Wisdom as your spellcasting ability for them. Once you cast either spell, you can't cast it again with this trait until you finish a ...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "wis": 2,
+      "str": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish",
+      "giant"
+    ],
+    "traits": [
+      "firbolg_magic",
+      "hidden_step",
+      "powerful_build",
+      "speech_of_beast_and_leaf"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Goblin",
+    "race_id": "goblin",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "con": 1
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "goblin"
+    ],
+    "traits": [
+      "darkvision",
+      "fury_of_the_small",
+      "nimble_escape"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Hobgoblin",
+    "race_id": "hobgoblin",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "con": 2,
+      "int": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "goblin"
+    ],
+    "traits": [
+      "darkvision",
+      "martial_training",
+      "saving_face"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Kenku",
+    "race_id": "kenku",
+    "description": "You can duplicate other creatures' handwriting and craftwork. You have advantage on all checks made to produce forgeries or duplicates of existing objects....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "auran"
+    ],
+    "traits": [
+      "expert_forgery",
+      "kenku_training",
+      "mimicry"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Kobold",
+    "race_id": "kobold",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "str": -2
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "draconic"
+    ],
+    "traits": [
+      "darkvision",
+      "grovel_cower_and_beg",
+      "pack_tactics",
+      "sunlight_sensitivity"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Lizardfolk",
+    "race_id": "lizardfolk",
+    "description": "Volo's Guide to Monsters",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "con": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "draconic"
+    ],
+    "traits": [
+      "swim_speed",
+      "bite",
+      "cunning_artisan",
+      "hold_breath",
+      "hunters_lore",
+      "natural_armor",
+      "hungry_jaws"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Orc",
+    "race_id": "orc",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 2,
+      "con": 1,
+      "int": -2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "orc"
+    ],
+    "traits": [
+      "darkvision",
+      "aggressive",
+      "menacing",
+      "powerful_build"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Tabaxi",
+    "race_id": "tabaxi",
+    "description": "You have a cat's keen senses, especially in the dark. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in dar...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "darkvision",
+      "feline_agility",
+      "cats_claws",
+      "cats_talents"
+    ],
+    "choices": {
+      "proficiencies": [
+        "perception",
+        "stealth"
+      ]
+    }
+  },
+  {
+    "name": "Triton",
+    "race_id": "triton",
+    "description": "Volo's Guide to Monsters",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 1,
+      "cha": 1,
+      "con": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "primordial"
+    ],
+    "traits": [
+      "swim_speed",
+      "amphibious",
+      "control_air_and_water",
+      "emissary_of_the_sea",
+      "guardians_of_the_depths"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Yuan-ti Pureblood",
+    "race_id": "yuanti_pureblood",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2,
+      "int": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "draconic",
+      "abyssal"
+    ],
+    "traits": [
+      "darkvision",
+      "innate_spellcasting",
+      "magic_resistance",
+      "poison_immunity"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Changeling",
+    "race_id": "changeling",
+    "description": "Unearthed Arcana: Eberron",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 1,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "duplicity",
+      "shapechanger"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Shifter (Beasthide)",
+    "race_id": "shifter_beasthide",
+    "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 1,
+      "con": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "sylvan"
+    ],
+    "traits": [
+      "darkvision",
+      "shifting",
+      "shifting_feature"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Shifter (Cliffwalk)",
+    "race_id": "shifter_cliffwalk",
+    "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "sylvan"
+    ],
+    "traits": [
+      "darkvision",
+      "shifting",
+      "shifting_feature"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Shifter (Longstride)",
+    "race_id": "shifter_longstride",
+    "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "sylvan"
+    ],
+    "traits": [
+      "darkvision",
+      "shifting",
+      "shifting_feature"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Shifter (Longtooth)",
+    "race_id": "shifter_longtooth",
+    "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 1,
+      "dex": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "sylvan"
+    ],
+    "traits": [
+      "darkvision",
+      "shifting",
+      "shifting_feature"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Warforged",
+    "race_id": "warforged",
+    "description": "Your construction incorporates wood and metal, granting you a +1 bonus to Armor Class....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 1,
+      "con": 1
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "composite_plating",
+      "living_construct"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Revenant",
+    "race_id": "revenant",
+    "description": "Having met a cruel and undeserved end, you have returned to the realm of the living. As a revenant, you thirst for revenge against those who wronged you in life, or seek to complete a final, critical ...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "con": 1
+    },
+    "size": "M",
+    "languages": [],
+    "traits": [
+      "revenant_subrace",
+      "racial_adjustments",
+      "relentless_nature"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Tiefling (Abyssal)",
+    "race_id": "tiefling_abyssal",
+    "description": "Thanks to your infernal heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim ligh...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2,
+      "con": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "abyssal"
+    ],
+    "traits": [
+      "darkvision",
+      "abyssal_arcana",
+      "abyssal_fortitude"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Minotaur (Krynn)",
+    "race_id": "minotaur_krynn",
+    "description": "From a young age, you focused on one of the three virtues of strength, cunning, or intellect. Your choice of your Strength, Intelligence, or Wisdom score increases by 1....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 1
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "conquerors_virtue",
+      "horns",
+      "goring_rush",
+      "hammering_horns",
+      "labyrinthine_recall",
+      "sea_reaver"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Merfolk (Cosi Creed)",
+    "race_id": "merfolk_cosi_creed",
+    "description": "Plane Shift Zendikar",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "int": 1,
+      "cha": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "merfolk"
+    ],
+    "traits": [
+      "amphibious",
+      "cantrip",
+      "creed_of_the_trickster",
+      "swimming"
+    ],
+    "choices": {
+      "proficiencies": [
+        "sleight_of_hand",
+        "stealth"
+      ]
+    }
+  },
+  {
+    "name": "Merfolk (Emeria Creed)",
+    "race_id": "merfolk_emeria_creed",
+    "description": "Plane Shift Zendikar",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "wis": 2,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "merfolk"
+    ],
+    "traits": [
+      "amphibious",
+      "cantrip",
+      "swimming",
+      "wind_creed_manipulation"
+    ],
+    "choices": {
+      "proficiencies": [
+        "deception",
+        "persuasion"
+      ]
+    }
+  },
+  {
+    "name": "Goblin (Grogtag Tribe)",
+    "race_id": "goblin_grogtag_tribe",
+    "description": "Thanks to your heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You ca...",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "con": 2
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "goblin"
+    ],
+    "traits": [
+      "darkvision",
+      "grit",
+      "grogtag_tamer"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Elf (Joraga Nation)",
+    "race_id": "elf_joraga_nation",
+    "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
+    "speed": 35,
+    "ability_score_modifiers": {
+      "dex": 1,
+      "wis": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "keen_senses",
+      "fey_ancestry",
+      "fleet_of_foot",
+      "mask_of_the_wild",
+      "elf_weapon_training"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Kor",
+    "race_id": "kor",
+    "description": "You have advantage on saving throws against being frightened....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "brave",
+      "climbing",
+      "kor_climbing",
+      "lucky"
+    ],
+    "choices": {
+      "proficiencies": [
+        "acrobaics",
+        "athletics"
+      ]
+    }
+  },
+  {
+    "name": "Goblin (Lavastep Tribe)",
+    "race_id": "goblin_lavastep_tribe",
+    "description": "Thanks to your heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You ca...",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "con": 2
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "goblin"
+    ],
+    "traits": [
+      "darkvision",
+      "grit",
+      "lavastep_grit"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Elf (Mul Daya Nation)",
+    "race_id": "elf_mul_daya_nation",
+    "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 1,
+      "wis": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "keen_senses",
+      "fey_ancestry",
+      "mul_daya_magic",
+      "superior_darkvision",
+      "sunlight_sensitivity",
+      "elf_weapon_training"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Goblin (Tuktuk Tribe)",
+    "race_id": "goblin_tuktuk_tribe",
+    "description": "Thanks to your heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You ca...",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "con": 2
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "goblin"
+    ],
+    "traits": [
+      "darkvision",
+      "grit",
+      "tuktuk_cunning"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Elf (Tajuru Nation)",
+    "race_id": "elf_tajuru_nation",
+    "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "wis": 2,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "keen_senses",
+      "fey_ancestry",
+      "trance",
+      "skill_versatility"
+    ],
+    "choices": {
+      "proficiencies": [
+        "perception",
+        "select_two_others"
+      ]
+    }
+  },
+  {
+    "name": "Merfolk (Ula Creed)",
+    "race_id": "merfolk_ula_creed",
+    "description": "Plane Shift Zendikar",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "int": 2,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "merfolk"
+    ],
+    "traits": [
+      "amphibious",
+      "cantrip",
+      "swimming",
+      "water_creed_navigation"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Vampire",
+    "race_id": "vampire",
+    "description": "You can drain blood and life energy from a willing creature, or one that is grappled by you, incapacitated, or restrained. Make a melee attack against the target. If you hit, you deal 1 piercing damag...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "int": 1,
+      "cha": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "vampire"
+    ],
+    "traits": [
+      "blood_thirst",
+      "darkvision",
+      "vampiric_resistance"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Aetherborn",
+    "race_id": "aetherborn",
+    "description": "Thanks to your heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You ca...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2,
+      "choose": 2
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "darkvision",
+      "born_of_aether",
+      "menacing"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Elf (Bishatar and Tirahar)",
+    "race_id": "elf_bishatar_and_tirahar",
+    "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
+    "speed": 35,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "keen_senses",
+      "fey_ancestry",
+      "trance",
+      "fleet_of_foot",
+      "mask_of_the_wild",
+      "elf_weapon_training"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Elf (Vadahar)",
+    "race_id": "elf_vadahar",
+    "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "keen_senses",
+      "fey_ancestry",
+      "trance",
+      "elf_weapon_training",
+      "cantrip",
+      "extra_language"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Vedalken",
+    "race_id": "vedalken",
+    "description": "You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "vedalken"
+    ],
+    "traits": [
+      "vedalken_cunning",
+      "aether_lore"
+    ],
+    "choices": {}
+  },
+  {
+    "name": "Aasimar (DMG)",
+    "race_id": "aasimar_dmg",
+    "description": "Thanks to your celestial heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim lig...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "wis": 1,
+      "cha": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "celestial"
+    ],
+    "traits": [
+      "darkvision",
+      "celestial_resistance",
+      "celestial_legacy"
+    ],
+    "choices": {}
+  }
+]

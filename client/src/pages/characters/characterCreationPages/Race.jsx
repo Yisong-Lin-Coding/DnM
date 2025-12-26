@@ -7,10 +7,10 @@ import { Card } from '../../../pageComponents/card';
 // - onChange: function(partial) to merge updates into the parent draft
 export function Race({ values, onChange }) {
   const RACES = [
-    { id: 'race:human', name: 'Human' },
-    { id: 'race:elf', name: 'Elf' },
-    { id: 'race:dwarf', name: 'Dwarf' },
-    { id: 'race:halfling', name: 'Halfling' },
+    { id: 'human', name: 'Human' },
+    { id: 'elf', name: 'Elf' },
+    { id: 'dwarf', name: 'Dwarf' },
+    { id: 'halfling', name: 'Halfling' },
   ];
 
   const selectedRace = values?.race || '';

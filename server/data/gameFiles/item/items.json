@@ -2,1155 +2,2088 @@
   "items": [
     {
       "id": "dagger_001",
-      "type": "Weapon",
       "name": "Dagger",
       "description": "A small, easily concealed blade.",
-      "damage": { "stab": "1d4", "slash": "1d4", "throw": "1d4" },
-      "slot": { "fist": 1 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 64,
       "cost": 2,
-      "rarity": "common",
-      "attributes": ["metal", "pierce", "melee", "light", "finesse", "weapon", "one-handed", "simple"],
-      "uses": ["stab", "slash", "throw"]
+      "attributes": [
+        "metal",
+        "pierce",
+        "melee",
+        "light",
+        "finesse",
+        "weapon",
+        "one-handed",
+        "simple"
+      ],
+      "properties": {
+        "damage": {
+          "stab": "1d4",
+          "slash": "1d4",
+          "throw": "1d4"
+        },
+        "slot": {
+          "fist": 1
+        },
+        "uses": [
+          "stab",
+          "slash",
+          "throw"
+        ]
+      }
     },
     {
       "id": "shortsword_001",
-      "type": "Weapon",
       "name": "Shortsword",
       "description": "Light melee weapon, finesse.",
-      "damage": { "stab": "1d6", "slash": "1d6" },
-      "slot": { "fist": 1 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 128,
       "cost": 12,
-      "rarity": "common",
-      "attributes": ["metal", "slash", "pierce", "melee", "finesse", "weapon", "one-handed", "martial"],
-      "uses": ["stab", "slash"]
+      "attributes": [
+        "metal",
+        "slash",
+        "pierce",
+        "melee",
+        "finesse",
+        "weapon",
+        "one-handed",
+        "martial"
+      ],
+      "properties": {
+        "damage": {
+          "stab": "1d6",
+          "slash": "1d6"
+        },
+        "slot": {
+          "fist": 1
+        },
+        "uses": [
+          "stab",
+          "slash"
+        ]
+      }
     },
     {
       "id": "longsword_001",
-      "type": "Weapon",
       "name": "Longsword",
       "description": "Versatile melee weapon.",
-      "damage": { "slash": "1d8", "stab": "1d10" },
-      "slot": { "hands": 2 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 224,
       "cost": 40,
-      "rarity": "common",
-      "attributes": ["metal", "slash", "pierce", "melee", "versatile", "two-handed", "weapon", "martial"],
-      "uses": ["slash", "stab", "chop"]
+      "attributes": [
+        "metal",
+        "slash",
+        "pierce",
+        "melee",
+        "versatile",
+        "two-handed",
+        "weapon",
+        "martial"
+      ],
+      "properties": {
+        "damage": {
+          "slash": "1d8",
+          "stab": "1d10"
+        },
+        "slot": {
+          "hands": 2
+        },
+        "uses": [
+          "slash",
+          "stab",
+          "chop"
+        ]
+      }
     },
     {
       "id": "greatsword_001",
-      "type": "Weapon",
       "name": "Greatsword",
       "description": "Two-handed heavy blade.",
-      "damage": { "slash": "2d6", "chop": "2d6" },
-      "slot": { "hands": 2 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 512,
       "cost": 80,
-      "rarity": "common",
-      "attributes": ["metal", "slash", "heavy", "melee", "two-handed", "weapon", "martial"],
-      "uses": ["slash", "chop"]
+      "attributes": [
+        "metal",
+        "slash",
+        "heavy",
+        "melee",
+        "two-handed",
+        "weapon",
+        "martial"
+      ],
+      "properties": {
+        "damage": {
+          "slash": "2d6",
+          "chop": "2d6"
+        },
+        "slot": {
+          "hands": 2
+        },
+        "uses": [
+          "slash",
+          "chop"
+        ]
+      }
     },
     {
       "id": "rapier_001",
-      "type": "Weapon",
       "name": "Rapier",
       "description": "Finesse weapon focused on piercing.",
-      "damage": { "stab": "1d8", "slash": "1d6" },
-      "slot": { "fist": 1 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 128,
       "cost": 30,
-      "rarity": "common",
-      "attributes": ["metal", "pierce", "melee", "finesse", "weapon", "one-handed", "martial"],
-      "uses": ["stab", "slash", "thrust"]
+      "attributes": [
+        "metal",
+        "pierce",
+        "melee",
+        "finesse",
+        "weapon",
+        "one-handed",
+        "martial"
+      ],
+      "properties": {
+        "damage": {
+          "stab": "1d8",
+          "slash": "1d6"
+        },
+        "slot": {
+          "fist": 1
+        },
+        "uses": [
+          "stab",
+          "slash",
+          "thrust"
+        ]
+      }
     },
     {
       "id": "handaxe_001",
-      "type": "Weapon",
       "name": "Handaxe",
       "description": "Light chopping weapon.",
-      "damage": { "chop": "1d6", "throw": "1d6" },
-      "slot": { "fist": 1 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 160,
       "cost": 8,
-      "rarity": "common",
-      "attributes": ["metal", "slash", "chop", "melee", "light", "weapon", "one-handed", "simple"],
-      "uses": ["chop", "throw"]
+      "attributes": [
+        "metal",
+        "slash",
+        "chop",
+        "melee",
+        "light",
+        "weapon",
+        "one-handed",
+        "simple"
+      ],
+      "properties": {
+        "damage": {
+          "chop": "1d6",
+          "throw": "1d6"
+        },
+        "slot": {
+          "fist": 1
+        },
+        "uses": [
+          "chop",
+          "throw"
+        ]
+      }
     },
     {
       "id": "quarterstaff_001",
-      "type": "Weapon",
       "name": "Quarterstaff",
       "description": "Simple wooden staff, versatile.",
-      "damage": { "bash": "1d6", "strike": "1d8" },
-      "slot": { "hands": 2 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 256,
       "cost": 6,
-      "rarity": "common",
-      "attributes": ["wood", "bludgeon", "melee", "versatile", "two-handed", "weapon", "simple"],
-      "uses": ["bash", "strike", "block"]
+      "attributes": [
+        "wood",
+        "bludgeon",
+        "melee",
+        "versatile",
+        "two-handed",
+        "weapon",
+        "simple"
+      ],
+      "properties": {
+        "damage": {
+          "bash": "1d6",
+          "strike": "1d8"
+        },
+        "slot": {
+          "hands": 2
+        },
+        "uses": [
+          "bash",
+          "strike",
+          "block"
+        ]
+      }
     },
     {
       "id": "shortbow_001",
-      "type": "Weapon",
       "name": "Shortbow",
       "description": "Light ranged bow.",
-      "damage": { "shoot": "1d6" },
-      "slot": { "hands": 2 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 128,
       "cost": 30,
-      "rarity": "common",
-      "attributes": ["wood", "pierce", "ranged", "two-handed", "weapon", "martial"],
-      "uses": ["shoot", "aim"]
+      "attributes": [
+        "wood",
+        "pierce",
+        "ranged",
+        "two-handed",
+        "weapon",
+        "martial"
+      ],
+      "properties": {
+        "damage": {
+          "shoot": "1d6"
+        },
+        "slot": {
+          "hands": 2
+        },
+        "uses": [
+          "shoot",
+          "aim"
+        ]
+      }
     },
     {
       "id": "longbow_001",
-      "type": "Weapon",
       "name": "Longbow",
       "description": "Long-ranged bow.",
-      "damage": { "shoot": "1d8" },
-      "slot": { "hands": 2 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 192,
       "cost": 60,
-      "rarity": "common",
-      "attributes": ["wood", "pierce", "ranged", "two-handed", "weapon", "heavy", "martial"],
-      "uses": ["shoot", "aim"]
+      "attributes": [
+        "wood",
+        "pierce",
+        "ranged",
+        "two-handed",
+        "weapon",
+        "heavy",
+        "martial"
+      ],
+      "properties": {
+        "damage": {
+          "shoot": "1d8"
+        },
+        "slot": {
+          "hands": 2
+        },
+        "uses": [
+          "shoot",
+          "aim"
+        ]
+      }
     },
     {
       "id": "light_crossbow_001",
-      "type": "Weapon",
       "name": "Light Crossbow",
       "description": "Simple crossbow requiring reloading.",
-      "damage": { "shoot": "1d8" },
-      "slot": { "fist": 1 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 320,
       "cost": 40,
-      "rarity": "common",
-      "attributes": ["metal", "pierce", "ranged", "loading", "weapon", "martial"],
-      "uses": ["shoot"]
+      "attributes": [
+        "metal",
+        "pierce",
+        "ranged",
+        "loading",
+        "weapon",
+        "martial"
+      ],
+      "properties": {
+        "damage": {
+          "shoot": "1d8"
+        },
+        "slot": {
+          "fist": 1
+        },
+        "uses": [
+          "shoot"
+        ]
+      }
     },
     {
       "id": "battleaxe",
-      "type": "Weapon",
       "name": "Battleaxe",
       "description": "A heavy axe for combat.",
-      "damage": { "chop": "1d8", "slice": "1d10" },
-      "slot": { "fist": 1 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 320,
       "cost": 20,
-      "rarity": "common",
-      "attributes": ["metal", "axe", "melee", "martial", "two-handed"],
-      "uses": ["chop"]
+      "attributes": [
+        "metal",
+        "axe",
+        "melee",
+        "martial",
+        "two-handed"
+      ],
+      "properties": {
+        "damage": {
+          "chop": "1d8",
+          "slice": "1d10"
+        },
+        "slot": {
+          "fist": 1
+        },
+        "uses": [
+          "chop"
+        ]
+      }
     },
     {
       "id": "warhammer",
-      "type": "Weapon",
       "name": "Warhammer",
       "description": "A hammer effective against armor.",
-      "damage": { "blunt": "1d8", "smash": "1d10" },
-      "slot": { "fist": 1 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 320,
       "cost": 25,
-      "rarity": "common",
-      "attributes": ["metal", "bludgeon", "melee", "martial"],
-      "uses": ["smash"]
+      "attributes": [
+        "metal",
+        "bludgeon",
+        "melee",
+        "martial"
+      ],
+      "properties": {
+        "damage": {
+          "blunt": "1d8",
+          "smash": "1d10"
+        },
+        "slot": {
+          "fist": 1
+        },
+        "uses": [
+          "smash"
+        ]
+      }
     },
     {
       "id": "mace",
-      "type": "Weapon",
       "name": "Mace",
       "description": "A blunt club for crushing.",
-      "damage": { "blunt": "1d6" },
-      "slot": { "fist": 1 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 192,
       "cost": 8,
-      "rarity": "common",
-      "attributes": ["metal", "bludgeon", "melee", "one-handed", "simple"],
-      "uses": ["smash"]
+      "attributes": [
+        "metal",
+        "bludgeon",
+        "melee",
+        "one-handed",
+        "simple"
+      ],
+      "properties": {
+        "damage": {
+          "blunt": "1d6"
+        },
+        "slot": {
+          "fist": 1
+        },
+        "uses": [
+          "smash"
+        ]
+      }
     },
     {
       "id": "spear",
-      "type": "Weapon",
       "name": "Spear",
       "description": "A pole with a sharp point for thrusting or throwing.",
-      "damage": { "thrust": "1d6", "throw": "1d6" },
-      "slot": { "hands": 2 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 192,
       "cost": 6,
-      "rarity": "common",
-      "attributes": ["pierce", "melee", "thrown", "weapon", "two-handed", "simple"],
-      "uses": ["thrust", "throw"]
+      "attributes": [
+        "pierce",
+        "melee",
+        "thrown",
+        "weapon",
+        "two-handed",
+        "simple"
+      ],
+      "properties": {
+        "damage": {
+          "thrust": "1d6",
+          "throw": "1d6"
+        },
+        "slot": {
+          "hands": 2
+        },
+        "uses": [
+          "thrust",
+          "throw"
+        ]
+      }
     },
     {
       "id": "sickle",
-      "type": "Weapon",
       "name": "Sickle",
       "description": "A small curved blade used for cutting.",
-      "damage": { "slash": "1d4" },
-      "slot": { "fist": 1 },
+      "type": "Weapon",
+      "rarity": "common",
       "weight": 64,
       "cost": 3,
-      "rarity": "common",
-      "attributes": ["slashing", "melee", "light", "simple"],
-      "uses": ["slash"]
+      "attributes": [
+        "slashing",
+        "melee",
+        "light",
+        "simple"
+      ],
+      "properties": {
+        "damage": {
+          "slash": "1d4"
+        },
+        "slot": {
+          "fist": 1
+        },
+        "uses": [
+          "slash"
+        ]
+      }
     },
     {
       "id": "padded_armor",
-      "type": "Armor",
       "name": "Padded",
       "description": "Light cloth armor.",
-      "armorClass": 11,
-      "slot": { "chest": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 320,
       "cost": 20,
-      "rarity": "common",
-      "attributes": ["cloth", "light", "armor"]
+      "attributes": [
+        "cloth",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 11,
+        "slot": {
+          "chest": 1
+        }
+      }
     },
     {
       "id": "leather_armor",
-      "type": "Armor",
       "name": "Leather",
       "description": "Light leather armor.",
-      "armorClass": 11,
-      "slot": { "chest": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 640,
       "cost": 60,
-      "rarity": "common",
-      "attributes": ["leather", "light", "armor"]
+      "attributes": [
+        "leather",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 11,
+        "slot": {
+          "chest": 1
+        }
+      }
     },
     {
       "id": "studded_leather",
-      "type": "Armor",
       "name": "Studded Leather",
       "description": "Reinforced leather armor.",
-      "armorClass": 12,
-      "slot": { "chest": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 832,
       "cost": 120,
-      "rarity": "common",
-      "attributes": ["leather", "studded", "light", "armor"]
+      "attributes": [
+        "leather",
+        "studded",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 12,
+        "slot": {
+          "chest": 1
+        }
+      }
     },
     {
       "id": "chain_shirt",
-      "type": "Armor",
       "name": "Chain Shirt",
       "description": "Light chain armor.",
-      "armorClass": 13,
-      "slot": { "chest": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 1280,
       "cost": 250,
-      "rarity": "common",
-      "attributes": ["metal", "chain", "medium", "armor"]
+      "attributes": [
+        "metal",
+        "chain",
+        "medium",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 13,
+        "slot": {
+          "chest": 1
+        }
+      }
     },
     {
       "id": "chain_mail",
-      "type": "Armor",
       "name": "Chain Mail",
       "description": "Heavier chain armor.",
-      "armorClass": 16,
-      "slot": { "chest": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 3520,
       "cost": 800,
-      "rarity": "common",
-      "attributes": ["metal", "chain", "heavy", "armor"]
+      "attributes": [
+        "metal",
+        "chain",
+        "heavy",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 16,
+        "slot": {
+          "chest": 1
+        }
+      }
     },
     {
       "id": "plate_armor",
-      "type": "Armor",
       "name": "Plate",
       "description": "Full plate armor.",
-      "armorClass": 18,
-      "slot": { "chest": 1 },
+      "type": "Armor",
+      "rarity": "rare",
       "weight": 4160,
       "cost": 3500,
-      "rarity": "rare",
-      "attributes": ["metal", "plate", "heavy", "armor"]
+      "attributes": [
+        "metal",
+        "plate",
+        "heavy",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 18,
+        "slot": {
+          "chest": 1
+        }
+      }
     },
     {
       "id": "shield_001",
-      "type": "Item",
       "name": "Shield",
       "description": "Provides a +2 bonus to AC while equipped.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 384,
       "cost": 30,
-      "rarity": "common",
-      "slot": { "hands": 1 },
-      "attributes": ["wood", "defensive", "shield", "equipment"],
-      "meta": { "bonusAC": 2 }
+      "attributes": [
+        "wood",
+        "defensive",
+        "shield",
+        "equipment"
+      ],
+      "properties": {
+        "slot": {
+          "hands": 1
+        },
+        "meta": {
+          "bonusAC": 2
+        }
+      }
     },
     {
       "id": "backpack_001",
-      "type": "Item",
       "name": "Backpack",
       "description": "Simple pack for carrying gear.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 128,
       "cost": 15,
-      "rarity": "common",
-      "slot": { "chest": 1 },
-      "attributes": ["container", "equipment"]
+      "attributes": [
+        "container",
+        "equipment"
+      ],
+      "properties": {
+        "slot": {
+          "chest": 1
+        }
+      }
     },
     {
       "id": "bedroll_001",
-      "type": "Item",
       "name": "Bedroll",
       "description": "A simple roll for sleeping outdoors.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 448,
       "cost": 8,
-      "rarity": "common",
-      "attributes": ["camping", "equipment"]
+      "attributes": [
+        "camping",
+        "equipment"
+      ],
+      "properties": {}
     },
     {
       "id": "rope_50ft",
-      "type": "Item",
       "name": "Rope (50 ft)",
       "description": "Hemp or silk rope for climbing and tying.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 640,
       "cost": 10,
-      "rarity": "common",
-      "attributes": ["tool", "climbing", "equipment"]
+      "attributes": [
+        "tool",
+        "climbing",
+        "equipment"
+      ],
+      "properties": {}
     },
     {
       "id": "tinderbox",
-      "type": "Item",
       "name": "Tinderbox",
       "description": "Used to start fires.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 64,
       "cost": 3,
-      "rarity": "common",
-      "attributes": ["tool", "fire", "equipment"]
+      "attributes": [
+        "tool",
+        "fire",
+        "equipment"
+      ],
+      "properties": {}
     },
     {
       "id": "torch",
-      "type": "Consumable",
       "name": "Torch",
       "description": "Provides light for a short time.",
-      "maxCharges": 1,
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 1,
-      "rarity": "common",
-      "attributes": ["light", "fire", "consumable"],
-      "effects": [
-        {
-          "type": "CompositeEffect",
-          "name": "Light Source",
-          "duration": 1,
-          "effects": []
-        }
-      ]
+      "attributes": [
+        "light",
+        "fire",
+        "consumable"
+      ],
+      "properties": {
+        "maxCharges": 1,
+        "effects": [
+          {
+            "type": "CompositeEffect",
+            "name": "Light Source",
+            "duration": 1,
+            "effects": []
+          }
+        ]
+      }
     },
     {
       "id": "lantern_hol_001",
-      "type": "Item",
       "name": "Hooded Lantern",
       "description": "A lantern that can be hooded to limit light.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 128,
       "cost": 12,
-      "rarity": "common",
-      "attributes": ["light", "equipment"]
+      "attributes": [
+        "light",
+        "equipment"
+      ],
+      "properties": {}
     },
     {
       "id": "waterskin",
-      "type": "Item",
       "name": "Waterskin",
       "description": "Container for water.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 320,
       "cost": 5,
-      "rarity": "common",
-      "attributes": ["container", "equipment"]
+      "attributes": [
+        "container",
+        "equipment"
+      ],
+      "properties": {}
     },
     {
       "id": "rations",
-      "type": "Item",
       "name": "Rations",
       "description": "Food for sustained travel.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 128,
       "cost": 5,
-      "rarity": "common",
-      "attributes": ["consumable", "food"]
+      "attributes": [
+        "consumable",
+        "food"
+      ],
+      "properties": {}
     },
     {
       "id": "thieves_tools",
-      "type": "Item",
       "name": "Thieves' Tools",
       "description": "Set of tools for locks and traps.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 64,
       "cost": 40,
-      "rarity": "common",
-      "attributes": ["tool", "lockpick", "equipment"]
+      "attributes": [
+        "tool",
+        "lockpick",
+        "equipment"
+      ],
+      "properties": {}
     },
     {
       "id": "healers_kit",
-      "type": "Item",
       "name": "Healer's Kit",
       "description": "Used to stabilize and treat wounds.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 192,
       "cost": 25,
-      "rarity": "common",
-      "attributes": ["tool", "medical", "equipment"]
+      "attributes": [
+        "tool",
+        "medical",
+        "equipment"
+      ],
+      "properties": {}
     },
     {
       "id": "potion_healing",
-      "type": "Consumable",
       "name": "Potion of Healing",
       "description": "Instantly restores hit points.",
-      "maxCharges": 1,
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 32,
       "cost": 50,
-      "rarity": "common",
-      "attributes": ["consumable", "healing"],
-      "effects": [
-        {
-          "type": "HealthRegen",
-          "name": "Healing Surge",
-          "duration": 1,
-          "amountPerTurn": 10
-        }
-      ]
+      "attributes": [
+        "consumable",
+        "healing"
+      ],
+      "properties": {
+        "maxCharges": 1,
+        "effects": [
+          {
+            "type": "HealthRegen",
+            "name": "Healing Surge",
+            "duration": 1,
+            "amountPerTurn": 10
+          }
+        ]
+      }
     },
     {
       "id": "potion_climbing",
-      "type": "Consumable",
       "name": "Potion of Climbing",
       "description": "Grants climbing speed temporarily.",
-      "maxCharges": 1,
+      "type": "Consumable",
+      "rarity": "uncommon",
       "weight": 32,
       "cost": 180,
-      "rarity": "uncommon",
-      "attributes": ["consumable", "movement"],
-      "effects": [
-        {
-          "type": "CompositeEffect",
-          "name": "Climbing Aid",
-          "duration": 10,
-          "effects": []
-        }
-      ]
+      "attributes": [
+        "consumable",
+        "movement"
+      ],
+      "properties": {
+        "maxCharges": 1,
+        "effects": [
+          {
+            "type": "CompositeEffect",
+            "name": "Climbing Aid",
+            "duration": 10,
+            "effects": []
+          }
+        ]
+      }
     },
     {
       "id": "ring_of_protection",
-      "type": "MagicItem",
       "name": "Ring of Protection",
       "description": "Grants a small protective bonus.",
+      "type": "MagicItem",
+      "rarity": "rare",
       "weight": 3,
       "cost": 500,
-      "rarity": "rare",
-      "slot": { "fingers": 1 },
-      "attributes": ["magic", "ring", "equipment"],
-      "passiveEffects": [
-        {
-          "type": "DamageBonus",
-          "name": "AC Boost",
-          "duration": -1,
-          "statType": "AC",
-          "amount": 1
-        }
-      ]
+      "attributes": [
+        "magic",
+        "ring",
+        "equipment"
+      ],
+      "properties": {
+        "slot": {
+          "fingers": 1
+        },
+        "passiveEffects": [
+          {
+            "type": "DamageBonus",
+            "name": "AC Boost",
+            "duration": -1,
+            "statType": "AC",
+            "amount": 1
+          }
+        ]
+      }
     },
     {
       "id": "musical_instrument_lute",
-      "type": "Item",
       "name": "Lute",
       "description": "Stringed instrument used by bards.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 192,
       "cost": 35,
-      "rarity": "common",
-      "attributes": ["instrument", "tool"]
+      "attributes": [
+        "instrument",
+        "tool"
+      ],
+      "properties": {}
     },
     {
       "id": "apple",
-      "type": "Consumable",
       "name": "Apple",
       "description": "A crisp, sweet apple.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 21,
       "cost": 1,
-      "rarity": "common",
-      "attributes": ["food", "fruit", "consumable", "perishable"],
-      "uses": ["eat", "throw"]
+      "attributes": [
+        "food",
+        "fruit",
+        "consumable",
+        "perishable"
+      ],
+      "properties": {
+        "uses": [
+          "eat",
+          "throw"
+        ]
+      }
     },
     {
       "id": "basic_fruit",
-      "type": "Consumable",
       "name": "Basic Fruit",
       "description": "A generic piece of fruit; tastes fruity.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 32,
       "cost": 1,
-      "rarity": "common",
-      "attributes": ["food", "fruit", "consumable", "perishable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "fruit",
+        "consumable",
+        "perishable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "rations_simple",
-      "type": "Consumable",
       "name": "Plain Meal",
       "description": "A plain meal of bread and soup. Cheap and filling.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 5,
-      "rarity": "common",
-      "attributes": ["food", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "elaborate_meal",
-      "type": "Consumable",
       "name": "Elaborate Meal",
       "description": "A hearty meal with meat and sides.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 10,
-      "rarity": "common",
-      "attributes": ["food", "consumable"],
-      "meta": { "HP": "2d4" },
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "consumable"
+      ],
+      "properties": {
+        "meta": {
+          "HP": "2d4"
+        },
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "fancy_meal",
-      "type": "Consumable",
       "name": "Fancy Meal",
       "description": "An exquisite meal of luxurious ingredients.",
+      "type": "Consumable",
+      "rarity": "uncommon",
       "weight": 64,
       "cost": 25,
-      "rarity": "uncommon",
-      "attributes": ["food", "consumable", "luxury"],
-      "meta": { "HP": "4d6" },
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "consumable",
+        "luxury"
+      ],
+      "properties": {
+        "meta": {
+          "HP": "4d6"
+        },
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "feast",
-      "type": "Consumable",
       "name": "Feast (serves 6)",
       "description": "A massive feast sufficient for several people.",
+      "type": "Consumable",
+      "rarity": "rare",
       "weight": 384,
       "cost": 250,
-      "rarity": "rare",
-      "attributes": ["food", "consumable", "bulk"],
-      "meta": { "HP": "2d6" },
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "consumable",
+        "bulk"
+      ],
+      "properties": {
+        "meta": {
+          "HP": "2d6"
+        },
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "rice",
-      "type": "Consumable",
       "name": "Rice",
       "description": "A small sack of rice.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 1,
-      "rarity": "common",
-      "attributes": ["food", "staple", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "staple",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "egg",
-      "type": "Consumable",
       "name": "Egg",
       "description": "A single egg.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 13,
       "cost": 2,
-      "rarity": "common",
-      "attributes": ["food", "consumable", "perishable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "consumable",
+        "perishable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "potato",
-      "type": "Consumable",
       "name": "Potato",
       "description": "A starchy tuber, versatile for cooking.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 32,
       "cost": 1,
-      "rarity": "common",
-      "attributes": ["food", "vegetable", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "vegetable",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "cheese",
-      "type": "Consumable",
       "name": "Cheese",
       "description": "A wedge of cheese.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 3,
-      "rarity": "common",
-      "attributes": ["food", "dairy", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "dairy",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "dried_fruit",
-      "type": "Consumable",
       "name": "Dried Fruit",
       "description": "Chewy, sweet dried fruit favored by travelers.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 32,
       "cost": 2,
-      "rarity": "common",
-      "attributes": ["food", "snack", "consumable", "non-perishable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "snack",
+        "consumable",
+        "non-perishable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "raw_meat",
-      "type": "Item",
       "name": "Raw Meat",
       "description": "Fresh raw meat; perishable and risky to eat uncooked.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 64,
       "cost": 3,
-      "rarity": "common",
-      "attributes": ["food", "raw", "perishable"],
-      "uses": ["cook"]
+      "attributes": [
+        "food",
+        "raw",
+        "perishable"
+      ],
+      "properties": {
+        "uses": [
+          "cook"
+        ]
+      }
     },
     {
       "id": "cooked_meat",
-      "type": "Consumable",
       "name": "Cooked Meat",
       "description": "Properly cooked meat, safe to eat.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 5,
-      "rarity": "common",
-      "attributes": ["food", "meat", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "meat",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "bread",
-      "type": "Consumable",
       "name": "Bread",
       "description": "A loaf of bread.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 1,
-      "rarity": "common",
-      "attributes": ["food", "staple", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "staple",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "fish",
-      "type": "Consumable",
       "name": "Fish (raw)",
       "description": "A freshly caught fish; should be cooked.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 2,
-      "rarity": "common",
-      "attributes": ["food", "raw", "perishable"],
-      "uses": ["cook"]
+      "attributes": [
+        "food",
+        "raw",
+        "perishable"
+      ],
+      "properties": {
+        "uses": [
+          "cook"
+        ]
+      }
     },
     {
       "id": "nuts",
-      "type": "Consumable",
       "name": "Nuts",
       "description": "A handful of nuts for snacking.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 16,
       "cost": 1,
-      "rarity": "common",
-      "attributes": ["food", "snack", "non-perishable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "snack",
+        "non-perishable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "honey",
-      "type": "Consumable",
       "name": "Honey",
       "description": "A jar of sweet honey.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 3,
-      "rarity": "common",
-      "attributes": ["food", "sweet", "preservative"],
-      "uses": ["eat", "cook"]
+      "attributes": [
+        "food",
+        "sweet",
+        "preservative"
+      ],
+      "properties": {
+        "uses": [
+          "eat",
+          "cook"
+        ]
+      }
     },
     {
       "id": "spices",
-      "type": "Item",
       "name": "Spices",
       "description": "A small collection of spices used for cooking.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 32,
       "cost": 5,
-      "rarity": "common",
-      "attributes": ["cooking", "tool"]
+      "attributes": [
+        "cooking",
+        "tool"
+      ],
+      "properties": {}
     },
     {
       "id": "salt",
-      "type": "Item",
       "name": "Salt",
       "description": "A pouch of salt for preserving and seasoning food.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 32,
       "cost": 1,
-      "rarity": "common",
-      "attributes": ["cooking", "preservative"]
+      "attributes": [
+        "cooking",
+        "preservative"
+      ],
+      "properties": {}
     },
     {
       "id": "sugar",
-      "type": "Item",
       "name": "Sugar",
       "description": "A pouch of sugar for sweetening food.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 32,
       "cost": 2,
-      "rarity": "common",
-      "attributes": ["cooking", "sweetener"]
+      "attributes": [
+        "cooking",
+        "sweetener"
+      ],
+      "properties": {}
     },
     {
       "id": "tea_leaves",
-      "type": "Item",
       "name": "Tea Leaves",
       "description": "Dried tea leaves for brewing.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 13,
       "cost": 2,
-      "rarity": "common",
-      "attributes": ["consumable", "drink", "caffeine"]
+      "attributes": [
+        "consumable",
+        "drink",
+        "caffeine"
+      ],
+      "properties": {}
     },
     {
       "id": "coffee_beans",
-      "type": "Item",
       "name": "Coffee Beans",
       "description": "Ground coffee for brewing a strong drink.",
+      "type": "Item",
+      "rarity": "common",
       "weight": 13,
       "cost": 3,
-      "rarity": "common",
-      "attributes": ["consumable", "drink", "caffeine"]
+      "attributes": [
+        "consumable",
+        "drink",
+        "caffeine"
+      ],
+      "properties": {}
     },
     {
       "id": "ale",
-      "type": "Consumable",
       "name": "Ale",
       "description": "A small bottle of ale.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 128,
       "cost": 5,
-      "rarity": "common",
-      "attributes": ["drink", "alcohol", "consumable"],
-      "uses": ["drink"]
+      "attributes": [
+        "drink",
+        "alcohol",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "drink"
+        ]
+      }
     },
     {
       "id": "wine",
-      "type": "Consumable",
       "name": "Wine",
       "description": "A bottle of wine.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 128,
       "cost": 20,
-      "rarity": "common",
-      "attributes": ["drink", "alcohol", "consumable"],
-      "uses": ["drink"]
+      "attributes": [
+        "drink",
+        "alcohol",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "drink"
+        ]
+      }
     },
     {
       "id": "mead",
-      "type": "Consumable",
       "name": "Mead",
       "description": "A sweet alcoholic beverage made from honey.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 128,
       "cost": 15,
-      "rarity": "common",
-      "attributes": ["drink", "alcohol", "consumable"],
-      "uses": ["drink"]
+      "attributes": [
+        "drink",
+        "alcohol",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "drink"
+        ]
+      }
     },
     {
       "id": "milk",
-      "type": "Consumable",
       "name": "Milk",
       "description": "A bottle of fresh milk.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 128,
       "cost": 2,
-      "rarity": "common",
-      "attributes": ["drink", "dairy", "consumable"],
-      "uses": ["drink"]
+      "attributes": [
+        "drink",
+        "dairy",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "drink"
+        ]
+      }
     },
     {
       "id": "juice",
-      "type": "Consumable",
       "name": "Juice",
       "description": "A bottle of fresh fruit juice.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 128,
       "cost": 3,
-      "rarity": "common",
-      "attributes": ["drink", "consumable"],
-      "uses": ["drink"]
+      "attributes": [
+        "drink",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "drink"
+        ]
+      }
     },
     {
       "id": "stew",
-      "type": "Consumable",
       "name": "Stew",
       "description": "A hearty stew filled with meat and vegetables.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 4,
-      "rarity": "common",
-      "attributes": ["food", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "cake",
-      "type": "Consumable",
       "name": "Cake",
       "description": "A slice of sweet cake.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 5,
-      "rarity": "common",
-      "attributes": ["food", "dessert", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "dessert",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "pie",
-      "type": "Consumable",
       "name": "Pie",
       "description": "A slice of fruit pie.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 64,
       "cost": 4,
-      "rarity": "common",
-      "attributes": ["food", "dessert", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "dessert",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "cookies",
-      "type": "Consumable",
       "name": "Cookies",
       "description": "A small bag of cookies.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 32,
       "cost": 2,
-      "rarity": "common",
-      "attributes": ["food", "snack", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "snack",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "jerky",
-      "type": "Consumable",
       "name": "Jerky",
       "description": "Dried meat, good for travel.",
+      "type": "Consumable",
+      "rarity": "common",
       "weight": 16,
       "cost": 3,
-      "rarity": "common",
-      "attributes": ["food", "preserved", "consumable"],
-      "uses": ["eat"]
+      "attributes": [
+        "food",
+        "preserved",
+        "consumable"
+      ],
+      "properties": {
+        "uses": [
+          "eat"
+        ]
+      }
     },
     {
       "id": "padded_boots",
-      "type": "Armor",
       "name": "Padded Boots (inner)",
       "description": "Cloth boots worn under outer footwear.",
-      "armorClass": 0,
-      "slot": { "feet_inner": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 64,
       "cost": 5,
-      "rarity": "common",
-      "attributes": ["cloth", "light", "armor"],
-      "AR": { "physical": 0, "slashing": 0, "pierce": 0, "bludgeoning": 0 }
+      "attributes": [
+        "cloth",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 0,
+        "slot": {
+          "feet_inner": 1
+        },
+        "AR": {
+          "physical": 0,
+          "slashing": 0,
+          "pierce": 0,
+          "bludgeoning": 0
+        }
+      }
     },
     {
       "id": "padded_leggings",
-      "type": "Armor",
       "name": "Padded Leggings (inner)",
       "description": "Soft padded leggings for comfort and minimal protection.",
-      "armorClass": 0,
-      "slot": { "legs_inner": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 160,
       "cost": 8,
-      "rarity": "common",
-      "attributes": ["cloth", "light", "armor"],
-      "AR": { "physical": 0, "slashing": 0 }
+      "attributes": [
+        "cloth",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 0,
+        "slot": {
+          "legs_inner": 1
+        },
+        "AR": {
+          "physical": 0,
+          "slashing": 0
+        }
+      }
     },
     {
       "id": "padded_chest_inner",
-      "type": "Armor",
       "name": "Padded Chest (inner)",
       "description": "Layer of padding worn beneath other armor.",
-      "armorClass": 11,
-      "slot": { "chest_inner": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 320,
       "cost": 20,
-      "rarity": "common",
-      "attributes": ["cloth", "light", "armor"],
-      "AR": { "physical": 0, "slashing": 0 }
+      "attributes": [
+        "cloth",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 11,
+        "slot": {
+          "chest_inner": 1
+        },
+        "AR": {
+          "physical": 0,
+          "slashing": 0
+        }
+      }
     },
     {
       "id": "padded_helmet",
-      "type": "Armor",
       "name": "Padded Cap",
       "description": "A padded cap offering minimal head protection.",
-      "armorClass": 0,
-      "slot": { "head": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 96,
       "cost": 6,
-      "rarity": "common",
-      "attributes": ["cloth", "light", "armor"],
-      "AR": { "physical": 0 }
+      "attributes": [
+        "cloth",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 0,
+        "slot": {
+          "head": 1
+        },
+        "AR": {
+          "physical": 0
+        }
+      }
     },
-
     {
       "id": "leather_boots",
-      "type": "Armor",
       "name": "Leather Boots (inner)",
       "description": "Sturdy leather footwear offering modest protection.",
-      "armorClass": 0,
-      "slot": { "feet_inner": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 128,
       "cost": 12,
-      "rarity": "common",
-      "attributes": ["leather", "light", "armor"],
-      "AR": { "physical": 0, "slashing": 1 }
+      "attributes": [
+        "leather",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 0,
+        "slot": {
+          "feet_inner": 1
+        },
+        "AR": {
+          "physical": 0,
+          "slashing": 1
+        }
+      }
     },
     {
       "id": "leather_leggings",
-      "type": "Armor",
       "name": "Leather Leggings (inner)",
       "description": "Leather leggings protecting the legs.",
-      "armorClass": 0,
-      "slot": { "legs_inner": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 512,
       "cost": 30,
-      "rarity": "common",
-      "attributes": ["leather", "light", "armor"],
-      "AR": { "physical": 0, "slashing": 1 }
+      "attributes": [
+        "leather",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 0,
+        "slot": {
+          "legs_inner": 1
+        },
+        "AR": {
+          "physical": 0,
+          "slashing": 1
+        }
+      }
     },
     {
       "id": "leather_chest_inner",
-      "type": "Armor",
       "name": "Leather Chest (inner)",
       "description": "A leather torso piece worn under heavier armor or alone.",
-      "armorClass": 11,
-      "slot": { "chest_inner": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 640,
       "cost": 60,
-      "rarity": "common",
-      "attributes": ["leather", "light", "armor"],
-      "AR": { "physical": 1, "slashing": 1 }
+      "attributes": [
+        "leather",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 11,
+        "slot": {
+          "chest_inner": 1
+        },
+        "AR": {
+          "physical": 1,
+          "slashing": 1
+        }
+      }
     },
     {
       "id": "leather_helmet",
-      "type": "Armor",
       "name": "Leather Cap",
       "description": "Simple leather head protection.",
-      "armorClass": 0,
-      "slot": { "head": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 192,
       "cost": 18,
-      "rarity": "common",
-      "attributes": ["leather", "light", "armor"],
-      "AR": { "physical": 1 }
+      "attributes": [
+        "leather",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 0,
+        "slot": {
+          "head": 1
+        },
+        "AR": {
+          "physical": 1
+        }
+      }
     },
-
     {
       "id": "chain_boots",
-      "type": "Armor",
       "name": "Chain Boots (inner)",
       "description": "Boots reinforced with chain links; worn inside outer greaves.",
-      "armorClass": 0,
-      "slot": { "feet_inner": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 384,
       "cost": 40,
-      "rarity": "common",
-      "attributes": ["metal", "chain", "armor"],
-      "AR": { "physical": 1, "slashing": 2, "pierce": 1 }
+      "attributes": [
+        "metal",
+        "chain",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 0,
+        "slot": {
+          "feet_inner": 1
+        },
+        "AR": {
+          "physical": 1,
+          "slashing": 2,
+          "pierce": 1
+        }
+      }
     },
     {
       "id": "chain_leggings",
-      "type": "Armor",
       "name": "Chain Leggings (inner)",
       "description": "Leg protection made from interlocking rings.",
-      "armorClass": 0,
-      "slot": { "legs_inner": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 1280,
       "cost": 120,
-      "rarity": "common",
-      "attributes": ["metal", "chain", "armor"],
-      "AR": { "physical": 1, "slashing": 2, "pierce": 1 }
+      "attributes": [
+        "metal",
+        "chain",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 0,
+        "slot": {
+          "legs_inner": 1
+        },
+        "AR": {
+          "physical": 1,
+          "slashing": 2,
+          "pierce": 1
+        }
+      }
     },
     {
       "id": "chain_chest_inner",
-      "type": "Armor",
       "name": "Chainmail Shirt (inner)",
       "description": "A hauberk of interlocking rings; good vs slashing.",
-      "armorClass": 16,
-      "slot": { "chest_inner": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 3520,
       "cost": 400,
-      "rarity": "common",
-      "attributes": ["metal", "chain", "heavy", "armor"],
-      "AR": { "physical": 2, "slashing": 3, "pierce": 1 }
+      "attributes": [
+        "metal",
+        "chain",
+        "heavy",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 16,
+        "slot": {
+          "chest_inner": 1
+        },
+        "AR": {
+          "physical": 2,
+          "slashing": 3,
+          "pierce": 1
+        }
+      }
     },
     {
       "id": "chain_helmet",
-      "type": "Armor",
       "name": "Chain Coif",
       "description": "A chain coif protecting the head and neck.",
-      "armorClass": 0,
-      "slot": { "head": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 640,
       "cost": 80,
-      "rarity": "common",
-      "attributes": ["metal", "chain", "armor"],
-      "AR": { "physical": 1, "slashing": 2 }
+      "attributes": [
+        "metal",
+        "chain",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 0,
+        "slot": {
+          "head": 1
+        },
+        "AR": {
+          "physical": 1,
+          "slashing": 2
+        }
+      }
     },
     {
       "id": "iron_boots",
-      "type": "Armor",
       "name": "Iron Boots (outer)",
       "description": "Heavy iron boots offering solid protection.",
-      "armorClass": 1,
-      "slot": { "feet_outer": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 800,
       "cost": 60,
-      "rarity": "common",
-      "attributes": ["metal", "iron", "armor"],
-      "AR": { "physical": 1, "bludgeoning": 1, "slashing": 1 }
+      "attributes": [
+        "metal",
+        "iron",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 1,
+        "slot": {
+          "feet_outer": 1
+        },
+        "AR": {
+          "physical": 1,
+          "bludgeoning": 1,
+          "slashing": 1
+        }
+      }
     },
     {
       "id": "iron_leggings",
-      "type": "Armor",
       "name": "Iron Greaves (outer)",
       "description": "Iron greaves to protect the legs.",
-      "armorClass": 2,
-      "slot": { "legs_outer": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 1600,
       "cost": 120,
-      "rarity": "common",
-      "attributes": ["metal", "iron", "armor", "heavy"],
-      "AR": { "physical": 1, "bludgeoning": 2 }
+      "attributes": [
+        "metal",
+        "iron",
+        "armor",
+        "heavy"
+      ],
+      "properties": {
+        "armorClass": 2,
+        "slot": {
+          "legs_outer": 1
+        },
+        "AR": {
+          "physical": 1,
+          "bludgeoning": 2
+        }
+      }
     },
     {
       "id": "iron_chest_outer",
-      "type": "Armor",
       "name": "Iron Chestplate (outer)",
       "description": "A simple iron breastplate offering good protection.",
-      "armorClass": 16,
-      "slot": { "chest_outer": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 3000,
       "cost": 300,
-      "rarity": "common",
-      "attributes": ["metal", "iron", "armor", "heavy"],
-      "AR": { "physical": 2, "bludgeoning": 2, "slashing": 1 }
+      "attributes": [
+        "metal",
+        "iron",
+        "armor",
+        "heavy"
+      ],
+      "properties": {
+        "armorClass": 16,
+        "slot": {
+          "chest_outer": 1
+        },
+        "AR": {
+          "physical": 2,
+          "bludgeoning": 2,
+          "slashing": 1
+        }
+      }
     },
     {
       "id": "iron_helmet",
-      "type": "Armor",
       "name": "Iron Helmet",
       "description": "A plain iron helmet to guard the head.",
-      "armorClass": 1,
-      "slot": { "head": 1 },
+      "type": "Armor",
+      "rarity": "common",
       "weight": 800,
       "cost": 80,
-      "rarity": "common",
-      "attributes": ["metal", "iron", "armor"],
-      "AR": { "physical": 1, "bludgeoning": 2 }
+      "attributes": [
+        "metal",
+        "iron",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 1,
+        "slot": {
+          "head": 1
+        },
+        "AR": {
+          "physical": 1,
+          "bludgeoning": 2
+        }
+      }
     },
-
     {
       "id": "reinforced_iron_chest_outer",
-      "type": "Armor",
       "name": "Reinforced Iron Chestplate (outer)",
       "description": "Iron chestplate with added reinforcement for blunt damage.",
-      "armorClass": 17,
-      "slot": { "chest_outer": 1 },
+      "type": "Armor",
+      "rarity": "uncommon",
       "weight": 3400,
       "cost": 600,
-      "rarity": "uncommon",
-      "attributes": ["metal", "iron", "reinforced", "armor"],
-      "AR": { "physical": 3, "bludgeoning": 3, "slashing": 1 }
+      "attributes": [
+        "metal",
+        "iron",
+        "reinforced",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 17,
+        "slot": {
+          "chest_outer": 1
+        },
+        "AR": {
+          "physical": 3,
+          "bludgeoning": 3,
+          "slashing": 1
+        }
+      }
     },
-
     {
       "id": "steel_boots",
-      "type": "Armor",
       "name": "Steel Boots (outer)",
       "description": "Polished steel boots offering strong protection.",
-      "armorClass": 1,
-      "slot": { "feet_outer": 1 },
+      "type": "Armor",
+      "rarity": "uncommon",
       "weight": 900,
       "cost": 150,
-      "rarity": "uncommon",
-      "attributes": ["metal", "steel", "armor", "heavy"],
-      "AR": { "physical": 2, "bludgeoning": 2 }
+      "attributes": [
+        "metal",
+        "steel",
+        "armor",
+        "heavy"
+      ],
+      "properties": {
+        "armorClass": 1,
+        "slot": {
+          "feet_outer": 1
+        },
+        "AR": {
+          "physical": 2,
+          "bludgeoning": 2
+        }
+      }
     },
     {
       "id": "steel_leggings",
-      "type": "Armor",
       "name": "Steel Greaves (outer)",
       "description": "Steel greaves for robust leg protection.",
-      "armorClass": 2,
-      "slot": { "legs_outer": 1 },
+      "type": "Armor",
+      "rarity": "uncommon",
       "weight": 1800,
       "cost": 300,
-      "rarity": "uncommon",
-      "attributes": ["metal", "steel", "armor", "heavy"],
-      "AR": { "physical": 2, "bludgeoning": 3 }
+      "attributes": [
+        "metal",
+        "steel",
+        "armor",
+        "heavy"
+      ],
+      "properties": {
+        "armorClass": 2,
+        "slot": {
+          "legs_outer": 1
+        },
+        "AR": {
+          "physical": 2,
+          "bludgeoning": 3
+        }
+      }
     },
     {
       "id": "steel_chest_outer",
-      "type": "Armor",
       "name": "Steel Chestplate (outer)",
       "description": "Well-forged steel chest armor, solid against blows.",
-      "armorClass": 18,
-      "slot": { "chest_outer": 1 },
+      "type": "Armor",
+      "rarity": "uncommon",
       "weight": 3600,
       "cost": 900,
-      "rarity": "uncommon",
-      "attributes": ["metal", "steel", "armor", "heavy"],
-      "AR": { "physical": 3, "bludgeoning": 3, "slashing": 2 }
+      "attributes": [
+        "metal",
+        "steel",
+        "armor",
+        "heavy"
+      ],
+      "properties": {
+        "armorClass": 18,
+        "slot": {
+          "chest_outer": 1
+        },
+        "AR": {
+          "physical": 3,
+          "bludgeoning": 3,
+          "slashing": 2
+        }
+      }
     },
     {
       "id": "steel_helmet",
-      "type": "Armor",
       "name": "Steel Helmet",
       "description": "A strong steel helmet designed to withstand heavy strikes.",
-      "armorClass": 2,
-      "slot": { "head": 1 },
+      "type": "Armor",
+      "rarity": "uncommon",
       "weight": 960,
       "cost": 200,
-      "rarity": "uncommon",
-      "attributes": ["metal", "steel", "armor"],
-      "AR": { "physical": 2, "bludgeoning": 3 }
+      "attributes": [
+        "metal",
+        "steel",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 2,
+        "slot": {
+          "head": 1
+        },
+        "AR": {
+          "physical": 2,
+          "bludgeoning": 3
+        }
+      }
     },
-
     {
       "id": "hardened_steel_chest_outer",
-      "type": "Armor",
       "name": "Hardened Steel Chestplate (outer)",
       "description": "Heat-treated hardened steel offering superior blunt resistance.",
-      "armorClass": 19,
-      "slot": { "chest_outer": 1 },
+      "type": "Armor",
+      "rarity": "rare",
       "weight": 3800,
       "cost": 1600,
-      "rarity": "rare",
-      "attributes": ["metal", "steel", "hardened", "armor"],
-      "AR": { "physical": 4, "bludgeoning": 4, "slashing": 2 }
+      "attributes": [
+        "metal",
+        "steel",
+        "hardened",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 19,
+        "slot": {
+          "chest_outer": 1
+        },
+        "AR": {
+          "physical": 4,
+          "bludgeoning": 4,
+          "slashing": 2
+        }
+      }
     },
-
     {
       "id": "mithril_boots",
-      "type": "Armor",
       "name": "Mithril Boots (outer)",
       "description": "Lightweight mithril footwear combining mobility and protection.",
-      "armorClass": 1,
-      "slot": { "feet_outer": 1 },
+      "type": "Armor",
+      "rarity": "very rare",
       "weight": 160,
       "cost": 2000,
-      "rarity": "very rare",
-      "attributes": ["mithril", "light", "armor"],
-      "AR": { "physical": 2, "slashing": 2, "pierce": 2 }
+      "attributes": [
+        "mithril",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 1,
+        "slot": {
+          "feet_outer": 1
+        },
+        "AR": {
+          "physical": 2,
+          "slashing": 2,
+          "pierce": 2
+        }
+      }
     },
     {
       "id": "mithril_leggings",
-      "type": "Armor",
       "name": "Mithril Greaves (outer)",
       "description": "Mithril leg armor: light yet very protective.",
-      "armorClass": 2,
-      "slot": { "legs_outer": 1 },
+      "type": "Armor",
+      "rarity": "very rare",
       "weight": 320,
       "cost": 4000,
-      "rarity": "very rare",
-      "attributes": ["mithril", "light", "armor"],
-      "AR": { "physical": 3, "slashing": 3, "pierce": 2 }
+      "attributes": [
+        "mithril",
+        "light",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 2,
+        "slot": {
+          "legs_outer": 1
+        },
+        "AR": {
+          "physical": 3,
+          "slashing": 3,
+          "pierce": 2
+        }
+      }
     },
     {
       "id": "mithril_chest_outer",
-      "type": "Armor",
       "name": "Mithril Breastplate (outer)",
       "description": "A masterfully forged mithril breastplate: excellent protection with low weight.",
-      "armorClass": 19,
-      "slot": { "chest_outer": 1 },
+      "type": "Armor",
+      "rarity": "legendary",
       "weight": 800,
       "cost": 12000,
-      "rarity": "legendary",
-      "attributes": ["mithril", "armor", "light"],
-      "AR": { "physical": 4, "slashing": 3, "pierce": 3, "magical": 1 }
+      "attributes": [
+        "mithril",
+        "armor",
+        "light"
+      ],
+      "properties": {
+        "armorClass": 19,
+        "slot": {
+          "chest_outer": 1
+        },
+        "AR": {
+          "physical": 4,
+          "slashing": 3,
+          "pierce": 3,
+          "magical": 1
+        }
+      }
     },
     {
       "id": "mithril_helmet",
-      "type": "Armor",
       "name": "Mithril Helm",
       "description": "A lightweight mithril helmet offering excellent protection.",
-      "armorClass": 2,
-      "slot": { "head": 1 },
+      "type": "Armor",
+      "rarity": "very rare",
       "weight": 160,
       "cost": 3000,
-      "rarity": "very rare",
-      "attributes": ["mithril", "armor"],
-      "AR": { "physical": 3, "slashing": 3 }
+      "attributes": [
+        "mithril",
+        "armor"
+      ],
+      "properties": {
+        "armorClass": 2,
+        "slot": {
+          "head": 1
+        },
+        "AR": {
+          "physical": 3,
+          "slashing": 3
+        }
+      }
     }
-
   ]
 }
