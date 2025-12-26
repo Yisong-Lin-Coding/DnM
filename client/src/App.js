@@ -37,6 +37,9 @@ function App() {
 
     socket.on("welcome", (data) => {
       console.log("Server says:", data.message);
+      if(localStorage.getItem("player_ID")){
+        socket.emit("playerData_logOn", { playerID: localStorage.getItem("player_ID") });
+      }
     });
 
     socket.on("connect_error", (err) => {
