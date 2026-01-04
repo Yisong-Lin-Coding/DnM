@@ -15,6 +15,7 @@ const classSchema = new mongoose.Schema({
     featuresByLevel: { type: Map, of: [String], default: {} },
 
     choices: { type: Object, default: {} },
+    subclasses: { type: [String], default: [] },
 
 
 

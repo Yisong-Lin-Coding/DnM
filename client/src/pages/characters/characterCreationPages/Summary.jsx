@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card } from '../../../pageComponents/card';
+import { CircleUser, Shuffle } from 'lucide-react';
 
 // Summary tab with Equipment merged here (barebones preview)
 export function Summary({ values, onChange, onSave }) {
@@ -8,8 +9,7 @@ export function Summary({ values, onChange, onSave }) {
 
   return (
     <div className='bg-website-default-900 min-h-screen grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr]'>
-      <div></div>
-      <div className='p-4 space-y-4'>
+      <div className='p-4 space-y-4  md:col-start-2'>
         <Card className='bg-website-default-800 border-website-specials-500'>
           <Card.Header>
             <Card.Title className='text-website-default-100'>Summary</Card.Title>

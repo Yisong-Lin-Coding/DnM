@@ -2084,6 +2084,311 @@
           "slashing": 3
         }
       }
+    },
+    {
+      "id": "torch",
+      "name": "Consumable",
+      "description": "A wooden torch that provides light and can ignite flammable materials.",
+      "type": "Item",
+      "rarity": "common",
+      "weight": 64,
+      "cost": 1,
+      "attributes": [
+        "tool",
+        "light",
+        "fire"
+      ],
+      "properties": {
+        "uses": [
+          "light"
+        ]
+      }
+    },
+    {
+      "id": "healer_kit",
+      "name": "Healer's Kit",
+      "description": "A kit containing bandages and salves for treating wounds.",
+      "type": "Item",
+      "rarity": "common",
+      "weight": 256,
+      "cost": 25,
+      "attributes": [
+        "tool",
+        "medical",
+        "healing"
+      ],
+      "properties": {
+        "uses": [
+          "treat_wounds"]
+        }
+      },
+    {
+      "id": "potion_healing",
+      "name": "Potion of Healing",
+      "description": "Restores health when consumed.",
+      "type": "Consumable",
+      "rarity": "common",
+      "weight": 32,
+      "cost": 50,
+      "attributes": [
+        "consumable",
+        "healing"
+      ],
+      "properties": {
+        "use": [
+          "drink"
+        ],
+        "effects": [
+          {
+            "type": "HealEffect",
+            "name": "Healing",
+            "duration": 0,
+            "amount": "2d4+2"
+          }
+        ]
+      }
+    },
+    {
+      "id":"blanket",
+      "name":"Blanket",
+      "description":"A warm blanket to provide comfort and warmth.",
+      "type":"Utility",
+      "rarity":"common",
+      "weight":256,
+      "cost":10,
+      "attributes":[
+        "comfort",
+        "warmth",
+        "camping"
+      ],
+      "properties":{
+        "uses":[
+          "cover",
+          "sleep"
+        ]
+      }
+    },
+    {
+      "id":"mess_kit",
+      "name":"Mess Kit",
+      "description":"A compact kit containing utensils and a plate for eating meals while traveling.",
+      "type":"Utility",
+      "rarity":"common",
+      "weight":128,
+      "cost":15,
+      "attributes":[
+        "cooking",
+        "eating",
+        "camping"
+      ],
+      "properties":{
+        "uses":[
+          "eat",
+          "prepare_food"
+        ]
+      }
+    },
+    {
+      "id":"hempen_rope",
+      "name":"Hempen Rope",
+      "description":"A sturdy rope made from hemp fibers, useful for climbing, tying, or securing items.",
+      "type":"Utility",
+      "rarity":"common",
+      "weight":16,
+      "cost":1,
+      "attributes":[
+        "tool",
+        "climbing",
+        "camping"
+      ],
+      "properties":{
+        "uses":[
+          "tie",
+          "climb",
+          "secure"
+        ]
+      }
+    },
+    {
+      "id":"crowbar",
+      "name":"Crowbar",
+      "description":"A strong metal crowbar useful for prying open crates, doors, or other objects.",
+      "type":"Utility",
+      "rarity":"common",
+      "weight":512,
+      "cost":20,
+      "attributes":[
+        "tool",
+        "prying",
+        "metal"
+      ],
+      "properties":{
+        "uses":[
+          "pry",
+          "lever"
+        ]
+      }
+    },
+    {
+      "id":"hammer",
+      "name":"Hammer",
+      "description":"A sturdy hammer useful for driving nails, breaking objects, or as a makeshift weapon.",
+      "type":"Utility",
+      "rarity":"common",
+      "weight":1024,
+      "cost":25,
+      "attributes":[
+        "tool",
+        "construction",
+        "metal"
+      ],
+      "properties":{
+        "uses":[
+          "build",
+          "break",
+          "weapon"
+        ]
+      }
+    },
+    {
+      "id":"shovel",
+      "name":"Shovel",
+      "description":"A durable shovel useful for digging, moving earth, or clearing debris.",
+      "type":"Utility",
+      "rarity":"common",
+      "weight":2048,
+      "cost":30,
+      "attributes":[
+        "tool",
+        "digging",
+        "metal"
+      ],
+      "properties":{
+        "uses":[
+          "dig",
+          "move_earth",
+          "clear"
+        ]
+      }
+    },
+    {
+      "id":"piton",
+      "name":"Piton",
+      "description":"A metal spike used in climbing to secure ropes to rock faces.",
+      "type":"Utility",
+      "rarity":"common",
+      "weight":64,
+      "cost":5,
+      "attributes":[
+        "tool",
+        "climbing",
+        "metal"
+      ],
+      "properties":{
+        "uses":[
+          "secure_rope",
+          "climb"
+        ]
     }
+  },
+  {
+    "id":"candle",
+    "name":"Candle",
+    "description":"A wax candle that provides light in dark environments.",
+    "type":"Utility",
+    "rarity":"common",
+    "weight":32,
+    "cost":2,
+    "attributes":[
+      "light",
+      "wax",
+      "fire"
+    ],
+    "properties":{
+      "uses":[
+        "light",
+        "melt_wax"
+      ]
+  }
+},
+{
+  "id":"oil_flask",
+  "name":"Flask of Oil",
+  "description":"A small flask filled with oil, useful for lighting fires or lubricating mechanisms.",
+  "type":"Utility",
+  "rarity":"uncommon",
+  "weight":128,
+  "cost":15,
+  "attributes":[
+    "fire",
+    "liquid",
+    "tool"
+  ],
+  "properties":{
+    "uses":[
+      "light_fire",
+      "lubricate"
+    ]
+  }
+},
+{
+  "id":"ball_bearing",
+  "name":"A single ball bearing",
+  "description":"A small metal ball bearing, useful for creating traps or mechanisms.",
+  "type":"Utility",
+  "rarity":"common",
+  "weight":8,
+  "cost":1,
+  "attributes":[
+    "metal",
+    "tool",
+    "mechanical"
+  ],
+  "properties":{
+    "uses":[
+      "trap",
+      "mechanism"
+    ]}},
+    {
+      "id":"string",
+      "name":"String",
+      "description":"A length of strong string, useful for tying or binding objects.",
+      "type":"Utility",
+      "rarity":"common",
+      "weight":16,
+      "cost":2,
+      "attributes":[
+        "tool",
+        "tying",
+        "binding"
+      ],
+      "properties":{
+        "uses":[
+          "tie",
+          "bind"
+        ]
+      }
+    },
+    {
+      "id":"bell",
+      "name":"Bell",
+      "description":"A small bell that produces a ringing sound when shaken.",
+      "type":"Utility",
+      "rarity":"common",
+      "weight":64,
+      "cost":10,
+      "attributes":[
+        "sound",
+        "tool",
+        "metal"
+      ],
+      "properties":{
+        "uses":[
+          "alert",
+          "signal"
+        ]
+    }
+  }
+
   ]
 }

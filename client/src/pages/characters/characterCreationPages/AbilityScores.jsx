@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card } from '../../../pageComponents/card';
+import { CircleUser, Shuffle } from 'lucide-react';
 
 export function AbilityScores({ values, onChange }) {
   const stats = values?.stats || { str: '', dex: '', con: '', int: '', wis: '', cha: '', luck: '' };
@@ -26,8 +27,23 @@ export function AbilityScores({ values, onChange }) {
 
   return (
     <div className='bg-website-default-900 min-h-screen grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr]'>
-      <div></div>
-      <div className='p-4 space-y-4'>
+      <div className='p-4 space-y-4  md:col-start-2'>
+
+        <div className='flex flex-row p-4 space-x-4 border-b border-website-specials-500'>
+          <CircleUser size={48} />
+          <div className='flex flex-col'>
+            <div className='text-left text-l font-semibold'>Character Name</div>
+            <input 
+              type="text"
+              placeholder='Name...'
+              className='border-b border-website-highlights-400 bg-website-default-900 focus:outline-none focus:bg-gradient-to-t from-website-highlights-500 to-website-default-900' 
+              value={values.name || ''}
+              onChange={(e) => emit({ name: e.target.value })}
+            />
+          </div>
+        </div>
+
+
         <Card className='bg-website-default-800 border-website-specials-500'>
           <Card.Header>
             <Card.Title className='text-website-default-100'>Ability Scores</Card.Title>

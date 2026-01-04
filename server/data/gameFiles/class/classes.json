@@ -9,8 +9,8 @@
       "MP": 0.3
     },
     "baseStatModifier": {
-      "str": 1,
-      "con": 1
+      "STR": 1,
+      "CON": 1
     },
     "baseProficiencies": [
       "lightArmor",
@@ -107,14 +107,30 @@
           }
         }
       }
-    }
+    },  
+    "subclasses": [
+      "pathOfWrath",
+      "pathOfMadness",
+      "pathOfDespair",
+      "pathOfEnvy",
+      "pathOfGlee",
+      "pathOfDevotion",
+      "pathOfTemperance"
+
+    ]
   },
   "Bard": {
     "name": "Bard",
     "classID": "bard",
     "description": "An inspiring magician whose power echoes the music of creation",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      "HP": 1,
+      "STA": 1,
+      "MP": 1.3
+    },
+    "baseStatModifier": {
+      "CHA":2
+    },
     "baseProficiencies": [
       "lightArmor",
       "simpleWeapons",
@@ -191,14 +207,30 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "rushE",
+      "beethovensSymphony",
+      "panisAngelicus",
+      "bohemianRhapsody",
+      "requiemOfSilence",
+      "moonlightSonata",
+      "diesIrae"
+
+    ]
   },
   "Cleric": {
     "name": "Cleric",
     "classID": "cleric",
     "description": "A priestly champion who wields divine magic in service of a higher power",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      "HP": 1.2,
+      "STA": 0.8,
+      "MP": 1.5},
+    "baseStatModifier": {
+      "WIS":1,
+      "INT":1
+    },
     "baseProficiencies": [
       "lightArmor",
       "mediumArmor",
@@ -263,14 +295,31 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "mandateOfHeaven",
+      "domainOfCommunion",
+      "liturgyOfEmbers",
+      "creedOfSerenity",
+      "edictOfJudgment",
+      "orderOfTheAnoited",
+      "covenantOfRevelation",
+      "sacramentOfWar"
+
+    ]
   },
   "Druid": {
     "name": "Druid",
     "classID": "druid",
     "description": "A priest of the old nature, wielding magic to preserve the balance of the natural world",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      "HP": 1,
+      "STA": 1,
+      "MP": 1.5},
+    "baseStatModifier": {
+      "INT":1,
+      "DEX":1
+    },
     "baseProficiencies": [
       "lightArmor",
       "mediumArmor",
@@ -327,14 +376,29 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "fruitOfTheLand",
+      "fruitOfTheSeasons",
+      "fruitOfSpores",
+      "fruitOfTheMoon",
+      "fruitOfTheHidden"
+
+    ]
   },
   "Fighter": {
     "name": "Fighter",
     "classID": "fighter",
     "description": "A master of weaponry and martial techniques who relies on discipline and training",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      "HP": 1.5,
+      "STA": 1.5,
+      "MP": 0.3},
+    "baseStatModifier": {
+      "STR":1,
+      "DEX":1
+
+    },
     "baseProficiencies": [
       "allArmor",
       "shields",
@@ -399,14 +463,30 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "legacyOfTheGreatKhan",
+      "alexandersLegacy",
+      "legacyOfTheRajputs",
+      "joanOfArcsLegacy",
+      "legacyOfBismark",
+      "lionheartsLegacy",
+      "legacyOfTheSettingSun"
+
+    ]
   },
   "Monk": {
     "name": "Monk",
     "classID": "monk",
     "description": "A master of martial arts, harnessing the power of the body in pursuit of physical and spiritual perfection",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      "HP": 1.2,
+      "STA": 2,
+      "MP": 0.8},
+    "baseStatModifier": {
+      "DEX":1,
+      "WIS":1
+    },
     "baseProficiencies": [
       "simpleWeapons",
       "shortswords",
@@ -447,14 +527,31 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "wayOfTheStoic",
+      "wayOfTheBuddha",
+      "wayOfTheTao",
+      "wayOfTheNihilist",
+      "wayOfTheAbsurdist",
+      "wayOfTheExistentialist",
+      "wayOfTheHedon"
+
+    ]
   },
   "Paladin": {
     "name": "Paladin",
     "classID": "paladin",
     "description": "A holy warrior bound by a solemn oath to righteousness and justice",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      "HP": 1.5,
+      "STA": 1,
+      "MP": 1},
+    "baseStatModifier": {
+      "CON":1,
+      "CHA":1
+
+    },
     "baseProficiencies": [
       "allArmor",
       "shields",
@@ -508,14 +605,28 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "sacredOath",
+      "oathOfDecotion",
+      "oathOfHeresy",
+      "oathOfSilence",
+      "oathOfMagic"
+
+    ]
   },
   "Ranger": {
     "name": "Ranger",
     "classID": "ranger",
     "description": "A skilled hunter and tracker who roams the wilderness in pursuit of justice",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      "HP": 1.2,
+      "STA": 1.5,
+      "MP": 0.8},
+    "baseStatModifier": {
+      "DEX":1,
+      "INT":1
+    },
     "baseProficiencies": [
       "lightArmor",
       "simpleWeapons",
@@ -568,14 +679,27 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "markOfTheHunter",
+      "markOfTheTracker",
+      "markOfTheNightStalker",
+      "markOfTheSurvivor",
+      "markOfTheBeast"
+
+    ]
   },
   "Rogue": {
     "name": "Rogue",
     "classID": "rogue",
     "description": "A cunning and skilled character who relies on stealth, precision, and deception",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      "HP": 1,
+      "STA": 2,
+      "MP": 0.5},
+    "baseStatModifier": {
+      "DEX":2
+    },
     "baseProficiencies": [
       "lightArmor",
       "simpleWeapons",
@@ -655,14 +779,30 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "assassin",
+      "ripper",
+      "stalker",
+      "ninja",
+      "spy",
+      "clown",
+      "scout",
+      "inquisitor"   
+     ]
   },
   "Sorcerer": {
     "name": "Sorcerer",
     "classID": "sorcerer",
     "description": "A spellcaster who draws power from raw magical talent and innate magical ability",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      "HP": 0.7,
+      "STA": 0.6,
+      "MP": 1.8},
+    "baseStatModifier": {
+      "CHA":1,
+      "INT":1
+    },
     "baseProficiencies": [
       "dagger",
       "darts",
@@ -715,14 +855,32 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "bloodOfInferna",
+      "bloodOfTempestas",
+      "bloodOfInundatio",
+      "bloodOfTerraeMotus",
+      "bloodfAbyssus",
+      "bloodOfCorporaCaelestia",
+      "bloodOfVacuus",
+      "bloodOfPrisma"
+
+    ]
   },
   "Warlock": {
     "name": "Warlock",
     "classID": "warlock",
     "description": "A spellcaster who has made a pact with a powerful otherworldly entity to gain magical power",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      "HP": 1,
+      "STA": 0.8,
+      "MP": 1.5},
+    "baseStatModifier": {
+
+      "CHA":1,
+      "WIS":1
+    },
     "baseProficiencies": [
       "lightArmor",
       "simpleWeapons",
@@ -776,14 +934,29 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "temptationOfLove",
+      "temptationOfThought",
+      "temptationOfHope",
+      "temptationOfSacrifice",
+      "temptationOfSelf"
+
+    ]
   },
   "Wizard": {
     "name": "Wizard",
     "classID": "wizard",
     "description": "A scholarly spellcaster who practices wizardry through intensive study and discipline",
-    "resourcePoolModifier": {},
-    "baseStatModifier": {},
+    "resourcePoolModifier": {
+      
+      "HP": 0.6,
+      "STA": 0.5,
+      "MP": 2
+    },
+    "baseStatModifier": {
+      "WIS":2
+    },
     "baseProficiencies": [
       "dagger",
       "darts",
@@ -837,6 +1010,18 @@
           }
         }
       }
-    }
+    },
+    "subclasses": [
+      "schoolOfElements",
+      "schoolOfArcane",
+      "schoolOfTheDivine",
+      "schoolOfTheBladesigner",
+      "schoolOfTheAbyss",
+      "schoolOfIllusions",
+      "schoolOfGravitas",
+      "schoolOfTheWild"
+
+    ]
+
   }
 }

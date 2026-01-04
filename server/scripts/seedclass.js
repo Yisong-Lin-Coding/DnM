@@ -75,7 +75,8 @@ async function seedClasses() {
         baseProficiencies: classData.baseProficiencies || [],
         baseEquipment: baseEquipmentArray,
         featuresByLevel: featuresByLevel,
-        choices: choices
+        choices: choices,
+        subclasses: classData.subclasses || []
       });
     }
 

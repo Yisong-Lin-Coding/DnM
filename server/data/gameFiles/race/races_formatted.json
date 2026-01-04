@@ -263,8 +263,8 @@
     "choices": {}
   },
   {
-    "name": "Elf (High)",
-    "race_id": "elf_high",
+    "name": "Elf",
+    "race_id": "elf",
     "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
     "speed": 30,
     "ability_score_modifiers": {

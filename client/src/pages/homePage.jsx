@@ -16,8 +16,13 @@ function HomePage() {
   const navigate = useNavigate();
   const CharacterMenu = () => {
     
-    navigate(`/ISK/${sessionID()}/character-menu`); 
+    navigate(`/ISK/${sessionID()}/character`); 
 } 
+
+  const CampaignMenu = () =>{
+
+    navigate(`/ISK/${sessionID()}/lobby`)
+  }
 
 const ChacterCreation = () => {
     
@@ -65,7 +70,7 @@ const Home = () =>{
 
         <div className="col-start-2 row-start-2 self-start w-[40%] mx-auto h-[55%] flex flex-col justify-between items-center p-8 space-y-4 rounded-lg bg-black/60 text-lg"> 
           <button onClick={CharacterMenu}>Lore</button> 
-          <button onClick={CharacterMenu}>Campaign</button> 
+          <button onClick={CampaignMenu}>Campaign</button> 
           <button onClick={CharacterMenu}>Characters</button>
           <button>Exit</button>
         </div>

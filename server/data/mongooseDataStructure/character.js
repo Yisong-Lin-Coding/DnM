@@ -3,7 +3,8 @@ const statSchema = require("./characterSheetRef/stats");
 const ARSchema = require("./characterSheetRef/AR");
 const invSchema = require("./characterSheetRef/inv"); 
 const skillsSchema = require('./characterSheetRef/skills');
-const effectsAppliedSchema = require('./characterSheetRef/appliedEffects');
+const appliedEffectSchema = require('./characterSheetRef/appliedEffects');
+const { ServerClosedEvent } = require("mongodb");
 
 const characterSchema   = new mongoose.Schema({
     playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', required: true },
@@ -41,8 +42,8 @@ const characterSchema   = new mongoose.Schema({
                 }},
     
     HP:{ current: {type:Number, default: 10}, max: {type:Number, default:10}, temp: {type:Number, default:0} },
-    STA:{ current: {type:Number, default: 10}, max: {type:Number, default:10} },
-    MP:{ current: {type:Number, default: 10}, max: {type:Number, default:10} },
+    STA:{ current: {type:Number, default: 10}, max: {type:Number, default:10}, temp: {type:Number, default:0} },
+    MP:{ current: {type:Number, default: 10}, max: {type:Number, default:10}, temp: {type:Number, default:0} },
 
     water: { current: {type:Number, default: 0}, max: {type:Number, default:8} },
     food:{ current: {type:Number, default: 0}, max: {type:Number, default:12}, },
@@ -52,7 +53,10 @@ const characterSchema   = new mongoose.Schema({
     AR:ARSchema,
     inv:invSchema,
     skills: skillsSchema,
-    effects:effectsAppliedSchema,
+    effects: [{
+        type: appliedEffectSchema,
+        default: []
+        }],
     
 
 })

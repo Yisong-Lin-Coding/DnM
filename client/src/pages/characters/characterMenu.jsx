@@ -4,6 +4,7 @@ import IndexCardFolder from "../../pageComponents/indexCard";
 import { useContext, useEffect, useState } from "react";
 import { SocketContext } from "../../socket.io/context";
 import { Plus } from "lucide-react"
+import CharacterCard from "../../pageComponents/characterCard"
 
 
 export default function CharacterMenu(){
@@ -56,21 +57,21 @@ export default function CharacterMenu(){
                 </Body.Left>
             <Body.Center className="row-span-1 col-start-2">
 
-                <IndexCardFolder>
+                <IndexCardFolder >
 
                     {loading && <div>Loading characters...</div>}
                     {error && <div className="text-red-400">Error: {error}</div>}
                     {!loading && !error && characters && characters.map(character => (
 
-                    <div key={character.id}>
-
-                        hello there {character.name}
+                      <CharacterCard 
+                        key={character.id} 
+                        character={character}
+                        to={`/ISK/${sessionStorage.getItem('session_ID') || 'default'}/character/view/${character.id}`} // optional navigation
                         
-                        
-                    </div>
+                    />
                     ))}
 
-                    <IndexCardFolder.File className=" " to={`/ISK/${sessionStorage.getItem(`session_ID`)}/character-creation`}>
+                    <IndexCardFolder.File className=" " to={`/ISK/${sessionStorage.getItem('session_ID') || 'default'}/character/creation`}>
                         <IndexCardFolder.File.Bottom>
                             <Plus className="size-8 aspect-[1/1]" />
                             <IndexCardFolder.File.Detail>

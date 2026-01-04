@@ -1,5 +1,5 @@
 import Header from "./header"
-
+import Footer from "./footer";
 export default function Body({children, className=""}){
 
 
@@ -43,6 +43,6 @@ Body.Center = function BodyCenter({children, className=""}){
 Body.Footer = function BodyFooter({children, className=""}){
 
     return(
-        <div className={`col-span-3 row-start-3 ${className}`}>{children}</div>
+        <Footer className={`col-span-3 row-start-3 ${className}`}>{children}</Footer>
     )
 }

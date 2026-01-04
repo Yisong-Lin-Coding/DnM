@@ -2,6 +2,7 @@ import React from 'react';
 import { Card } from '../../../pageComponents/card';
 import { useContext, useEffect, useState } from "react";
 import { SocketContext } from "../../../socket.io/context";
+import { CircleUser, Shuffle } from 'lucide-react';
 // Minimal, controlled Race selection component
 // Props:
 // - values: the parent-held character draft object
@@ -11,18 +12,18 @@ export function Race({ values, onChange }) {
 
 
   const socket = useContext(SocketContext);
-  const [classes, setClasses] = useState([]);
+  const [races, setRaces] = useState([]);
 
 useEffect(() => {
   socket.emit(
     'database_query',
     {
-      collection: 'classes',
+      collection: 'races',
       operation: 'findAll',
     },
     (response) => {
       if (response.success) {
-        setClasses(response.data);
+        setRaces(response.data);
       }
     }
   );
@@ -35,8 +36,24 @@ useEffect(() => {
 
   return (
     <div className='bg-website-default-900 min-h-screen grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr]'>
-      <div></div>
-      <div className='p-4 space-y-4'>
+      <div className='p-4 space-y-4  md:col-start-2'>
+
+
+        <div className='flex flex-row p-4 space-x-4 border-b border-website-specials-500'>
+          <CircleUser size={48} />
+          <div className='flex flex-col'>
+            <div className='text-left text-l font-semibold'>Character Name</div>
+            <input 
+              type="text"
+              placeholder='Name...'
+              className='border-b border-website-highlights-400 bg-website-default-900 focus:outline-none focus:bg-gradient-to-t from-website-highlights-500 to-website-default-900' 
+              value={values.name || ''}
+              onChange={(e) => emit({ name: e.target.value })}
+            />
+          </div>
+        </div>
+
+
         <Card className='bg-website-default-800 border-website-specials-500'>
           <Card.Header>
             <Card.Title className='text-website-default-100'>Race</Card.Title>
@@ -54,8 +71,8 @@ useEffect(() => {
                   onChange={(e) => emit({ race: e.target.value })}
                 >
                   <option value='' disabled>Select race</option>
-                  {RACES.map(r => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
+                  {races.map(r => (
+                    <option key={r._id} value={r._id}>{r.name}</option>
                   ))}
                 </select>
               </div>
@@ -73,7 +90,7 @@ useEffect(() => {
             </Card.Header>
             <Card.Content>
               <div className='text-website-default-300'>
-                Selected: {RACES.find(r => r.id === selectedRace)?.name}
+                Selected: {races.find(r => r.id === selectedRace)?.name}
               </div>
             </Card.Content>
           </Card>

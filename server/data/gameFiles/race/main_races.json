@@ -1,0 +1,686 @@
+[
+  {
+    "name": "Aarakocra",
+    "race_id": "aarakocra",
+    "description": "You have a flying speed of 50 feet. To use this speed, you can't be wearing medium or heavy armor....",
+    "speed": 25,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "auran"
+    ],
+    "traits": [
+      "flight",
+      "talons"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Dragonborn",
+    "race_id": "dragonborn",
+    "description": "You have draconic ancestry. Choose one type of dragon from the Draconic Ancestry table. Your breath weapon and damage resistance are determined by the dragon type, as shown in the table. (Player's Han...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 2,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "draconic"
+    ],
+    "traits": [
+      "draconic_ancestry",
+      "breath_weapon",
+      "damage_resistance"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Goliath",
+    "race_id": "goliath",
+    "description": "Elemental Evil Player's Companion",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 2,
+      "con": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "giant"
+    ],
+    "traits": [
+      "natural_athlete",
+      "stones_endurance",
+      "powerful_build",
+      "mountain_born"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Elf",
+    "race_id": "elf",
+    "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "int": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      "darkvision",
+      "keen_senses",
+      "fey_ancestry",
+      "trance",
+      "elf_weapon_training",
+      "cantrip"
+    ],
+    "choices": {},
+    "subraces": [
+      "elf_drow",
+      "elf_eladrin",
+      "halfelf",
+      "elf_wood",
+      "halfelf_wood_elf_descent",
+      "halfelf_moon_elf_or_sun_elf_descent",
+      "halfelf_drow_descent",
+      "halfelf_aquatic_elf_descent",
+      "elf_joraga_nation",
+      "elf_mul_daya_nation",
+      "elf_tajuru_nation",
+      "elf_bishatar_and_tirahar",
+      "elf_vadahar"
+    ]
+  },
+  {
+    "name": "Human",
+    "race_id": "human",
+    "description": "You can speak, read, and write Common and one extra language of your choice. Humans typically learn the languages of other peoples they deal with, including obscure dialects. They are fond of sprinkli...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 1,
+      "dex": 1,
+      "con": 1,
+      "int": 1,
+      "wis": 1,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish",
+      "dwarvish",
+      "orc"
+    ],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "human_variant"
+    ]
+  },
+  {
+    "name": "Bugbear",
+    "race_id": "bugbear",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 2,
+      "dex": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "goblin"
+    ],
+    "traits": [
+      "darkvision",
+      "longlimbed",
+      "powerful_build",
+      "sneaky",
+      "surprise_attack"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Firbolg",
+    "race_id": "firbolg",
+    "description": "You can cast detect magic and disguise self with this trait, using Wisdom as your spellcasting ability for them. Once you cast either spell, you can't cast it again with this trait until you finish a ...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "wis": 2,
+      "str": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "elvish",
+      "giant"
+    ],
+    "traits": [
+      "firbolg_magic",
+      "hidden_step",
+      "powerful_build",
+      "speech_of_beast_and_leaf"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Goblin",
+    "race_id": "goblin",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "con": 1
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "goblin"
+    ],
+    "traits": [
+      "darkvision",
+      "fury_of_the_small",
+      "nimble_escape"
+    ],
+    "choices": {},
+    "subraces": [
+      "goblin_grogtag_tribe",
+      "goblin_lavastep_tribe",
+      "goblin_tuktuk_tribe"
+    ]
+  },
+  {
+    "name": "Hobgoblin",
+    "race_id": "hobgoblin",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "con": 2,
+      "int": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "goblin"
+    ],
+    "traits": [
+      "darkvision",
+      "martial_training",
+      "saving_face"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Kenku",
+    "race_id": "kenku",
+    "description": "You can duplicate other creatures' handwriting and craftwork. You have advantage on all checks made to produce forgeries or duplicates of existing objects....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "auran"
+    ],
+    "traits": [
+      "expert_forgery",
+      "kenku_training",
+      "mimicry"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Kobold",
+    "race_id": "kobold",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "str": -2
+    },
+    "size": "S",
+    "languages": [
+      "common",
+      "draconic"
+    ],
+    "traits": [
+      "darkvision",
+      "grovel_cower_and_beg",
+      "pack_tactics",
+      "sunlight_sensitivity"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Lizardfolk",
+    "race_id": "lizardfolk",
+    "description": "Volo's Guide to Monsters",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "con": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "draconic"
+    ],
+    "traits": [
+      "swim_speed",
+      "bite",
+      "cunning_artisan",
+      "hold_breath",
+      "hunters_lore",
+      "natural_armor",
+      "hungry_jaws"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Orc",
+    "race_id": "orc",
+    "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 2,
+      "con": 1,
+      "int": -2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "orc"
+    ],
+    "traits": [
+      "darkvision",
+      "aggressive",
+      "menacing",
+      "powerful_build"
+    ],
+    "choices": {},
+    "subraces": [
+      "halforc"
+    ]
+  },
+  {
+    "name": "Tabaxi",
+    "race_id": "tabaxi",
+    "description": "You have a cat's keen senses, especially in the dark. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in dar...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "darkvision",
+      "feline_agility",
+      "cats_claws",
+      "cats_talents"
+    ],
+    "choices": {
+      "proficiencies": [
+        "perception",
+        "stealth"
+      ]
+    },
+    "subraces": []
+  },
+  {
+    "name": "Triton",
+    "race_id": "triton",
+    "description": "Volo's Guide to Monsters",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 1,
+      "cha": 1,
+      "con": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "primordial"
+    ],
+    "traits": [
+      "swim_speed",
+      "amphibious",
+      "control_air_and_water",
+      "emissary_of_the_sea",
+      "guardians_of_the_depths"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Changeling",
+    "race_id": "changeling",
+    "description": "Unearthed Arcana: Eberron",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 1,
+      "cha": 1
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "duplicity",
+      "shapechanger"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Warforged",
+    "race_id": "warforged",
+    "description": "Your construction incorporates wood and metal, granting you a +1 bonus to Armor Class....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "str": 1,
+      "con": 1
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "composite_plating",
+      "living_construct"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Revenant",
+    "race_id": "revenant",
+    "description": "Having met a cruel and undeserved end, you have returned to the realm of the living. As a revenant, you thirst for revenge against those who wronged you in life, or seek to complete a final, critical ...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "con": 1
+    },
+    "size": "M",
+    "languages": [],
+    "traits": [
+      "revenant_subrace",
+      "racial_adjustments",
+      "relentless_nature"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Kor",
+    "race_id": "kor",
+    "description": "You have advantage on saving throws against being frightened....",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "dex": 2,
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "brave",
+      "climbing",
+      "kor_climbing",
+      "lucky"
+    ],
+    "choices": {
+      "proficiencies": [
+        "acrobaics",
+        "athletics"
+      ]
+    },
+    "subraces": []
+  },
+  {
+    "name": "Vampire",
+    "race_id": "vampire",
+    "description": "You can drain blood and life energy from a willing creature, or one that is grappled by you, incapacitated, or restrained. Make a melee attack against the target. If you hit, you deal 1 piercing damag...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "int": 1,
+      "cha": 2
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "vampire"
+    ],
+    "traits": [
+      "blood_thirst",
+      "darkvision",
+      "vampiric_resistance"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Aetherborn",
+    "race_id": "aetherborn",
+    "description": "Thanks to your heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You ca...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "cha": 2,
+      "choose": 2
+    },
+    "size": "M",
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      "darkvision",
+      "born_of_aether",
+      "menacing"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Vedalken",
+    "race_id": "vedalken",
+    "description": "You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic...",
+    "speed": 30,
+    "ability_score_modifiers": {
+      "wis": 1
+    },
+    "size": "M",
+    "languages": [
+      "common",
+      "vedalken"
+    ],
+    "traits": [
+      "vedalken_cunning",
+      "aether_lore"
+    ],
+    "choices": {},
+    "subraces": []
+  },
+  {
+    "name": "Genasi",
+    "race_id": "genasi",
+    "description": "A Genasi with various subraces and variants.",
+    "speed": 30,
+    "ability_score_modifiers": {},
+    "size": "M",
+    "languages": [],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "genasi_air",
+      "genasi_earth",
+      "genasi_fire",
+      "genasi_water"
+    ]
+  },
+  {
+    "name": "Gnome",
+    "race_id": "gnome",
+    "description": "A Gnome with various subraces and variants.",
+    "speed": 25,
+    "ability_score_modifiers": {},
+    "size": "S",
+    "languages": [],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "gnome_deep",
+      "gnome_forest",
+      "gnome_rock"
+    ]
+  },
+  {
+    "name": "Dwarf",
+    "race_id": "dwarf",
+    "description": "A Dwarf with various subraces and variants.",
+    "speed": 25,
+    "ability_score_modifiers": {},
+    "size": "M",
+    "languages": [],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "dwarf_hill",
+      "dwarf_mountain",
+      "dwarf_duergar"
+    ]
+  },
+  {
+    "name": "Halfling",
+    "race_id": "halfling",
+    "description": "A Halfling with various subraces and variants.",
+    "speed": 25,
+    "ability_score_modifiers": {},
+    "size": "S",
+    "languages": [],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "halfling_lightfoot",
+      "halfling_stout",
+      "halfling_ghostwise"
+    ]
+  },
+  {
+    "name": "Shifter",
+    "race_id": "shifter",
+    "description": "A Shifter with various subraces and variants.",
+    "speed": 30,
+    "ability_score_modifiers": {},
+    "size": "M",
+    "languages": [],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "shifter_razorclaw",
+      "shifter_wildhunt",
+      "shifter_beasthide",
+      "shifter_cliffwalk",
+      "shifter_longstride",
+      "shifter_longtooth"
+    ]
+  },
+  {
+    "name": "Tiefling",
+    "race_id": "tiefling",
+    "description": "A Tiefling with various subraces and variants.",
+    "speed": 30,
+    "ability_score_modifiers": {},
+    "size": "M",
+    "languages": [],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "tiefling_infernal",
+      "tiefling_abyssal"
+    ]
+  },
+  {
+    "name": "Aasimar",
+    "race_id": "aasimar",
+    "description": "A Aasimar with various subraces and variants.",
+    "speed": 30,
+    "ability_score_modifiers": {},
+    "size": "M",
+    "languages": [],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "aasimar_fallen",
+      "aasimar_protector",
+      "aasimar_scourge",
+      "aasimar_dmg"
+    ]
+  },
+  {
+    "name": "Yuan-ti Pureblood",
+    "race_id": "yuanti",
+    "description": "A Yuan-ti Pureblood with various subraces and variants.",
+    "speed": 30,
+    "ability_score_modifiers": {},
+    "size": "M",
+    "languages": [],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "yuanti_pureblood"
+    ]
+  },
+  {
+    "name": "Minotaur",
+    "race_id": "minotaur",
+    "description": "A Minotaur with various subraces and variants.",
+    "speed": 30,
+    "ability_score_modifiers": {},
+    "size": "M",
+    "languages": [],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "minotaur_krynn"
+    ]
+  },
+  {
+    "name": "Merfolk",
+    "race_id": "merfolk",
+    "description": "A Merfolk with various subraces and variants.",
+    "speed": 30,
+    "ability_score_modifiers": {},
+    "size": "M",
+    "languages": [],
+    "traits": [],
+    "choices": {},
+    "subraces": [
+      "merfolk_cosi_creed",
+      "merfolk_emeria_creed",
+      "merfolk_ula_creed"
+    ]
+  }
+]

@@ -66,7 +66,7 @@ function reformatClassesForSchema() {
 const reformattedClasses = reformatClassesForSchema();
 
 // Write to the JSON file
-const filePath = path.join(__dirname, '../data/gameFiles/class/classes.json');
+const filePath = path.join(__dirname, '../data/gameFiles/class/classes_reforamtted.json');
 fs.writeFileSync(filePath, JSON.stringify(reformattedClasses, null, 2), 'utf8');
 
 console.log('Successfully reformatted classes.json to match schema!');

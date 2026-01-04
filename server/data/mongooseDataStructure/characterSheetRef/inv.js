@@ -5,22 +5,31 @@ const invSchema = new mongoose.Schema({
     items: {
         type: Map,
         of: new mongoose.Schema({
-            quantity: { type: Number, default: 1 },
-            durability: { type: Number, default: 100 },
-            equipped: { type: Boolean, default: false }
-        }, { _id: false })
+            equipped: { type: Boolean, default: false },
+            ItemID: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
+        })
     },
     equipment: {
-        head: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
-        body: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
-        legs: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
-        feet: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        innerhead: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        outerhead: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        face: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        eyes: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        innerbody: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        outerbody: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        innerlegs: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        outerlegs: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        innerfeet: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        outerfeet: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
         arms: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
         hands: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        fists: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        wrist: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        waist: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
         weapon: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
         fingers: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
         neck: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
         trinkets: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
+        back: { type: [mongoose.Schema.Types.ObjectId], ref: 'Item', default: [] },
     }
 
 })

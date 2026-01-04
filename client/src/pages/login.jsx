@@ -42,10 +42,15 @@ useEffect(() => {
     function autoLogin() {
         const playerID = (localStorage.getItem("player_ID") || "");
         const sessionID = (sessionStorage.getItem("session_ID") || "")
+        const lastLocation = (sessionStorage.getItem("lastLocation") || "")
         
         socket.emit("login_validityCheck", { playerID, sessionID }, (response) => {
             if (response.success) {
-                navigate(`/ISK/${sessionID}/home`);
+                if(lastLocation){
+                    navigate(`/ISK/${sessionID}/${lastLocation}`)
+                }else {
+                    navigate(`/ISK/${sessionID}/home`);
+                }
             } 
             else {
                 console.log(response.error || response.message);

@@ -1,0 +1,37 @@
+[
+    {
+        "name": "Small Bag",
+        "itemID": "smallbag",
+        "description": "A small bag for carrying items.",
+        "spaceCapacity": 250000,
+        "weightCapacity": 3200,
+        "weight": 32
+    },
+    {
+        "name": "Large Bag",
+        "itemID": "largebag",
+        "description": "A large bag for carrying items.",
+        "spaceCapacity": 5000000,
+        "weightCapacity": 12800,
+        "weight": 256
+    },
+    {
+        "name": "Backpack",
+        "itemID": "backpack",
+        "description": "A backpack for carrying items.",
+        "spaceCapacity": 45000000,
+        "weightCapacity": 19200,
+        "weight": 512
+    },
+    {
+        "name": "Adventurer's Pack",
+        "itemID": "adventurerspack",
+        "description": "A pack designed for adventurers, with extra compartments for gear.",
+        "spaceCapacity": 150000000,
+        "weightCapacity": 640000,
+        "weight": 400
+    }
+
+
+
+]

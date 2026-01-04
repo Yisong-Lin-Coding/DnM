@@ -14,4 +14,4 @@ const campaignSchema = new mongoose.Schema({
     gameSaves: {type: Map, of: mongoose.Schema.Types.Mixed, default: {} }
 })
 
-module.exports = mongoose.model('Spell', spellSchema);
+module.exports = mongoose.model('Campaign', spellSchema);

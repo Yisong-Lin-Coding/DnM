@@ -10,6 +10,7 @@ const raceSchema = new mongoose.Schema({
     languages: { type: [String], default: [] },
     traits: { type: [String], default: [] },
     choices: { type: Object, default: {} },
+    subraces: { type: [Object], default: [] },
 
 
 

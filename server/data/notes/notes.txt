@@ -1,0 +1,26 @@
+1 weight = 1/64 of a pound
+1 space = 1/10 of a cubic inch
+1 gold = 1 Dollar
+
+ slots
+
+        innerhead: 1
+        outerhead: 2
+        face: 1
+        eyes: 2
+        innerbody: 2
+        outerbody: 1
+        innerlegs: 2
+        outerlegs: 1
+        innerfeet: 2
+        outerfeet: 2
+        arms: 2
+        hands: 2
+        fists: 2
+        wrist: 8
+        waist: 1
+        weapon: 10
+        fingers: 10
+        neck: 3
+        trinkets: 5
+        back: 1

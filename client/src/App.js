@@ -2,6 +2,7 @@ import logo from './logo.svg';
 import './App.css';
 import { HashRouter  as Router, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './handlers/protectedRoutes';
+import { GameProvider } from './data/gameContext';
 
 import Login from './pages/login';
 import StartScreen from './pages/startScreen';
@@ -9,16 +10,33 @@ import HomePage from './pages/homePage';
 import SignUp from './pages/signUp';
 import Test from './pages/test'
 import Test2 from './pages/test2'
+import GameComponent from './pages/game/game'
+import LobbyLayout from './pages/campaign/lobbyLayout';
+import LobbyMenu from './pages/campaign/campaignMenu';
+import JoinLobby from './pages/campaign/joinCampaign';
+import CreateLobby from './pages/campaign/createCampaign';
 
 import CharacterMenu from './pages/characters/characterMenu';
 import CharacterCreation from './pages/characters/characterCreation'
+import CharacterViewer from './pages/characters/characterViewer';
 
 import { SocketContext, socket } from './socket.io/context';
 import { useEffect, useState } from 'react';
 
+
+
 function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
+
+  function GameWrapper() {
+  return (
+    <GameProvider>
+      <GameComponent />
+    </GameProvider>
+  );
+}
+
 
   useEffect(() => {
     console.log('Attempting to connect to socket...');
@@ -93,13 +111,28 @@ function App() {
           <Route path="/test2" element={<Test2 />} />
           <Route path="/ISK/:sessionID" element={<ProtectedRoute />}> 
             <Route path="home" element={<HomePage />} />
-            <Route path="character-menu" element={<CharacterMenu />} />
-            <Route path="character-creation" element ={<CharacterCreation />} />
+
+            <Route path="character">
+              <Route index element={<CharacterMenu />}/>
+              <Route path="creation" element={<CharacterCreation />} />
+              <Route path="view/:characterID" element={<CharacterViewer />} />
+              <Route path="edit/:characterID" element={<CharacterCreation />} />
+            </Route>
+
+            <Route path="lobby" element ={<LobbyLayout />}>
+              <Route path="menu" element ={<LobbyMenu />} />
+              <Route path="join" element ={<JoinLobby />} />
+              <Route path="create" element ={<CreateLobby />} />
+              
+            </Route>
+            <Route path="game/:gameID" element ={<GameWrapper  />} />
+
           </Route>
         </Routes>
       </Router>
     </SocketContext.Provider>
   );
 }
+
 
 export default App;
