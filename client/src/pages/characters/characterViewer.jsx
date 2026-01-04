@@ -17,10 +17,11 @@ export default function CharacterViewer(){
         useEffect(() => {
         if (!characterID) return; // optional safety check
 
+        console.log('Fetching character ID:', characterID);
         socket.emit(
             'database_query',
             {
-            collection: 'character',
+            collection: 'characters',
             operation: 'findById',
             filter: { _id:characterID },
             },
@@ -28,7 +29,7 @@ export default function CharacterViewer(){
             if (response.success) {
                 console.log(response);
             } else {
-                console.error('Failed to fetch character:', response.error);
+                console.error('Failed to fetch character:', response.message);
             }
             }
         );

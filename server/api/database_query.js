@@ -52,25 +52,19 @@ module.exports = (socket) => {
                     break;
 
                 case 'findById':
-                    // Determine ID field
-                    const idField = options.idField || '_id';
-                    const idValue = filter[idField] || filter.id || filter.characterID;
-
+                    const idValue = filter._id || filter.id || filter.characterID;
                     if (!idValue) {
                         callback({ success: false, message: 'No ID provided for findById' });
                         return;
                     }
 
-                    // Use findById if default _id, otherwise findOne with cast
-                    if (idField === '_id') {
-                        // findById automatically casts string to ObjectId
-                        result = await Model.findById(idValue);
-                    } else {
-                        // For custom ID fields
-                        result = await Model.findOne({ [idField]: idValue });
-                    }
+                    console.log('Server: looking for _id =', idValue);
+
+                    // Use findById to auto-cast string to ObjectId
+                    result = await Model.findById(idValue);
 
                     if (!result) {
+                        console.log('Server: document not found!');
                         callback({ success: false, message: 'Document not found' });
                         return;
                     }
