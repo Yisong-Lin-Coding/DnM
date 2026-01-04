@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Item = require('../data/mongooseDataStructure/item');
 const Class = require('../data/mongooseDataStructure/class');
 const Race = require('../data/mongooseDataStructure/race');
@@ -5,48 +6,45 @@ const Player = require('../data/mongooseDataStructure/player');
 const Character = require('../data/mongooseDataStructure/character');
 const Background = require('../data/mongooseDataStructure/background');
 
-// Define all available models here - just add new ones to this array
+// Define all available models here
 const MODELS = {
-    'items': Item,
-    'classes': Class,
-    'races': Race,
-    'players': Player,
-    'characters': Character,
-    'backgrounds': Background,
-    // Add new models here as you expand:
-    // 'spells': Spell,
-    // 'monsters': Monster,
-    // 'players': Player,
+    items: Item,
+    classes: Class,
+    races: Race,
+    players: Player,
+    characters: Character,
+    backgrounds: Background,
+    // Add new models here as needed
 };
 
 module.exports = (socket) => {
 
     socket.on('database_query', async (data, callback) => {
-        const { collection, operation, filter, options } = data;
+        const { collection, operation, filter = {}, options = {} } = data;
 
         try {
-            // Get the model from the MODELS object
+            // 1️⃣ Check collection
             const Model = MODELS[collection];
-            
             if (!Model) {
                 callback({ 
                     success: false, 
-                    message: `Invalid collection: ${collection}. Available collections: ${Object.keys(MODELS).join(', ')}` 
+                    message: `Invalid collection: ${collection}. Available collections: ${Object.keys(MODELS).join(', ')}`
                 });
                 return;
             }
 
             let result;
 
-            // Handle different operations
-            switch(operation) {
+            // 2️⃣ Handle operations
+            switch (operation) {
+
                 case 'findAll':
-                    result = await Model.find(filter || {});
-                    if (options?.limit) result = result.slice(0, options.limit);
+                    result = await Model.find(filter);
+                    if (options.limit) result = result.slice(0, options.limit);
                     break;
 
                 case 'findOne':
-                    result = await Model.findOne(filter || {});
+                    result = await Model.findOne(filter);
                     if (!result) {
                         callback({ success: false, message: 'Document not found' });
                         return;
@@ -54,9 +52,24 @@ module.exports = (socket) => {
                     break;
 
                 case 'findById':
-                    const idField = options?.idField || '_id';
-                    const query = { [idField]: filter.id };
-                    result = await Model.findOne(query);
+                    // Determine ID field
+                    const idField = options.idField || '_id';
+                    const idValue = filter[idField] || filter.id || filter.characterID;
+
+                    if (!idValue) {
+                        callback({ success: false, message: 'No ID provided for findById' });
+                        return;
+                    }
+
+                    // Use findById if default _id, otherwise findOne with cast
+                    if (idField === '_id') {
+                        // findById automatically casts string to ObjectId
+                        result = await Model.findById(idValue);
+                    } else {
+                        // For custom ID fields
+                        result = await Model.findOne({ [idField]: idValue });
+                    }
+
                     if (!result) {
                         callback({ success: false, message: 'Document not found' });
                         return;
@@ -64,15 +77,15 @@ module.exports = (socket) => {
                     break;
 
                 case 'count':
-                    result = await Model.countDocuments(filter || {});
+                    result = await Model.countDocuments(filter);
                     break;
 
                 case 'distinct':
-                    if (!options?.field) {
+                    if (!options.field) {
                         callback({ success: false, message: 'Field required for distinct operation' });
                         return;
                     }
-                    result = await Model.distinct(options.field, filter || {});
+                    result = await Model.distinct(options.field, filter);
                     break;
 
                 default:
@@ -80,6 +93,7 @@ module.exports = (socket) => {
                     return;
             }
 
+            // 3️⃣ Return result
             callback({ success: true, data: result });
 
         } catch (err) {
@@ -87,5 +101,4 @@ module.exports = (socket) => {
             callback({ success: false, message: 'Database query failed', error: err.message });
         }
     });
-
 };

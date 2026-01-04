@@ -7,7 +7,7 @@ import Header_PFP from "./header_pfp";
 import { Menu, Mail, CircleUserRound   } from 'lucide-react';
 
 
-export default function Header({ className = "" }) {
+export default function Header({ className = "", title }) {
   // 'menu' | 'mail' | 'profile' | null
   const [openPanel, setOpenPanel] = useState(null);
   const locate = useLocation();
@@ -98,7 +98,7 @@ export default function Header({ className = "" }) {
 
       {/* Center: Page Title */}
       <div className="absolute left-1/2 -translate-x-1/2 inline-block text-xl">
-        <div className="p-4">{pageTitle}</div>
+        <div className="p-4">{title || pageTitle}</div>
       </div>
 
       {/* Right: Mail + Profile */}

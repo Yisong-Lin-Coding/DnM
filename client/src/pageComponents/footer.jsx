@@ -3,14 +3,14 @@ import { Link } from "react-router-dom"
 import { useNavigate } from 'react-router-dom';
 
 
-export default function Footer(){
+export default function Footer({ children, className = "" }){
 
 
 
 
 
     return(
-        <div className="bg-black font-serif text-center text-white p-4 flex flex-col justify-between items-center">
+        <div className={` ${className} bg-black font-serif text-center text-white flex flex-col justify-between items-center `}>
           <div className="flex flex-row space-x-4 p-4">
             <div>
                 <Link 
