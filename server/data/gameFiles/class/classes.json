@@ -12,15 +12,15 @@
       "STR": 1,
       "CON": 1
     },
-    "baseProficiencies": [
-      "lightArmor",
-      "mediumArmor",
-      "shields",
-      "simpleWeapons",
-      "martialWeapons",
-      "STRsavingThrows",
-      "CONsavingThrows"
-    ],
+    "baseProficiencies": 
+      {
+        "armor":["lightArmor","mediumArmor","shields"],
+        "weapons":["simpleWeapons","martialWeapons"],
+        "tools":[],
+        "abilityScore":["STR","CONsavingThrows"],
+        "skills":[]
+        
+      },
     "baseEquipment": [
       "explorerPack:1",
       "javelin:4"
@@ -131,16 +131,15 @@
     "baseStatModifier": {
       "CHA":2
     },
-    "baseProficiencies": [
-      "lightArmor",
-      "simpleWeapons",
-      "handCrossbows",
-      "longswords",
-      "rapiers",
-      "shortswords",
-      "DEXsavingThrows",
-      "CHAsavingThrows"
-    ],
+    "baseProficiencies":
+      {
+        "armor":["lightArmor"],
+        "weapons":["simpleWeapons","handCrossbows","longswords","rapiers","shortswords"],
+        "tools":[],
+        "abilityScore":["DEX", "CHA"],
+        "skills":[]
+        
+      },
     "baseEquipment": [
       "leatherArmor:1",
       "dagger:1"
@@ -231,14 +230,15 @@
       "WIS":1,
       "INT":1
     },
-    "baseProficiencies": [
-      "lightArmor",
-      "mediumArmor",
-      "shields",
-      "simpleWeapons",
-      "WISsavingThrows",
-      "CHAsavingThrows"
-    ],
+    "baseProficiencies":
+      {
+        "armor":["lightArmor","mediumArmor","shields"],
+        "weapons":["simpleWeapons"],
+        "tools":[],
+        "abilityScore":["WIS","CHA"],
+        "skills":[]
+        
+      },
     "baseEquipment": [
       "holySymbol:1",
       "shield:1"
@@ -320,23 +320,26 @@
       "INT":1,
       "DEX":1
     },
-    "baseProficiencies": [
-      "lightArmor",
-      "mediumArmor",
-      "shields",
-      "clubs",
-      "daggers",
-      "darts",
-      "javelins",
-      "maces",
-      "quarterstaffs",
-      "scimitars",
-      "sickles",
-      "slings",
-      "spears",
-      "INTsavingThrows",
-      "WISsavingThrows"
-    ],
+    "baseProficiencies":
+      {
+        "armor":["lightArmor","mediumArmor","shields"],
+        "weapons":[
+          "clubs", 
+          "daggers", 
+          "darts",
+          "javelins", 
+          "maces",
+          "quarterstaffs",
+          "scimitars",
+          "sickles",
+          "slings",
+          "spears"
+        ],
+        "tools":[],
+        "abilityScore":["INT", "WIS"],
+        "skills":[]
+        
+      },
     "baseEquipment": [
       "woodenShield:1",
       "holySymbol:1"
@@ -399,14 +402,17 @@
       "DEX":1
 
     },
-    "baseProficiencies": [
-      "allArmor",
-      "shields",
+    "baseProficiencies": 
+      {
+        "armor":["lightArmor","mediumArmor","heavyArmor","shields"],
+        "weapons":[
       "simpleWeapons",
-      "martialWeapons",
-      "STRsavingThrows",
-      "CONsavingThrows"
-    ],
+      "martialWeapons"],
+        "tools":[],
+        "abilityScore":["STR", "CON"],
+        "skills":[]
+        
+      },
     "baseEquipment": [],
     "featuresByLevel": {},
     "choices": {
@@ -487,12 +493,15 @@
       "DEX":1,
       "WIS":1
     },
-    "baseProficiencies": [
-      "simpleWeapons",
-      "shortswords",
-      "STRsavingThrows",
-      "DEXsavingThrows"
-    ],
+    "baseProficiencies": 
+      {
+        "armor":[],
+        "weapons":["simpleWeapons","shortswords"],
+        "tools":[],
+        "abilityScore":["STR", "DEX"],
+        "skills":[]
+        
+      },
     "baseEquipment": [],
     "featuresByLevel": {},
     "choices": {
@@ -552,14 +561,18 @@
       "CHA":1
 
     },
-    "baseProficiencies": [
-      "allArmor",
-      "shields",
+    "baseProficiencies":
+      {
+        "armor":["lightArmor","mediumArmor","heavyArmor","shields"],
+        "weapons":[
       "simpleWeapons",
-      "martialWeapons",
-      "WISsavingThrows",
-      "CHAsavingThrows"
-    ],
+      "martialWeapons"],
+        "tools":[],
+        "abilityScore":["WIS",
+      "CHA"],
+        "skills":[]
+        
+      },
     "baseEquipment": [
       "holySymbol:1"
     ],
@@ -627,13 +640,16 @@
       "DEX":1,
       "INT":1
     },
-    "baseProficiencies": [
-      "lightArmor",
-      "simpleWeapons",
-      "martialWeapons",
-      "STRsavingThrows",
-      "DEXsavingThrows"
-    ],
+    "baseProficiencies": 
+      {
+        "armor":["lightArmor"],
+        "weapons":["simpleWeapons",
+      "martialWeapons"],
+        "tools":[],
+        "abilityScore":["STR","DEX"],
+        "skills":[]
+        
+      },
     "baseEquipment": [],
     "featuresByLevel": {},
     "choices": {
@@ -700,17 +716,19 @@
     "baseStatModifier": {
       "DEX":2
     },
-    "baseProficiencies": [
-      "lightArmor",
-      "simpleWeapons",
+    "baseProficiencies":
+      {
+        "armor":["lightArmor"],
+        "weapons":["simpleWeapons",
       "handCrossbows",
       "longswords",
       "rapiers",
-      "shortswords",
-      "thieves_tools",
-      "DEXsavingThrows",
-      "INTsavingThrows"
-    ],
+      "shortswords"],
+        "tools":["thievesTools"],
+        "abilityScore":["DEX","INT"],
+        "skills":[]
+        
+      },
     "baseEquipment": [
       "leatherArmor:1"
     ],
@@ -803,15 +821,20 @@
       "CHA":1,
       "INT":1
     },
-    "baseProficiencies": [
-      "dagger",
+    "baseProficiencies": 
+      {
+        "armor":[],
+        "weapons":["dagger",
       "darts",
       "sling",
       "quarterstaff",
-      "lightCrossbow",
-      "CONsavingThrows",
-      "CHAsavingThrows"
-    ],
+      "lightCrossbow"],
+        "tools":[],
+        "abilityScore":["CON","CHA"],
+        "skills":[]
+        
+      },
+      
     "baseEquipment": [],
     "featuresByLevel": {},
     "choices": {
@@ -881,12 +904,16 @@
       "CHA":1,
       "WIS":1
     },
-    "baseProficiencies": [
-      "lightArmor",
-      "simpleWeapons",
-      "WISsavingThrows",
-      "CHAsavingThrows"
-    ],
+    "baseProficiencies": 
+      {
+        "armor":["lightArmor"],
+        "weapons":["simpleWeapons"],
+        "tools":[],
+        "abilityScore":["WIS","CHA"],
+        "skills":[]
+        
+      },
+
     "baseEquipment": [
       "leatherArmor:1"
     ],
@@ -957,15 +984,20 @@
     "baseStatModifier": {
       "WIS":2
     },
-    "baseProficiencies": [
-      "dagger",
+    "baseProficiencies":
+      {
+        "armor":[],
+        "weapons":["dagger",
       "darts",
       "sling",
       "quarterstaff",
-      "lightCrossbow",
-      "INTsavingThrows",
-      "WISsavingThrows"
-    ],
+      "lightCrossbow"],
+        "tools":[],
+        "abilityScore":["INT","WIS"],
+        "skills":[]
+        
+      },
+      
     "baseEquipment": [
       "spellbook:1"
     ],

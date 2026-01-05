@@ -10,10 +10,10 @@ export default function Body({children, className=""}){
     )
 }
 
-Body.Header = function BodyHeader({children, className=""}){
+Body.Header = function BodyHeader({children, className="", title}){
 
     return(
-        <Header className={`col-span-3 row-start-1 ${className}`}>
+        <Header className={`col-span-3 row-start-1 ${className}`} title ={title}>
       {children}
     </Header>
     )

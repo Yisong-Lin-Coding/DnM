@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import getImage from "../handlers/getImage";
 import Header_Menu from "./header_menu";
 import Header_Mail from "./header_mail";
 import Header_PFP from "./header_pfp";
-import { Menu, Mail, CircleUserRound   } from 'lucide-react';
-
+import { Menu, Mail, CircleUserRound, X } from 'lucide-react';
 
 export default function Header({ className = "", title }) {
-  // 'menu' | 'mail' | 'profile' | null
   const [openPanel, setOpenPanel] = useState(null);
   const locate = useLocation();
   const headerRef = useRef(null);
@@ -21,7 +18,6 @@ export default function Header({ className = "", title }) {
     setOpenPanel((prev) => (prev === panel ? null : panel));
   };
 
-  // Close when clicking outside the header (including any popovers)
   useEffect(() => {
     function onDocMouseDown(e) {
       if (headerRef.current && !headerRef.current.contains(e.target)) {
@@ -32,7 +28,6 @@ export default function Header({ className = "", title }) {
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, []);
 
-  // Close on Escape
   useEffect(() => {
     function onKeyDown(e) {
       if (e.key === "Escape") setOpenPanel(null);
@@ -41,123 +36,102 @@ export default function Header({ className = "", title }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Close when route changes
   useEffect(() => {
     setOpenPanel(null);
   }, [locate.key]);
 
-  // Derive a readable page title from the current path
   const pageTitle = useMemo(() => {
     const path = locate?.pathname || "/";
     const parts = path.split("/").filter(Boolean);
     if (parts.length === 0) return "Home";
     const last = decodeURIComponent(parts[parts.length - 1]);
-    if (!last) return "Home";
     return last.charAt(0).toUpperCase() + last.slice(1);
   }, [locate?.pathname]);
 
-  // Utility to toggle visibility classes and pointer-events for hidden popovers
+  // Refined Popover Classes
   const popoverClasses = (isOpen, side = "left") =>
     [
-      "absolute top-full p-4 bg-black shadow-lg transition-opacity duration-200 text-left flex flex-col space-y-8 border-b border-white",
-      side === "left" ? "left-0 border-r" : "right-0 border-l",
+      "absolute top-full bg-website-default-900/95 backdrop-blur-md shadow-2xl transition-all duration-300 border-t-2 border-website-specials-500 z-50",
+      side === "left" ? "left-0 border-r border-website-default-700" : "right-0 border-l border-website-default-700",
       isOpen
-        ? "opacity-100 visible pointer-events-auto"
-        : "invisible opacity-0 pointer-events-none group-hover:visible group-hover:opacity-100",
+        ? "opacity-100 translate-y-0 visible"
+        : "opacity-0 -translate-y-2 invisible pointer-events-none",
     ].join(" ");
 
+  // Shared Button Style
+  const btnStyle = (isActive) => 
+    `p-4 transition-colors duration-200 hover:bg-website-default-800 flex items-center justify-center ${
+      isActive ? "text-website-specials-500 bg-website-default-800" : "text-website-neutral-100"
+    }`;
+
   return (
-    <div
+    <header
       ref={headerRef}
-      className={`bg-website-default-900 w-full h-full text-white text-center flex justify-between p-0 items-stretch sticky top-0 border-website-specials-400 border-b z-50 ${className}`}
+      className={`font-body bg-website-default-900 w-full h-16 text-white flex justify-between items-stretch sticky top-0 border-b border-website-default-700 z-50 ${className}`}
     >
       {/* Left: Menu */}
-      <div className="relative inline-block group">
+      <div className="relative flex">
         <button
-          id="menu-button"
           type="button"
-          className="p-4 text-white cursor-pointer text-center"
-          aria-haspopup="menu"
-          aria-expanded={isMenuOpen}
-          aria-controls="menu-popover"
+          className={btnStyle(isMenuOpen)}
           onClick={() => togglePanel("menu")}
+          aria-expanded={isMenuOpen}
         >
-          <Menu />
-          <span className="sr-only">{isMenuOpen ? "Close menu" : "Open menu"}</span>
+          {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
 
-        <div
-          id="menu-popover"
-          role="menu"
-          aria-labelledby="menu-button"
-          className={`${popoverClasses(isMenuOpen, "left")} w-[140px]`}
-        >
+        <div className={`${popoverClasses(isMenuOpen, "left")} w-64 p-2`}>
           <Header_Menu />
         </div>
       </div>
 
       {/* Center: Page Title */}
-      <div className="absolute left-1/2 -translate-x-1/2 inline-block text-xl">
-        <div className="p-4">{title || pageTitle}</div>
+      <div className="flex items-center justify-center">
+        <h1 className="text-lg font-semibold tracking-wide uppercase text-website-neutral-50">
+          {title || pageTitle}
+        </h1>
       </div>
 
-      {/* Right: Mail + Profile */}
-      <div className="inline-block">
-        <div className="p-4 flex flex-row space-x-8 relative">
-          {/* Mail */}
-          <div className="group inline-block relative">
-            <button
-              id="mail-button"
-              type="button"
-              className="text-center relative cursor-pointer"
-              aria-haspopup="dialog"
-              aria-expanded={isMailOpen}
-              aria-controls="mail-popover"
-              onClick={() => togglePanel("mail")}
-            >
-              <Mail />
-              <div className="h-4 w-4 bg-red-600 rounded-full absolute -bottom-1 -right-1 text-[10px] leading-4 text-center">
-                99+
-              </div>
-              <span className="sr-only">{isMailOpen ? "Close inbox" : "Open inbox"}</span>
-            </button>
-
-            <div
-              id="mail-popover"
-              role="dialog"
-              aria-labelledby="mail-button"
-              className={`${popoverClasses(isMailOpen, "right")} w-[350px]`}
-            >
-              <Header_Mail />
+      {/* Right: Actions */}
+      <div className="flex items-stretch">
+        {/* Mail */}
+        <div className="relative flex">
+          <button
+            type="button"
+            className={btnStyle(isMailOpen)}
+            onClick={() => togglePanel("mail")}
+          >
+            <div className="relative">
+              <Mail size={24} />
+              <span className="absolute -top-2 -right-2 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-website-specials-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-website-specials-500 text-[10px] items-center justify-center font-bold">
+                  9
+                </span>
+              </span>
             </div>
+          </button>
+
+          <div className={`${popoverClasses(isMailOpen, "right")} w-[350px] p-4 max-h-[80vh] overflow-y-auto scrollbar-transparent`}>
+            <Header_Mail />
           </div>
+        </div>
 
-          {/* Profile */}
-          <div className="group inline-block relative">
-            <button
-              id="profile-button"
-              type="button"
-              className="text-white cursor-pointer text-center"
-              aria-haspopup="menu"
-              aria-expanded={isProfileOpen}
-              aria-controls="profile-popover"
-              onClick={() => togglePanel("profile")}
-            >
-              <CircleUserRound />
-              <span className="sr-only">{isProfileOpen ? "Close profile menu" : "Open profile menu"}</span>
-            </button>
+        {/* Profile */}
+        <div className="relative flex border-l border-website-default-800">
+          <button
+            type="button"
+            className={btnStyle(isProfileOpen)}
+            onClick={() => togglePanel("profile")}
+          >
+            <CircleUserRound size={24} />
+          </button>
 
-            <div
-              id="profile-popover"
-              role="menu"
-              aria-labelledby="profile-button"
-              className={`${popoverClasses(isProfileOpen, "right")} w-[250px]`}
-            >
-              <Header_PFP />
-            </div>
+          <div className={`${popoverClasses(isProfileOpen, "right")} w-64 p-4`}>
+            <Header_PFP />
           </div>
         </div>
       </div>
-    </div>
+    </header>
   );
 }

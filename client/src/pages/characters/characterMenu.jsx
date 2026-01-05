@@ -55,7 +55,7 @@ export default function CharacterMenu(){
             <Body.Left className="row-span-1 col-start-1">
                     
                 </Body.Left>
-            <Body.Center className="row-span-1 col-start-2">
+            <Body.Center className="row-span-1 col-start-2 min-h-screen">
 
                 <IndexCardFolder >
 

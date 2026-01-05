@@ -10,7 +10,14 @@ const classSchema = new mongoose.Schema({
         MP: 1
     } },
     baseStatModifier: { type: Object, default: {}},
-    baseProficiencies: { type: [String], default: [] },
+    baseProficiencies: {
+            armor: { type: [String], default: [] },
+            weapons: { type: [String], default: [] },
+            tools: { type: [String], default: [] },
+            abilityScore: { type: [String], default: [] },
+            skills: { type: [String], default: [] },
+            },
+
     baseEquipment: { type: [String], default: [] },
     featuresByLevel: { type: Map, of: [String], default: {} },
 

@@ -83,7 +83,7 @@ const effects = {
     stackable: true,
     maxStacks: 99,
     onApply(target, stacks) {
-      target.addModifier('speedDecrease', 1 * stacks);
+      target.addModifier('speed', -1 * stacks);
     }
   },
 
@@ -125,7 +125,7 @@ const effects = {
     stackable: false,
     maxStacks: 1,
     onApply(target) {
-      target.addModifier('cannotReact', true);
+      target.addModifier('reactionAdvantage', -1);
     }
   },
 
@@ -152,7 +152,7 @@ const effects = {
     maxStacks: 3,
     onApply(target, stacks) {
       target.addModifier('perceptionMultiplier', 0.5);
-      target.addModifier('disadvantage', stacks);
+      target.addModifier('advantage', -stacks);
     }
   },
 
@@ -160,13 +160,13 @@ const effects = {
     id: "true_blindness",
     name: "True Blindness",
     tier: "Greater",
-    description: "Perception set to zero, quad disadvantage",
+    description: "Perception set to zero, 10x disadvantage",
     school: "affliction",
     stackable: false,
     maxStacks: 1,
     onApply(target) {
       target.setModifier('perceptionMultiplier', 0);
-      target.addModifier('quadDisadvantage', true);
+      target.addModifier('disadvantge', 10);
     }
   },
 

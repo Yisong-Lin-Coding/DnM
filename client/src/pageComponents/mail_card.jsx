@@ -1,248 +1,145 @@
-
-
+import { Star, Paperclip, Check } from 'lucide-react';
 
 function classNames(...xs) {
-    return xs.filter(Boolean).join(' ');
-  }
+  return xs.filter(Boolean).join(' ');
+}
 
-  function getInitials(name = '') {
-    const parts = name.trim().split(/\s+/);
-    const initials = (parts[0]?.[0] || '') + (parts[1]?.[0] || '');
-    return initials.toUpperCase() || 'U';
-  }
+function getInitials(name = '') {
+  const parts = name.trim().split(/\s+/);
+  const initials = (parts[0]?.[0] || '') + (parts[1]?.[0] || '');
+  return initials.toUpperCase() || 'U';
+}
 
-  function formatTimestamp(input) {
-    const d = input instanceof Date ? input : new Date(input);
-    if (Number.isNaN(d.getTime())) return '';
-    const now = new Date();
-    const isToday =
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate();
+function formatTimestamp(input) {
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const isToday =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
 
-    if (isToday) {
-      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    }
-    // e.g., "Sep 3"
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  }
+  return isToday 
+    ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
-  function StarIcon({ filled, className }) {
+function UnreadDot({ show }) {
+  if (!show) return null;
+  return (
+    <span
+      className="inline-block h-2 w-2 rounded-full bg-website-specials-500 shadow-[0_0_8px_rgba(233,69,96,0.6)]"
+      aria-label="Unread"
+    />
+  );
+}
+
+export default function Mail_Card({
+  sender = { name: 'Sender Name', email: 'sender@example.com', avatarUrl: '' },
+  subject = 'Subject summary',
+  snippet = 'Message content preview...',
+  date = new Date(),
+  unread = false,
+  flagged = false,
+  attachments = 0,
+  selected = false,
+  loading = false,
+  onClick,
+  onToggleSelect,
+}) {
+  if (loading) {
     return (
-      <svg
-        className={className}
-        viewBox="0 0 24 24"
-        fill={filled ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth="1.5"
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M11.48 3.5c.2-.5.84-.5 1.04 0l2.02 4.99c.09.22.3.37.54.4l5.39.46c.52.04.73.69.33 1.02l-4.1 3.44c-.18.15-.26.39-.2.62l1.25 5.25c.12.51-.43.92-.88.65l-4.64-2.77a.67.67 0 0 0-.68 0L6.9 20.33c-.45.27-1-.14-.88-.65l1.25-5.25c.06-.23-.02-.47-.2-.62l-4.1-3.44c-.4-.33-.19-.98.33-1.02l5.39-.46c.24-.02.45-.18.54-.4l2.02-4.99Z"
-        />
-      </svg>
-    );
-  }
-
-  function PaperclipIcon({ className }) {
-    return (
-      <svg
-        className={className}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M21 11.5 12.5 20a5 5 0 1 1-7.07-7.07l9.19-9.19a3.5 3.5 0 1 1 4.95 4.95L10 17.26a2 2 0 0 1-2.83-2.83L15.6 6"
-        />
-      </svg>
-    );
-  }
-
-  function UnreadDot({ show }) {
-    if (!show) return null;
-    return (
-      <span
-        className="inline-block h-2.5 w-2.5 rounded-full bg-blue-400 ring-2 ring-blue-400/25"
-        aria-label="Unread"
-        title="Unread"
-      />
-    );
-  }
-
-  export default function Mail_Card({
-    sender = { name: 'Sender Name', email: 'sender@example.com', avatarUrl: '' },
-    subject = 'Subject goes here with a concise summary',
-    snippet = 'Preview of the message content appears here to give context at a glance.',
-    date = new Date(),
-    unread = false,
-    flagged = false,
-    attachments = 0,
-    selected = false,
-    loading = false,
-    onClick,
-    onToggleSelect,
-  }) {
-    if (loading) {
-      return (
-        <div
-          className={classNames(
-            'grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border p-3',
-            'border-white/10 bg-website-base',
-            'animate-pulse'
-          )}
-          aria-busy="true"
-          aria-label="Loading message"
-        >
-          <div className="flex items-center gap-3">
-            <div className="h-5 w-5 rounded border border-white/10 bg-white/5" />
-            <div className="h-10 w-10 rounded-full bg-white/10" />
-          </div>
-          <div className="space-y-2">
-            <div className="h-4 w-3/5 rounded bg-white/10" />
-            <div className="h-3 w-4/5 rounded bg-white/5" />
-          </div>
-          <div className="h-3 w-12 rounded bg-white/10" />
-        </div>
-      );
-    }
-
-    const initials = getInitials(sender?.name || sender?.email);
-    const when = formatTimestamp(date);
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        onClick?.(e);
-      }
-    };
-
-    const toggleSelect = (e) => {
-      // Prevent row onClick when toggling checkbox
-      e.stopPropagation();
-      onToggleSelect?.(!selected);
-    };
-
-    return (
-      <div
-        role="button"
-        tabIndex={0}
-        aria-selected={selected}
-        onClick={onClick}
-        onKeyDown={handleKeyDown}
-        className={classNames(
-          'group grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border p-3',
-          'transition-colors duration-150',
-          'border-white/10 bg-website-base',
-          'hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40'
-        )}
-      >
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-website-default-800 bg-website-default-900/50 p-3 animate-pulse">
         <div className="flex items-center gap-3">
-          {typeof onToggleSelect === 'function' ? (
-            <button
-              type="button"
-              onClick={toggleSelect}
-              aria-pressed={selected}
-              className={classNames(
-                'flex h-5 w-5 items-center justify-center rounded border text-white/80',
-                selected
-                  ? 'border-blue-400 bg-blue-500/20'
-                  : 'border-white/20 bg-transparent hover:bg-white/10'
-              )}
-              title={selected ? 'Deselect' : 'Select'}
-            >
-              {selected ? (
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              ) : null}
-            </button>
-          ) : (
-            <UnreadDot show={unread} />
-          )}
-
-          <div className="relative h-10 w-10 shrink-0">
-            {sender?.avatarUrl ? (
-              <img
-                src={sender.avatarUrl}
-                alt={`${sender.name || sender.email} avatar`}
-                className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10"
-                loading="lazy"
-              />
-            ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white/90 ring-1 ring-white/10">
-                {initials}
-              </div>
-            )}
-          </div>
+          <div className="h-5 w-5 rounded border border-website-default-700 bg-website-default-800" />
+          <div className="h-10 w-10 rounded-full bg-website-default-800" />
         </div>
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span
-              className={classNames(
-                'truncate',
-                unread ? 'font-semibold text-white' : 'font-medium text-white/90'
-              )}
-              title={subject}
-            >
-              {subject}
-            </span>
-
-            {flagged ? (
-              <StarIcon
-                filled
-                className="h-4 w-4 text-yellow-400 drop-shadow-[0_0_2px_rgba(250,204,21,0.35)]"
-              />
-            ) : null}
-
-            {attachments > 0 ? (
-              <span
-                className="ml-1 inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-white/70"
-                title={`${attachments} attachment${attachments === 1 ? '' : 's'}`}
-              >
-                <PaperclipIcon className="h-3.5 w-3.5" />
-                {attachments}
-              </span>
-            ) : null}
-          </div>
-
-          <div
-            className={classNames(
-              'mt-0.5 flex items-center gap-2 text-sm',
-              unread ? 'text-white/80' : 'text-white/60'
-            )}
-          >
-            <span className="truncate" title={`${sender?.name || ''} <${sender?.email || ''}>`}>
-              {sender?.name || sender?.email}
-            </span>
-            <span aria-hidden="true" className="text-white/30">•</span>
-            <span className="truncate" title={snippet}>
-              {snippet}
-            </span>
-          </div>
+        <div className="space-y-2">
+          <div className="h-4 w-3/5 rounded bg-website-default-800" />
+          <div className="h-3 w-4/5 rounded bg-website-default-800/50" />
         </div>
-
-        <div className="ml-2 flex h-full flex-col items-end justify-between">
-          <span className="text-xs text-white/60" title={new Date(date).toLocaleString()}>
-            {when}
-          </span>
-
-          {/* Unread indicator on the right when checkbox is present */}
-          {typeof onToggleSelect === 'function' ? <UnreadDot show={unread} /> : null}
-        </div>
+        <div className="h-3 w-12 rounded bg-website-default-800" />
       </div>
     );
   }
+
+  const initials = getInitials(sender?.name || sender?.email);
+  const when = formatTimestamp(date);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      className={classNames(
+        'group grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border p-3 transition-all duration-200 focus:outline-none',
+        selected 
+          ? 'border-website-specials-500 bg-website-default-800 ring-1 ring-website-specials-500/20' 
+          : 'border-website-default-800 bg-website-default-900 hover:bg-website-default-800 hover:border-website-default-700'
+      )}
+    >
+      <div className="flex items-center gap-3">
+        {typeof onToggleSelect === 'function' && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleSelect(!selected); }}
+            className={classNames(
+              'flex h-5 w-5 items-center justify-center rounded border transition-colors',
+              selected
+                ? 'border-website-specials-500 bg-website-specials-500 text-white'
+                : 'border-website-default-600 bg-transparent hover:border-website-specials-500'
+            )}
+          >
+            {selected && <Check size={14} strokeWidth={3} />}
+          </button>
+        )}
+
+        <div className="relative h-10 w-10 shrink-0">
+          {sender?.avatarUrl ? (
+            <img
+              src={sender.avatarUrl}
+              alt="avatar"
+              className="h-10 w-10 rounded-full object-cover border border-website-default-700"
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-website-highlights-900 text-website-highlights-200 text-xs font-bold border border-website-highlights-700">
+              {initials}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className={classNames(
+            'truncate text-sm tracking-wide',
+            unread ? 'font-bold text-website-neutral-50' : 'font-medium text-website-neutral-300'
+          )}>
+            {subject}
+          </span>
+          {flagged && <Star size={14} className="fill-website-specials-500 text-website-specials-500" />}
+        </div>
+
+        <div className="mt-0.5 flex items-center gap-2 text-xs">
+          <span className={unread ? 'text-website-highlights-300' : 'text-website-neutral-500'}>
+            {sender?.name || sender?.email}
+          </span>
+          <span className="text-website-neutral-700">•</span>
+          <span className="truncate text-website-neutral-500" title={snippet}>
+            {snippet}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-col items-end justify-between h-full py-0.5">
+        <span className="text-[10px] font-medium uppercase tracking-tighter text-website-neutral-500">
+          {when}
+        </span>
+        <div className="flex items-center gap-2">
+          {attachments > 0 && <Paperclip size={12} className="text-website-neutral-600" />}
+          <UnreadDot show={unread} />
+        </div>
+      </div>
+    </div>
+  );
+}
