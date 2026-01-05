@@ -12,112 +12,50 @@
       "STR": 1,
       "CON": 1
     },
-    "baseProficiencies": 
-      {
-        "armor":["lightArmor","mediumArmor","shields"],
-        "weapons":["simpleWeapons","martialWeapons"],
-        "tools":[],
-        "abilityScore":["STR","CONsavingThrows"],
-        "skills":[]
-        
-      },
+    "baseProficiencies": {
+      "armor": ["lightArmor", "mediumArmor", "shields"],
+      "weapons": ["simpleWeapons", "martialWeapons"],
+      "tools": [],
+      "abilityScore": ["STR", "CONsavingThrows"],
+      "skills": []
+    },
     "baseEquipment": [
-      "explorerPack:1",
+      "explorersPack:1",
       "javelin:4"
     ],
     "featuresByLevel": {
-      "level1": [
-        "rage001",
-        "INTDisable001",
-        "BarbEmotion001"
-      ],
-      "level2": [
-        "madDash001",
-        "unarmoredDefense001"
-      ],
-      "level4": [
-        "muscleMemory001"
-      ],
-      "level5": [
-        "fastMovement001"
-      ],
-      "level6": [
-        "BarbAttack001"
-      ],
-      "level7": [
-        "dangerSense001",
-        "BarbMantel001"
-      ],
-      "level8": [
-        "battleInstinct001",
-        "extraAttack001",
-        "tribalKnowledge001"
-      ],
-      "level9": [
-        "feralInstinct001"
-      ],
-      "level10": [
-        "BarbEmotion002",
-        "fastMovement002",
-        "undyingFury001"
-      ],
-      "level11": [
-        "BarbScream001"
-      ],
-      "level12": [
-        "BarbAttack002",
-        "destructiveGlance001",
-        "BarbMantel002",
-        "rage002",
-        "proteinShake"
-      ],
-      "level13": [
-        "rageAura001"
-      ]
+      "level1": ["rage001", "INTDisable001", "BarbEmotion001"],
+      "level2": ["madDash001", "unarmoredDefense001"],
+      "level4": ["muscleMemory001"],
+      "level5": ["fastMovement001"],
+      "level6": ["BarbAttack001"],
+      "level7": ["dangerSense001", "BarbMantel001"],
+      "level8": ["battleInstinct001", "extraAttack001", "tribalKnowledge001"],
+      "level9": ["feralInstinct001"],
+      "level10": ["BarbEmotion002", "fastMovement002", "undyingFury001"],
+      "level11": ["BarbScream001"],
+      "level12": ["BarbAttack002", "destructiveGlance001", "BarbMantel002", "rage002", "proteinShake"],
+      "level13": ["rageAura001"]
     },
     "choices": {
       "proficiencies": {
         "skills": {
           "amount": 2,
-          "options": [
-            "animalHandling",
-            "athletics",
-            "intimidation",
-            "nature",
-            "perception",
-            "survival"
-          ]
+          "options": ["animalHandling", "athletics", "intimidation", "nature", "perception", "survival"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "greataxe": 1
-          },
-          "option2": {
-            "anyMartialWeapon": 1
-          }
+          "option1": {"greataxe": 1},
+          "option2": {"anyMartialWeapon": 1}
         },
         "choice2": {
-          "option1": {
-            "handaxes": 2
-          },
-          "option2": {
-            "anySimpleWeapon": 1
-          }
+          "option1": {"handaxe": 2},
+          "option2": {"anySimpleWeapon": 1}
         }
       }
-    },  
-    "subclasses": [
-      "pathOfWrath",
-      "pathOfMadness",
-      "pathOfDespair",
-      "pathOfEnvy",
-      "pathOfGlee",
-      "pathOfDevotion",
-      "pathOfTemperance"
-
-    ]
+    },
+    "subclasses": ["pathOfWrath", "pathOfMadness", "pathOfDespair", "pathOfEnvy", "pathOfGlee", "pathOfDevotion", "pathOfTemperance"]
   },
   "Bard": {
     "name": "Bard",
@@ -129,17 +67,15 @@
       "MP": 1.3
     },
     "baseStatModifier": {
-      "CHA":2
+      "CHA": 2
     },
-    "baseProficiencies":
-      {
-        "armor":["lightArmor"],
-        "weapons":["simpleWeapons","handCrossbows","longswords","rapiers","shortswords"],
-        "tools":[],
-        "abilityScore":["DEX", "CHA"],
-        "skills":[]
-        
-      },
+    "baseProficiencies": {
+      "armor": ["lightArmor"],
+      "weapons": ["simpleWeapons", "handCrossbows", "longswords", "rapiers", "shortswords"],
+      "tools": [],
+      "abilityScore": ["DEX", "CHA"],
+      "skills": []
+    },
     "baseEquipment": [
       "leatherArmor:1",
       "dagger:1"
@@ -149,74 +85,30 @@
       "proficiencies": {
         "skills": {
           "amount": 3,
-          "options": [
-            "acrobatics",
-            "animalHandling",
-            "arcana",
-            "athletics",
-            "deception",
-            "history",
-            "insight",
-            "intimidation",
-            "investigation",
-            "medicine",
-            "nature",
-            "perception",
-            "performance",
-            "persuasion",
-            "religion",
-            "sleightOfHand",
-            "stealth",
-            "survival"
-          ]
+          "options": ["acrobatics", "animalHandling", "arcana", "athletics", "deception", "history", "insight", "intimidation", "investigation", "medicine", "nature", "perception", "performance", "persuasion", "religion", "sleightOfHand", "stealth", "survival"]
         },
         "tools": {
           "amount": 3,
-          "options": [
-            "musicalInstruments"
-          ]
+          "options": ["musicalInstruments"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "rapier": 1
-          },
-          "option2": {
-            "longsword": 1
-          },
-          "option3": {
-            "anySimpleWeapon": 1
-          }
+          "option1": {"rapier": 1},
+          "option2": {"longsword": 1},
+          "option3": {"anySimpleWeapon": 1}
         },
         "choice2": {
-          "option1": {
-            "diplomatsPack": 1
-          },
-          "option2": {
-            "entertainersPack": 1
-          }
+          "option1": {"diplomatsPack": 1},
+          "option2": {"entertainersPack": 1}
         },
         "choice3": {
-          "option1": {
-            "lute": 1
-          },
-          "option2": {
-            "anyMusicalInstrument": 1
-          }
+          "option1": {"lute": 1},
+          "option2": {"anyMusicalInstrument": 1}
         }
       }
     },
-    "subclasses": [
-      "rushE",
-      "beethovensSymphony",
-      "panisAngelicus",
-      "bohemianRhapsody",
-      "requiemOfSilence",
-      "moonlightSonata",
-      "diesIrae"
-
-    ]
+    "subclasses": ["rushE", "beethovensSymphony", "panisAngelicus", "bohemianRhapsody", "requiemOfSilence", "moonlightSonata", "diesIrae"]
   },
   "Cleric": {
     "name": "Cleric",
@@ -225,20 +117,19 @@
     "resourcePoolModifier": {
       "HP": 1.2,
       "STA": 0.8,
-      "MP": 1.5},
-    "baseStatModifier": {
-      "WIS":1,
-      "INT":1
+      "MP": 1.5
     },
-    "baseProficiencies":
-      {
-        "armor":["lightArmor","mediumArmor","shields"],
-        "weapons":["simpleWeapons"],
-        "tools":[],
-        "abilityScore":["WIS","CHA"],
-        "skills":[]
-        
-      },
+    "baseStatModifier": {
+      "WIS": 1,
+      "INT": 1
+    },
+    "baseProficiencies": {
+      "armor": ["lightArmor", "mediumArmor", "shields"],
+      "weapons": ["simpleWeapons"],
+      "tools": [],
+      "abilityScore": ["WIS", "CHA"],
+      "skills": []
+    },
     "baseEquipment": [
       "holySymbol:1",
       "shield:1"
@@ -248,65 +139,30 @@
       "proficiencies": {
         "skills": {
           "amount": 2,
-          "options": [
-            "history",
-            "insight",
-            "medicine",
-            "persuasion",
-            "religion"
-          ]
+          "options": ["history", "insight", "medicine", "persuasion", "religion"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "mace": 1
-          },
-          "option2": {
-            "warhammer": 1
-          }
+          "option1": {"mace": 1},
+          "option2": {"warhammer": 1}
         },
         "choice2": {
-          "option1": {
-            "scaleMail": 1
-          },
-          "option2": {
-            "leatherArmor": 1
-          },
-          "option3": {
-            "chainMail": 1
-          }
+          "option1": {"scaleMail": 1},
+          "option2": {"leatherArmor": 1},
+          "option3": {"chainMail": 1}
         },
         "choice3": {
-          "option1": {
-            "lightCrossbow": 1,
-            "crossbowBolts": 20
-          },
-          "option2": {
-            "anySimpleWeapon": 1
-          }
+          "option1": {"lightCrossbow": 1, "crossbowBolts": 20},
+          "option2": {"anySimpleWeapon": 1}
         },
         "choice4": {
-          "option1": {
-            "priestsPack": 1
-          },
-          "option2": {
-            "explorersPack": 1
-          }
+          "option1": {"priestsPack": 1},
+          "option2": {"explorersPack": 1}
         }
       }
     },
-    "subclasses": [
-      "mandateOfHeaven",
-      "domainOfCommunion",
-      "liturgyOfEmbers",
-      "creedOfSerenity",
-      "edictOfJudgment",
-      "orderOfTheAnoited",
-      "covenantOfRevelation",
-      "sacramentOfWar"
-
-    ]
+    "subclasses": ["mandateOfHeaven", "domainOfCommunion", "liturgyOfEmbers", "creedOfSerenity", "edictOfJudgment", "orderOfTheAnoited", "covenantOfRevelation", "sacramentOfWar"]
   },
   "Druid": {
     "name": "Druid",
@@ -315,79 +171,47 @@
     "resourcePoolModifier": {
       "HP": 1,
       "STA": 1,
-      "MP": 1.5},
-    "baseStatModifier": {
-      "INT":1,
-      "DEX":1
+      "MP": 1.5
     },
-    "baseProficiencies":
-      {
-        "armor":["lightArmor","mediumArmor","shields"],
-        "weapons":[
-          "clubs", 
-          "daggers", 
-          "darts",
-          "javelins", 
-          "maces",
-          "quarterstaffs",
-          "scimitars",
-          "sickles",
-          "slings",
-          "spears"
-        ],
-        "tools":[],
-        "abilityScore":["INT", "WIS"],
-        "skills":[]
-        
-      },
+    "baseStatModifier": {
+      "INT": 1,
+      "DEX": 1
+    },
+    "baseProficiencies": {
+      "armor": ["lightArmor", "mediumArmor", "shields"],
+      "weapons": ["clubs", "daggers", "darts", "javelins", "maces", "quarterstaffs", "scimitars", "sickles", "slings", "spears"],
+      "tools": [],
+      "abilityScore": ["INT", "WIS"],
+      "skills": []
+    },
     "baseEquipment": [
       "woodenShield:1",
-      "holySymbol:1"
+      "druidicFocus:1"
     ],
     "featuresByLevel": {},
     "choices": {
       "proficiencies": {
         "skills": {
           "amount": 2,
-          "options": [
-            "arcana",
-            "animalHandling",
-            "insight",
-            "medicine",
-            "nature",
-            "perception",
-            "religion",
-            "survival"
-          ]
+          "options": ["arcana", "animalHandling", "insight", "medicine", "nature", "perception", "religion", "survival"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "scimitar": 1
-          },
-          "option2": {
-            "anySimpleWeapon": 1
-          }
+          "option1": {"scimitar": 1},
+          "option2": {"anySimpleWeapon": 1}
         },
         "choice2": {
-          "option1": {
-            "explorersPack": 1
-          },
-          "option2": {
-            "herbalismKit": 1
-          }
+          "option1": {"leatherArmor": 1},
+          "option2": {"hideArmor": 1}
+        },
+        "choice3": {
+          "option1": {"explorersPack": 1},
+          "option2": {"herbalismKit": 1}
         }
       }
     },
-    "subclasses": [
-      "fruitOfTheLand",
-      "fruitOfTheSeasons",
-      "fruitOfSpores",
-      "fruitOfTheMoon",
-      "fruitOfTheHidden"
-
-    ]
+    "subclasses": ["fruitOfTheLand", "fruitOfTheSeasons", "fruitOfSpores", "fruitOfTheMoon", "fruitOfTheHidden"]
   },
   "Fighter": {
     "name": "Fighter",
@@ -396,90 +220,48 @@
     "resourcePoolModifier": {
       "HP": 1.5,
       "STA": 1.5,
-      "MP": 0.3},
-    "baseStatModifier": {
-      "STR":1,
-      "DEX":1
-
+      "MP": 0.3
     },
-    "baseProficiencies": 
-      {
-        "armor":["lightArmor","mediumArmor","heavyArmor","shields"],
-        "weapons":[
-      "simpleWeapons",
-      "martialWeapons"],
-        "tools":[],
-        "abilityScore":["STR", "CON"],
-        "skills":[]
-        
-      },
+    "baseStatModifier": {
+      "STR": 1,
+      "DEX": 1
+    },
+    "baseProficiencies": {
+      "armor": ["lightArmor", "mediumArmor", "heavyArmor", "shields"],
+      "weapons": ["simpleWeapons", "martialWeapons"],
+      "tools": [],
+      "abilityScore": ["STR", "CON"],
+      "skills": []
+    },
     "baseEquipment": [],
     "featuresByLevel": {},
     "choices": {
       "proficiencies": {
         "skills": {
           "amount": 2,
-          "options": [
-            "acrobatics",
-            "animalHandling",
-            "athletics",
-            "history",
-            "insight",
-            "intimidation",
-            "perception",
-            "survival"
-          ]
+          "options": ["acrobatics", "animalHandling", "athletics", "history", "insight", "intimidation", "perception", "survival"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "chainMail": 1
-          },
-          "option2": {
-            "leatherArmor": 1,
-            "longbow": 1,
-            "arrows": 20
-          }
+          "option1": {"chainMail": 1},
+          "option2": {"leatherArmor": 1, "longbow": 1, "arrows": 20}
         },
         "choice2": {
-          "option1": {
-            "martialWeapon": 1,
-            "shield": 1
-          },
-          "option2": {
-            "martialWeapons": 2
-          }
+          "option1": {"martialWeapon": 1, "shield": 1},
+          "option2": {"martialWeapon": 2}
         },
         "choice3": {
-          "option1": {
-            "lightCrossbow": 1,
-            "crossbowBolts": 20
-          },
-          "option2": {
-            "handaxes": 2
-          }
+          "option1": {"lightCrossbow": 1, "crossbowBolts": 20},
+          "option2": {"handaxe": 2}
         },
         "choice4": {
-          "option1": {
-            "dungeoneersPack": 1
-          },
-          "option2": {
-            "explorersPack": 1
-          }
+          "option1": {"dungeoneersPack": 1},
+          "option2": {"explorersPack": 1}
         }
       }
     },
-    "subclasses": [
-      "legacyOfTheGreatKhan",
-      "alexandersLegacy",
-      "legacyOfTheRajputs",
-      "joanOfArcsLegacy",
-      "legacyOfBismark",
-      "lionheartsLegacy",
-      "legacyOfTheSettingSun"
-
-    ]
+    "subclasses": ["legacyOfTheGreatKhan", "alexandersLegacy", "legacyOfTheRajputs", "joanOfArcsLegacy", "legacyOfBismark", "lionheartsLegacy", "legacyOfTheSettingSun"]
   },
   "Monk": {
     "name": "Monk",
@@ -488,65 +270,46 @@
     "resourcePoolModifier": {
       "HP": 1.2,
       "STA": 2,
-      "MP": 0.8},
-    "baseStatModifier": {
-      "DEX":1,
-      "WIS":1
+      "MP": 0.8
     },
-    "baseProficiencies": 
-      {
-        "armor":[],
-        "weapons":["simpleWeapons","shortswords"],
-        "tools":[],
-        "abilityScore":["STR", "DEX"],
-        "skills":[]
-        
-      },
-    "baseEquipment": [],
+    "baseStatModifier": {
+      "DEX": 1,
+      "WIS": 1
+    },
+    "baseProficiencies": {
+      "armor": [],
+      "weapons": ["simpleWeapons", "shortswords"],
+      "tools": [],
+      "abilityScore": ["STR", "DEX"],
+      "skills": []
+    },
+    "baseEquipment": [
+      "dart:10"
+    ],
     "featuresByLevel": {},
     "choices": {
       "proficiencies": {
         "skills": {
           "amount": 2,
-          "options": [
-            "acrobatics",
-            "athletics",
-            "history",
-            "insight",
-            "religion",
-            "stealth"
-          ]
+          "options": ["acrobatics", "athletics", "history", "insight", "religion", "stealth"]
+        },
+        "tools": {
+          "amount": 1,
+          "options": ["artisansTools", "musicalInstruments"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "shortsword": 1
-          },
-          "option2": {
-            "anySimpleWeapon": 1
-          }
+          "option1": {"shortsword": 1},
+          "option2": {"anySimpleWeapon": 1}
         },
         "choice2": {
-          "option1": {
-            "dungeoneersPack": 1
-          },
-          "option2": {
-            "explorersPack": 1
-          }
+          "option1": {"dungeoneersPack": 1},
+          "option2": {"explorersPack": 1}
         }
       }
     },
-    "subclasses": [
-      "wayOfTheStoic",
-      "wayOfTheBuddha",
-      "wayOfTheTao",
-      "wayOfTheNihilist",
-      "wayOfTheAbsurdist",
-      "wayOfTheExistentialist",
-      "wayOfTheHedon"
-
-    ]
+    "subclasses": ["wayOfTheStoic", "wayOfTheBuddha", "wayOfTheTao", "wayOfTheNihilist", "wayOfTheAbsurdist", "wayOfTheExistentialist", "wayOfTheHedon"]
   },
   "Paladin": {
     "name": "Paladin",
@@ -555,78 +318,47 @@
     "resourcePoolModifier": {
       "HP": 1.5,
       "STA": 1,
-      "MP": 1},
-    "baseStatModifier": {
-      "CON":1,
-      "CHA":1
-
+      "MP": 1
     },
-    "baseProficiencies":
-      {
-        "armor":["lightArmor","mediumArmor","heavyArmor","shields"],
-        "weapons":[
-      "simpleWeapons",
-      "martialWeapons"],
-        "tools":[],
-        "abilityScore":["WIS",
-      "CHA"],
-        "skills":[]
-        
-      },
+    "baseStatModifier": {
+      "CON": 1,
+      "CHA": 1
+    },
+    "baseProficiencies": {
+      "armor": ["lightArmor", "mediumArmor", "heavyArmor", "shields"],
+      "weapons": ["simpleWeapons", "martialWeapons"],
+      "tools": [],
+      "abilityScore": ["WIS", "CHA"],
+      "skills": []
+    },
     "baseEquipment": [
-      "holySymbol:1"
+      "holySymbol:1",
+      "chainMail:1"
     ],
     "featuresByLevel": {},
     "choices": {
       "proficiencies": {
         "skills": {
           "amount": 2,
-          "options": [
-            "athletics",
-            "insight",
-            "intimidation",
-            "medicine",
-            "persuasion",
-            "religion"
-          ]
+          "options": ["athletics", "insight", "intimidation", "medicine", "persuasion", "religion"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "martialWeapon": 1,
-            "shield": 1
-          },
-          "option2": {
-            "martialWeapons": 2
-          }
+          "option1": {"martialWeapon": 1, "shield": 1},
+          "option2": {"martialWeapon": 2}
         },
         "choice2": {
-          "option1": {
-            "fiveJavelins": 5
-          },
-          "option2": {
-            "anySimpleWeapon": 1
-          }
+          "option1": {"javelin": 5},
+          "option2": {"anySimpleMeleeWeapon": 1}
         },
         "choice3": {
-          "option1": {
-            "priestsPack": 1
-          },
-          "option2": {
-            "explorersPack": 1
-          }
+          "option1": {"priestsPack": 1},
+          "option2": {"explorersPack": 1}
         }
       }
     },
-    "subclasses": [
-      "sacredOath",
-      "oathOfDecotion",
-      "oathOfHeresy",
-      "oathOfSilence",
-      "oathOfMagic"
-
-    ]
+    "subclasses": ["sacredOath", "oathOfDecotion", "oathOfHeresy", "oathOfSilence", "oathOfMagic"]
   },
   "Ranger": {
     "name": "Ranger",
@@ -635,75 +367,48 @@
     "resourcePoolModifier": {
       "HP": 1.2,
       "STA": 1.5,
-      "MP": 0.8},
-    "baseStatModifier": {
-      "DEX":1,
-      "INT":1
+      "MP": 0.8
     },
-    "baseProficiencies": 
-      {
-        "armor":["lightArmor"],
-        "weapons":["simpleWeapons",
-      "martialWeapons"],
-        "tools":[],
-        "abilityScore":["STR","DEX"],
-        "skills":[]
-        
-      },
-    "baseEquipment": [],
+    "baseStatModifier": {
+      "DEX": 1,
+      "INT": 1
+    },
+    "baseProficiencies": {
+      "armor": ["lightArmor", "mediumArmor", "shields"],
+      "weapons": ["simpleWeapons", "martialWeapons"],
+      "tools": [],
+      "abilityScore": ["STR", "DEX"],
+      "skills": []
+    },
+    "baseEquipment": [
+      "longbow:1",
+      "quiver:1",
+      "arrows:20"
+    ],
     "featuresByLevel": {},
     "choices": {
       "proficiencies": {
         "skills": {
           "amount": 3,
-          "options": [
-            "animalHandling",
-            "athletics",
-            "insight",
-            "investigation",
-            "nature",
-            "perception",
-            "stealth",
-            "survival"
-          ]
+          "options": ["animalHandling", "athletics", "insight", "investigation", "nature", "perception", "stealth", "survival"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "scaleArmor": 1
-          },
-          "option2": {
-            "leatherArmor": 1
-          }
+          "option1": {"scaleMail": 1},
+          "option2": {"leatherArmor": 1}
         },
         "choice2": {
-          "option1": {
-            "twoMartialWeapons": 2
-          },
-          "option2": {
-            "martialWeapon": 1,
-            "shield": 1
-          }
+          "option1": {"shortsword": 2},
+          "option2": {"simpleWeapon": 2}
         },
         "choice3": {
-          "option1": {
-            "dungeoneersPack": 1
-          },
-          "option2": {
-            "explorersPack": 1
-          }
+          "option1": {"dungeoneersPack": 1},
+          "option2": {"explorersPack": 1}
         }
       }
     },
-    "subclasses": [
-      "markOfTheHunter",
-      "markOfTheTracker",
-      "markOfTheNightStalker",
-      "markOfTheSurvivor",
-      "markOfTheBeast"
-
-    ]
+    "subclasses": ["markOfTheHunter", "markOfTheTracker", "markOfTheNightStalker", "markOfTheSurvivor", "markOfTheBeast"]
   },
   "Rogue": {
     "name": "Rogue",
@@ -712,102 +417,48 @@
     "resourcePoolModifier": {
       "HP": 1,
       "STA": 2,
-      "MP": 0.5},
-    "baseStatModifier": {
-      "DEX":2
+      "MP": 0.5
     },
-    "baseProficiencies":
-      {
-        "armor":["lightArmor"],
-        "weapons":["simpleWeapons",
-      "handCrossbows",
-      "longswords",
-      "rapiers",
-      "shortswords"],
-        "tools":["thievesTools"],
-        "abilityScore":["DEX","INT"],
-        "skills":[]
-        
-      },
+    "baseStatModifier": {
+      "DEX": 2
+    },
+    "baseProficiencies": {
+      "armor": ["lightArmor"],
+      "weapons": ["simpleWeapons", "handCrossbows", "longswords", "rapiers", "shortswords"],
+      "tools": ["thievesTools"],
+      "abilityScore": ["DEX", "INT"],
+      "skills": []
+    },
     "baseEquipment": [
-      "leatherArmor:1"
+      "leatherArmor:1",
+      "dagger:2",
+      "thievesTools:1"
     ],
     "featuresByLevel": {},
     "choices": {
       "proficiencies": {
         "skills": {
           "amount": 4,
-          "options": [
-            "acrobatics",
-            "animalHandling",
-            "arcana",
-            "athletics",
-            "deception",
-            "history",
-            "insight",
-            "intimidation",
-            "investigation",
-            "medicine",
-            "nature",
-            "perception",
-            "performance",
-            "persuasion",
-            "religion",
-            "sleightOfHand",
-            "stealth",
-            "survival"
-          ]
+          "options": ["acrobatics", "athletics", "deception", "insight", "intimidation", "investigation", "perception", "performance", "persuasion", "sleightOfHand", "stealth"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "rapier": 1
-          },
-          "option2": {
-            "shortsword": 1
-          }
+          "option1": {"rapier": 1},
+          "option2": {"shortsword": 1}
         },
         "choice2": {
-          "option1": {
-            "shortbow": 1,
-            "arrows": 20
-          },
-          "option2": {
-            "shortsword": 1
-          }
+          "option1": {"shortbow": 1, "quiver": 1, "arrows": 20},
+          "option2": {"shortsword": 1}
         },
         "choice3": {
-          "option1": {
-            "burglarsPack": 1
-          },
-          "option2": {
-            "dungeoneersPack": 1
-          },
-          "option3": {
-            "explorersPack": 1
-          }
-        },
-        "choice4": {
-          "option1": {
-            "dagger": 1
-          },
-          "option2": {
-            "daggersTwo": 2
-          }
+          "option1": {"burglarsPack": 1},
+          "option2": {"dungeoneersPack": 1},
+          "option3": {"explorersPack": 1}
         }
       }
     },
-    "subclasses": [
-      "assassin",
-      "ripper",
-      "stalker",
-      "ninja",
-      "spy",
-      "clown",
-      "scout",
-      "inquisitor"   
-     ]
+    "subclasses": ["assassin", "ripper", "stalker", "ninja", "spy", "clown", "scout", "inquisitor"]
   },
   "Sorcerer": {
     "name": "Sorcerer",
@@ -816,80 +467,47 @@
     "resourcePoolModifier": {
       "HP": 0.7,
       "STA": 0.6,
-      "MP": 1.8},
-    "baseStatModifier": {
-      "CHA":1,
-      "INT":1
+      "MP": 1.8
     },
-    "baseProficiencies": 
-      {
-        "armor":[],
-        "weapons":["dagger",
-      "darts",
-      "sling",
-      "quarterstaff",
-      "lightCrossbow"],
-        "tools":[],
-        "abilityScore":["CON","CHA"],
-        "skills":[]
-        
-      },
-      
-    "baseEquipment": [],
+    "baseStatModifier": {
+      "CHA": 1,
+      "INT": 1
+    },
+    "baseProficiencies": {
+      "armor": [],
+      "weapons": ["daggers", "darts", "slings", "quarterstaffs", "lightCrossbows"],
+      "tools": [],
+      "abilityScore": ["CON", "CHA"],
+      "skills": []
+    },
+    "baseEquipment": [
+      "dagger:2",
+      "arcaneFocus:1"
+    ],
     "featuresByLevel": {},
     "choices": {
       "proficiencies": {
         "skills": {
           "amount": 2,
-          "options": [
-            "arcana",
-            "deception",
-            "insight",
-            "intimidation",
-            "persuasion",
-            "religion"
-          ]
+          "options": ["arcana", "deception", "insight", "intimidation", "persuasion", "religion"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "lightCrossbow": 1,
-            "bolts": 20
-          },
-          "option2": {
-            "anySimpleWeapon": 1
-          }
+          "option1": {"lightCrossbow": 1, "crossbowBolts": 20},
+          "option2": {"anySimpleWeapon": 1}
         },
         "choice2": {
-          "option1": {
-            "diplomatsPack": 1
-          },
-          "option2": {
-            "dungeoneersPack": 1
-          }
+          "option1": {"componentPouch": 1},
+          "option2": {"arcaneFocus": 1}
         },
         "choice3": {
-          "option1": {
-            "dagger": 1
-          },
-          "option2": {
-            "daggersTwo": 2
-          }
+          "option1": {"dungeoneersPack": 1},
+          "option2": {"explorersPack": 1}
         }
       }
     },
-    "subclasses": [
-      "bloodOfInferna",
-      "bloodOfTempestas",
-      "bloodOfInundatio",
-      "bloodOfTerraeMotus",
-      "bloodfAbyssus",
-      "bloodOfCorporaCaelestia",
-      "bloodOfVacuus",
-      "bloodOfPrisma"
-
-    ]
+    "subclasses": ["bloodOfInferna", "bloodOfTempestas", "bloodOfInundatio", "bloodOfTerraeMotus", "bloodfAbyssus", "bloodOfCorporaCaelestia", "bloodOfVacuus", "bloodOfPrisma"]
   },
   "Warlock": {
     "name": "Warlock",
@@ -898,162 +516,95 @@
     "resourcePoolModifier": {
       "HP": 1,
       "STA": 0.8,
-      "MP": 1.5},
-    "baseStatModifier": {
-
-      "CHA":1,
-      "WIS":1
+      "MP": 1.5
     },
-    "baseProficiencies": 
-      {
-        "armor":["lightArmor"],
-        "weapons":["simpleWeapons"],
-        "tools":[],
-        "abilityScore":["WIS","CHA"],
-        "skills":[]
-        
-      },
-
+    "baseStatModifier": {
+      "CHA": 1,
+      "WIS": 1
+    },
+    "baseProficiencies": {
+      "armor": ["lightArmor"],
+      "weapons": ["simpleWeapons"],
+      "tools": [],
+      "abilityScore": ["WIS", "CHA"],
+      "skills": []
+    },
     "baseEquipment": [
-      "leatherArmor:1"
+      "leatherArmor:1",
+      "dagger:2",
+      "arcaneFocus:1"
     ],
     "featuresByLevel": {},
     "choices": {
       "proficiencies": {
         "skills": {
           "amount": 2,
-          "options": [
-            "arcana",
-            "deception",
-            "history",
-            "insight",
-            "intimidation",
-            "investigation",
-            "nature",
-            "religion"
-          ]
+          "options": ["arcana", "deception", "history", "insight", "intimidation", "investigation", "nature", "religion"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "lightCrossbow": 1,
-            "bolts": 20
-          },
-          "option2": {
-            "anySimpleWeapon": 1
-          }
+          "option1": {"lightCrossbow": 1, "crossbowBolts": 20},
+          "option2": {"anySimpleWeapon": 1}
         },
         "choice2": {
-          "option1": {
-            "scholarsPack": 1
-          },
-          "option2": {
-            "dungeoneersPack": 1
-          }
+          "option1": {"componentPouch": 1},
+          "option2": {"arcaneFocus": 1}
         },
         "choice3": {
-          "option1": {
-            "dagger": 1
-          },
-          "option2": {
-            "daggersTwo": 2
-          }
+          "option1": {"scholarsPack": 1},
+          "option2": {"dungeoneersPack": 1}
         }
       }
     },
-    "subclasses": [
-      "temptationOfLove",
-      "temptationOfThought",
-      "temptationOfHope",
-      "temptationOfSacrifice",
-      "temptationOfSelf"
-
-    ]
+    "subclasses": ["temptationOfLove", "temptationOfThought", "temptationOfHope", "temptationOfSacrifice", "temptationOfSelf"]
   },
   "Wizard": {
     "name": "Wizard",
     "classID": "wizard",
     "description": "A scholarly spellcaster who practices wizardry through intensive study and discipline",
     "resourcePoolModifier": {
-      
       "HP": 0.6,
       "STA": 0.5,
       "MP": 2
     },
     "baseStatModifier": {
-      "WIS":2
+      "WIS": 2
     },
-    "baseProficiencies":
-      {
-        "armor":[],
-        "weapons":["dagger",
-      "darts",
-      "sling",
-      "quarterstaff",
-      "lightCrossbow"],
-        "tools":[],
-        "abilityScore":["INT","WIS"],
-        "skills":[]
-        
-      },
-      
+    "baseProficiencies": {
+      "armor": [],
+      "weapons": ["daggers", "darts", "slings", "quarterstaffs", "lightCrossbows"],
+      "tools": [],
+      "abilityScore": ["INT", "WIS"],
+      "skills": []
+    },
     "baseEquipment": [
-      "spellbook:1"
+      "spellbook:1",
+      "arcaneFocus:1"
     ],
     "featuresByLevel": {},
     "choices": {
       "proficiencies": {
         "skills": {
           "amount": 2,
-          "options": [
-            "arcana",
-            "history",
-            "insight",
-            "investigation",
-            "medicine",
-            "religion"
-          ]
+          "options": ["arcana", "history", "insight", "investigation", "medicine", "religion"]
         }
       },
       "equipment": {
         "choice1": {
-          "option1": {
-            "quarterstaff": 1
-          },
-          "option2": {
-            "dagger": 1
-          }
+          "option1": {"quarterstaff": 1},
+          "option2": {"dagger": 1}
         },
         "choice2": {
-          "option1": {
-            "scholarsPack": 1
-          },
-          "option2": {
-            "explorersPack": 1
-          }
+          "option1": {"componentPouch": 1},
+          "option2": {"arcaneFocus": 1}
         },
         "choice3": {
-          "option1": {
-            "dagger": 1
-          },
-          "option2": {
-            "daggersTwo": 2
-          }
+          "option1": {"scholarsPack": 1},
+          "option2": {"explorersPack": 1}
         }
       }
     },
-    "subclasses": [
-      "schoolOfElements",
-      "schoolOfArcane",
-      "schoolOfTheDivine",
-      "schoolOfTheBladesigner",
-      "schoolOfTheAbyss",
-      "schoolOfIllusions",
-      "schoolOfGravitas",
-      "schoolOfTheWild"
-
-    ]
-
+    "subclasses": ["schoolOfElements", "schoolOfArcane", "schoolOfTheDivine", "schoolOfTheBladesigner", "schoolOfTheAbyss", "schoolOfIllusions", "schoolOfGravitas", "schoolOfTheWild"]
   }
 }
