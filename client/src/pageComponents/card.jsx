@@ -34,7 +34,8 @@ Card.Content = function CardContent({ children, className = "" }) {
   const { isOpen } = useContext(CardContext);
   
   return (
-    <div className={`transition-all duration-300 ease-in-out ${isOpen ? ' opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
+    <div className={`transition-all duration-300 ease-in-out overflow-hidden 
+      ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
       <div className={`p-4 ${className}`}>
         {children}
       </div>

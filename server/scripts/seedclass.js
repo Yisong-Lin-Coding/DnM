@@ -20,75 +20,62 @@ async function seedClasses() {
     
     console.log('✓ Connected to MongoDB');
 
-    // Delete all existing classes
+    // 1. Clear existing data
     const deleteResult = await Class.deleteMany({});
     console.log(`✓ Deleted ${deleteResult.deletedCount} existing classes from database`);
 
     console.log('Transforming and seeding classes...');
     const classesToInsert = [];
 
+    // 2. Map through the JSON keys (Barbarian, Bard, etc.)
     for (const className in classesData) {
       const classData = classesData[className];
       
-      // Convert baseEquipment from object to array of strings
-      const baseEquipmentArray = [];
-      if (classData.baseEquipment) {
-        for (const [item, quantity] of Object.entries(classData.baseEquipment)) {
-          baseEquipmentArray.push(`${item}:${quantity}`);
+      // Convert the featuresByLevel object from JSON into a Map for Mongoose
+      // This matches your Schema: featuresByLevel: { type: Map, of: [String] }
+      const featuresMap = new Map();
+      if (classData.featuresByLevel) {
+        for (const [level, features] of Object.entries(classData.featuresByLevel)) {
+          featuresMap.set(level, features);
         }
       }
 
-      // Convert features from level objects to Map format
-      const featuresByLevel = new Map();
-      if (classData.features) {
-        for (const [level, featuresObj] of Object.entries(classData.features)) {
-          const featureIds = [];
-          for (const [featureName, featureData] of Object.entries(featuresObj)) {
-            if (featureData && featureData.id) {
-              featureIds.push(featureData.id);
-            }
-          }
-          if (featureIds.length > 0) {
-            featuresByLevel.set(level, featureIds);
-          }
-        }
-      }
-
-      // Build choices object from choiceProficiencies and choiceEquipment
-      const choices = {};
-      
-      if (classData.choiceProficiencies) {
-        choices.proficiencies = classData.choiceProficiencies;
-      }
-      
-      if (classData.choiceEquipment) {
-        choices.equipment = classData.choiceEquipment;
-      }
-
-      // Create the class object for MongoDB
+      // 3. Construct the clean object
+      // We take the data directly from JSON because your JSON structure 
+      // already matches your Schema requirements.
       classesToInsert.push({
         name: classData.name,
-        classID: className.toLowerCase(),
+        classID: classData.classID, // Uses "barbarian", "bard", etc. from JSON
         description: classData.description,
         resourcePoolModifier: classData.resourcePoolModifier || { HP: 1, STA: 1, MP: 1 },
         baseStatModifier: classData.baseStatModifier || {},
-        baseProficiencies: classData.baseProficiencies || [],
-        baseEquipment: baseEquipmentArray,
-        featuresByLevel: featuresByLevel,
-        choices: choices,
+        baseProficiencies: classData.baseProficiencies || {
+          armor: [],
+          weapons: [],
+          tools: [],
+          abilityScore: [],
+          skills: []
+        },
+        baseEquipment: classData.baseEquipment || [],
+        featuresByLevel: featuresMap,
+        choices: classData.choices || {}, // This now correctly captures the choices object
         subclasses: classData.subclasses || []
       });
     }
 
+    // 4. Batch insert
     const result = await Class.insertMany(classesToInsert);
     console.log(`✓ Successfully seeded ${result.length} classes into database`);
 
     await mongoose.connection.close();
     console.log('✓ Connection closed');
     process.exit(0);
+
   } catch (err) {
     console.error('Seed error:', err);
-    await mongoose.connection.close();
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close();
+    }
     process.exit(1);
   }
 }

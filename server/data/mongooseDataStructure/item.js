@@ -4,7 +4,7 @@ const itemSchema = new mongoose.Schema({
     name: { type: String, required: true },
     itemId: { type: String, required: true, unique: true },
     description: { type: String, required: true },
-    rarity: { type: String, enum: ['common', 'uncommon', 'rare',"very rare", 'epic', 'legendary'], default: 'common' },
+    rarity: { type: String, enum: ['common', 'uncommon', 'rare',"veryRare", 'epic', 'legendary', `artifact`], default: 'common' },
     unqiue: { type: Boolean, default: false },
     weight: { type: Number, default: 0 },
     cost: { type: Number, default: 0 },

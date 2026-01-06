@@ -16,7 +16,7 @@
       "armor": ["lightArmor", "mediumArmor", "shields"],
       "weapons": ["simpleWeapons", "martialWeapons"],
       "tools": [],
-      "abilityScore": ["STR", "CONsavingThrows"],
+      "abilityScore": ["STR", "CON"],
       "skills": []
     },
     "baseEquipment": [

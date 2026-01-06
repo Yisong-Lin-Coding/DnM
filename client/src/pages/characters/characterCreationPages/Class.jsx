@@ -1,236 +1,674 @@
-import React from 'react';
+import React, { useContext, useEffect, useState, useMemo } from 'react';
 import { Card } from '../../../pageComponents/card';
-import { useContext, useEffect, useState, useMemo } from "react";
-import { CircleUser, Shuffle } from 'lucide-react';
+import { CircleUser } from 'lucide-react';
 import { SocketContext } from "../../../socket.io/context";
 
 export function Class({ values, onChange }) {
-  const socket = useContext(SocketContext);
-  const [classes, setClasses] = useState([]);
+    const socket = useContext(SocketContext);
+    const [classes, setClasses] = useState([]);
 
-  useEffect(() => {
-    socket.emit(
-      'database_query',
-      {
-        collection: 'classes',
-        operation: 'findAll',
-      },
-      (response) => {
-        if (response.success) {
-          setClasses(response.data);
-          console.log(response.data);
+    // 1. Fetch classes on mount
+    useEffect(() => {
+        socket.emit(
+            'database_query',
+            {
+                collection: 'classes',
+                operation: 'findAll',
+            },
+            (response) => {
+                if (response.success) {
+                    setClasses(response.data);
+                }
+            }
+        );
+    }, [socket]);
+
+    const selected = values?.class || '';
+    const emit = (partial) => { if (typeof onChange === 'function') onChange(partial); };
+
+    // Memoize the selected class object
+    const selectedClass = useMemo(() => {
+        return classes.find(c => c._id === selected);
+    }, [classes, selected]);
+
+    // Define weapon and tool lists (all in camelCase)
+    const simpleWeapons = [
+        'club', 'dagger', 'greatclub', 'handaxe', 'javelin', 'lightHammer', 'mace', 
+        'quarterstaff', 'sickle', 'spear', 'lightCrossbow', 'dart', 'shortbow', 'sling'
+    ];
+
+    const martialWeapons = [
+        'battleaxe', 'flail', 'glaive', 'greataxe', 'greatsword', 'halberd', 'lance', 
+        'longsword', 'maul', 'morningstar', 'pike', 'rapier', 'scimitar', 'shortsword', 
+        'trident', 'warPick', 'warhammer', 'whip', 'blowgun', 'handCrossbow', 
+        'heavyCrossbow', 'longbow', 'net'
+    ];
+
+    const simpleMeleeWeapons = [
+        'club', 'dagger', 'greatclub', 'handaxe', 'javelin', 'lightHammer', 'mace', 
+        'quarterstaff', 'sickle', 'spear'
+    ];
+
+    const musicalInstruments = [
+        'bagpipes', 'drum', 'dulcimer', 'flute', 'lute', 'lyre', 'horn', 'panFlute', 
+        'shawm', 'viol'
+    ];
+
+    const artisansTools = [
+        'alchemistsSupplies', 'brewersSupplies', 'calligraphersSupplies', 'carpentersTools',
+        'cartographersTools', 'cobblersTools', 'cooksUtensils', 'glassblowersTools',
+        'jewelersTools', 'leatherworkersTools', 'masonsTools', 'paintersSupplies',
+        'pottersTools', 'smithsTools', 'tinkersTools', 'weaversTools', 'woodcarversTools'
+    ];
+
+    // Define starting packs with their contents
+    const startingPacks = {
+        burglarsPack: {
+            name: "Burglar's Pack",
+            items: ['backpack:1', 'ballBearings:1000', 'string:10', 'bell:1', 'candle:5', 
+                   'crowbar:1', 'hammer:1', 'piton:10', 'hoodedLantern:1', 'oilFlask:2', 
+                   'rations:5', 'tinderbox:1', 'waterskin:1', 'hempenRope:1']
+        },
+        diplomatsPack: {
+            name: "Diplomat's Pack",
+            items: ['chest:1', 'mapCase:2', 'fineClothes:1', 'inkBottle:1', 'inkPen:1', 
+                   'lamp:1', 'oilFlask:2', 'paper:5', 'perfume:1', 'sealingWax:1', 'soap:1']
+        },
+        dungeoneersPack: {
+            name: "Dungeoneer's Pack",
+            items: ['backpack:1', 'crowbar:1', 'hammer:1', 'piton:10', 'torch:10', 
+                   'tinderbox:1', 'rations:10', 'waterskin:1', 'hempenRope:1']
+        },
+        entertainersPack: {
+            name: "Entertainer's Pack",
+            items: ['backpack:1', 'bedroll:1', 'costume:2', 'candle:5', 'rations:5', 
+                   'waterskin:1', 'disguiseKit:1']
+        },
+        explorersPack: {
+            name: "Explorer's Pack",
+            items: ['backpack:1', 'bedroll:1', 'messKit:1', 'tinderbox:1', 'torch:10', 
+                   'rations:10', 'waterskin:1', 'hempenRope:1']
+        },
+        priestsPack: {
+            name: "Priest's Pack",
+            items: ['backpack:1', 'blanket:1', 'candle:10', 'tinderbox:1', 'almsBox:1', 
+                   'incense:2', 'censer:1', 'vestments:1', 'rations:2', 'waterskin:1']
+        },
+        scholarsPack: {
+            name: "Scholar's Pack",
+            items: ['backpack:1', 'bookLore:1', 'inkBottle:1', 'inkPen:1', 'parchment:10', 
+                   'littleBagSand:1', 'smallKnife:1']
         }
-      }
+    };
+
+    // Helper: Check if an item is a starting pack
+    const isStartingPack = (itemKey) => {
+        return startingPacks.hasOwnProperty(itemKey);
+    };
+
+    // Helper: Check if an item key starts with "any"
+    const isAnyItem = (itemKey) => {
+        return itemKey.toLowerCase().startsWith('any');
+    };
+
+    // Helper: Get dropdown options based on "any" type
+    const getAnyItemOptions = (itemKey) => {
+        const lowerKey = itemKey.toLowerCase();
+        if (lowerKey.includes('simpleweapon')) return simpleWeapons;
+        if (lowerKey.includes('martialweapon')) return martialWeapons;
+        if (lowerKey.includes('simplemelee')) return simpleMeleeWeapons;
+        if (lowerKey.includes('musicalinstrument')) return musicalInstruments;
+        if (lowerKey.includes('artisanstool')) return artisansTools;
+        return [];
+    };
+
+    // Helper: Generate unique ID for inventory items
+    const generateUniqueId = () => {
+        return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    };
+
+    // Helper: Convert itemId (camelCase) to MongoDB _id by querying items collection
+    const addItemsToInventory = async (itemsArray, callback) => {
+        if (!itemsArray || itemsArray.length === 0) {
+            callback({});
+            return;
+        }
+        
+        // Batch query all items at once
+        const itemIds = [...new Set(itemsArray.map(item => item.itemId))];
+        
+        socket.emit(
+            'database_query',
+            {
+                collection: 'items',
+                operation: 'find',
+                query: { itemId: { $in: itemIds } }
+            },
+            (response) => {
+                if (response.success) {
+                    const itemsMap = {};
+                    response.data.forEach(item => {
+                        itemsMap[item.itemId] = item._id;
+                    });
+                    
+                    // Create inventory map with unique IDs
+                    const inventoryMap = {};
+                    itemsArray.forEach(({ itemId, quantity }) => {
+                        const itemMongoId = itemsMap[itemId];
+                        if (itemMongoId) {
+                            for (let i = 0; i < quantity; i++) {
+                                const uniqueId = generateUniqueId();
+                                inventoryMap[uniqueId] = {
+                                    equipped: false,
+                                    ItemID: itemMongoId
+                                };
+                            }
+                        }
+                    });
+                    
+                    callback(inventoryMap);
+                } else {
+                    console.error('Failed to fetch items:', response.error);
+                    callback({});
+                }
+            }
+        );
+    };
+
+    // 2. Logic: Handle Class Selection & Auto-populate Base Proficiencies + Resources
+    const handleClassChange = (classId) => {
+        const fullClassData = classes.find(c => c._id === classId);
+        if (!fullClassData) return;
+
+        const baseMods = fullClassData.baseProficiencies || {};
+        const resMods = fullClassData.resourcePoolModifier || { HP: 1, STA: 1, MP: 1 };
+
+        // Parse base equipment items
+        const fixedItems = (fullClassData.baseEquipment || []).map(itemStr => {
+            const parts = itemStr.split(':');
+            const name = parts.length === 3 ? parts[1] : parts[0];
+            const qty = parts.length === 3 ? parseInt(parts[2]) : parseInt(parts[1]);
+            return { itemId: name, quantity: qty || 1 };
+        });
+
+                        const applyUpdate = (inventoryMap) => {
+            // Convert proficiency arrays to Map format (key: proficiency name, value: boolean or level)
+            const proficienciesMap = {};
+            
+            // Add armor proficiencies
+            (baseMods.armor || []).forEach(armor => {
+                proficienciesMap[armor] = 'proficient';
+            });
+            
+            // Add weapon proficiencies
+            (baseMods.weapons || []).forEach(weapon => {
+                proficienciesMap[weapon] = 'proficient';
+            });
+            
+            // Add tool proficiencies
+            (baseMods.tools || []).forEach(tool => {
+                proficienciesMap[tool] = 'proficient';
+            });
+            
+            // Add ability score proficiencies (saving throws)
+            (baseMods.abilityScore || []).forEach(ability => {
+                proficienciesMap[ability] = 'proficient';
+            });
+
+            const update = {
+                class: classId,
+                // Auto-calculate base resources (Example base: 10 * modifier)
+                HP: { ...values.HP, max: Math.floor(10 * (resMods.HP || 1)), current: Math.floor(10 * (resMods.HP || 1)) },
+                STA: { ...values.STA, max: Math.floor(10 * (resMods.STA || 1)), current: Math.floor(10 * (resMods.STA || 1)) },
+                MP: { ...values.MP, max: Math.floor(10 * (resMods.MP || 1)), current: Math.floor(10 * (resMods.MP || 1)) },
+                // Push base proficiencies into character skills as Map
+                skills: {
+                    ...values.skills,
+                    proficiencies: proficienciesMap
+                },
+                // Set base equipment
+                inv: { 
+                    gp: values.inv?.gp || 0,
+                    items: inventoryMap,
+                    equipment: values.inv?.equipment || {}
+                },
+                // Reset equipment choices
+                equipmentChoices: {},
+                // Reset any item selections
+                anyItemSelections: {}
+            };
+
+            emit(update);
+        };
+
+        // Convert items to inventory format
+        if (fixedItems.length > 0) {
+            addItemsToInventory(fixedItems, applyUpdate);
+        } else {
+            applyUpdate({});
+        }
+    };
+
+    // 3. Logic: Handle Skill Choice Toggles (Pick X)
+    const handleSkillToggle = (skillName) => {
+        if (!selectedClass?.choices?.proficiencies?.skills) return;
+
+        const currentProficiencies = values.skills?.proficiencies || {};
+        const maxAllowed = selectedClass.choices.proficiencies.skills.amount;
+
+        // Count how many skill proficiencies are already chosen (excluding armor, weapons, etc.)
+        const skillOptions = selectedClass.choices.proficiencies.skills.options || [];
+        const currentSkillCount = Object.keys(currentProficiencies).filter(key => 
+            skillOptions.includes(key)
+        ).length;
+
+        // Create new proficiencies map
+        const newProficiencies = { ...currentProficiencies };
+
+        if (newProficiencies[skillName]) {
+            // Remove the skill
+            delete newProficiencies[skillName];
+        } else {
+            // Add the skill if limit not reached
+            if (currentSkillCount < maxAllowed) {
+                newProficiencies[skillName] = 'proficient';
+            } else {
+                return; // Limit reached
+            }
+        }
+
+        emit({
+            skills: {
+                ...values.skills,
+                proficiencies: newProficiencies
+            }
+        });
+    };
+
+    // 4. Logic: Handle Equipment Choice Selection
+    const handleEquipmentChoice = (choiceKey, optionKey, items) => {
+        const currentItems = { ...(values.inv?.items || {}) };
+        const previousChoices = values.equipmentChoices || {};
+        
+        // Remove items from previous choice if exists
+        if (previousChoices[choiceKey]) {
+            const previousOptionKey = previousChoices[choiceKey].optionKey;
+            const previousItems = selectedClass.choices.equipment[choiceKey][previousOptionKey];
+            
+            // Find and remove all items from previous choice
+            Object.keys(currentItems).forEach(uniqueId => {
+                const shouldRemove = previousChoices[choiceKey].addedIds?.includes(uniqueId);
+                if (shouldRemove) {
+                    delete currentItems[uniqueId];
+                }
+            });
+        }
+        
+        // Process items - expand packs, skip "any" items
+        const itemsToAdd = [];
+        Object.entries(items).forEach(([name, qty]) => {
+            if (isAnyItem(name)) {
+                // Skip "any" items - they'll be handled by dropdown
+                return;
+            }
+            
+            if (isStartingPack(name)) {
+                // Add the pack container itself
+                itemsToAdd.push({ itemId: name, quantity: qty });
+                
+                // Add all items from the pack
+                const packContents = startingPacks[name].items;
+                packContents.forEach(itemStr => {
+                    const parts = itemStr.split(':');
+                    const itemName = parts[0];
+                    const itemQty = parseInt(parts[1]) || 1;
+                    itemsToAdd.push({ itemId: itemName, quantity: itemQty * qty });
+                });
+            } else {
+                // Regular item
+                itemsToAdd.push({ itemId: name, quantity: qty });
+            }
+        });
+        
+        // Convert items to inventory format
+        addItemsToInventory(itemsToAdd, (newInventoryItems) => {
+            const addedIds = Object.keys(newInventoryItems);
+            const updatedItems = { ...currentItems, ...newInventoryItems };
+            
+            emit({
+                equipmentChoices: { 
+                    ...previousChoices, 
+                    [choiceKey]: { optionKey, items, addedIds }
+                },
+                inv: { 
+                    ...values.inv, 
+                    items: updatedItems 
+                }
+            });
+        });
+    };
+
+    // 5. Logic: Handle "Any" Item Selection (Dropdown)
+    const handleAnyItemSelection = (choiceKey, optionKey, anyItemKey, selectedItem) => {
+        const currentItems = { ...(values.inv?.items || {}) };
+        const previousSelections = values.anyItemSelections || {};
+        
+        // Remove previous "any" selection for this specific key if exists
+        const prevSelectionKey = `${choiceKey}_${optionKey}_${anyItemKey}`;
+        if (previousSelections[prevSelectionKey]) {
+            const oldUniqueId = previousSelections[prevSelectionKey].uniqueId;
+            if (oldUniqueId && currentItems[oldUniqueId]) {
+                delete currentItems[oldUniqueId];
+            }
+        }
+        
+        // Get quantity from the original "any" item
+        const originalItems = selectedClass.choices.equipment[choiceKey][optionKey];
+        const quantity = originalItems[anyItemKey];
+        
+        // Add the newly selected item
+        const itemsToAdd = [{ itemId: selectedItem, quantity }];
+        
+        addItemsToInventory(itemsToAdd, (newInventoryItems) => {
+            const uniqueIds = Object.keys(newInventoryItems);
+            const updatedItems = { ...currentItems, ...newInventoryItems };
+            
+            emit({
+                anyItemSelections: {
+                    ...previousSelections,
+                    [prevSelectionKey]: {
+                        itemId: selectedItem,
+                        uniqueId: uniqueIds[0] // Store the first unique ID for removal later
+                    }
+                },
+                inv: { 
+                    ...values.inv, 
+                    items: updatedItems 
+                }
+            });
+        });
+    };
+
+    return (
+        <div className='bg-website-default-900 min-h-screen grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr]'>
+            <div className='p-4 space-y-4 md:col-start-2'>
+
+                {/* Name Input */}
+                <div className='flex flex-row p-4 space-x-4 border-b border-website-specials-500'>
+                    <CircleUser size={48} />
+                    <div className='flex flex-col'>
+                        <div className='text-left text-l font-semibold'>Character Name</div>
+                        <input
+                            type="text"
+                            placeholder='Name...'
+                            className='border-b border-website-highlights-400 bg-website-default-900 focus:outline-none focus:bg-gradient-to-t from-website-highlights-500 to-website-default-900'
+                            value={values.name || ''}
+                            onChange={(e) => emit({ name: e.target.value })}
+                        />
+                    </div>
+                </div>
+
+                <div className='space-y-8 flex flex-col text-left'>
+                    <div>
+                        <h1 className="text-2xl font-semibold mb-4 text-white">Base Class</h1>
+
+                        <div className="grid grid-cols-1 gap-6">
+                            {/* Class Selector */}
+                            <Card className='bg-website-default-800 border-website-specials-500'>
+                                <Card.Header>
+                                    <Card.Title className='text-website-default-100'>Class</Card.Title>
+                                    <Card.Description className='text-website-default-300'>Choose your base class.</Card.Description>
+                                </Card.Header>
+                                <Card.Content>
+                                    <div className='flex flex-col'>
+                                        <select
+                                            className='rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 text-white focus:outline-none'
+                                            value={selected}
+                                            onChange={(e) => handleClassChange(e.target.value)}
+                                        >
+                                            <option value='' disabled>Select class</option>
+                                            {classes.map(c => (
+                                                <option key={c._id} value={c._id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                        {selectedClass && (
+                                            <div className='mt-4 p-4 border border-website-specials-500 rounded bg-website-default-900/50'>
+                                                <div className='text-website-default-300 text-sm'>
+                                                    {selectedClass.description}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </Card.Content>
+                            </Card>
+
+                            {selectedClass && (
+                                <>
+                                    {/* Modifiers Card */}
+                                    <Card className='bg-website-default-800 border-website-specials-500'>
+                                        <Card.Header className="border-b border-website-default-700 pb-4">
+                                            <Card.Title className='text-website-default-100'>◈ Class Modifiers</Card.Title>
+                                        </Card.Header>
+                                        <Card.Content className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="bg-website-default-900/50 p-4 rounded-lg border border-website-default-700">
+                                                <h4 className="text-website-specials-400 text-xs tracking-widest mb-3 uppercase">Stat Increases</h4>
+                                                <ul className='space-y-2'>
+                                                    {Object.entries(selectedClass.baseStatModifier || {}).map(([stat, val]) => (
+                                                        <li key={stat} className="flex justify-between text-sm">
+                                                            <span className="text-website-default-100 font-bold">{stat}</span>
+                                                            <span className="text-website-specials-500">+{val}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div className="bg-website-default-900/50 p-4 rounded-lg border border-website-default-700">
+                                                <h4 className="text-website-highlights-400 text-xs tracking-widest mb-3 uppercase">Resource Multipliers</h4>
+                                                <ul className='space-y-2'>
+                                                    {Object.entries(selectedClass.resourcePoolModifier || {}).map(([res, val]) => (
+                                                        <li key={res} className="flex justify-between text-sm">
+                                                            <span className="text-website-default-100 font-bold">{res}</span>
+                                                            <span className="text-website-highlights-500">x{val.toFixed(1)}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </Card.Content>
+                                    </Card>
+
+                                    {/* Proficiencies Card */}
+                                    <Card className='bg-website-default-800 border-website-specials-500'>
+                                        <Card.Header className="border-b border-website-default-700/50">
+                                            <Card.Title className='text-website-default-100'>🛡️ Proficiencies</Card.Title>
+                                        </Card.Header>
+                                        <Card.Content className="space-y-4">
+                                            <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+                                                {Object.entries(selectedClass.baseProficiencies || {}).map(([cat, items]) => (
+                                                    Array.isArray(items) && items.length > 0 && (
+                                                        <div key={cat} className="bg-website-default-900/60 p-3 rounded-lg border border-website-default-700">
+                                                            <h4 className="text-website-highlights-400 text-[10px] uppercase mb-2">{cat}</h4>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {items.map(item => (
+                                                                    <span key={item} className="px-2 py-0.5 bg-website-default-700 text-white text-[10px] rounded border border-website-default-600">
+                                                                        {item.replace(/([A-Z])/g, ' $1')}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                ))}
+                                            </div>
+
+                                            {/* Skill Choices */}
+                                            {selectedClass.choices?.proficiencies?.skills && (
+                                                <div className="bg-website-specials-900/20 border border-website-specials-700/30 p-3 rounded-lg">
+                                                    <div className="flex justify-between items-center mb-3">
+                                                        <h4 className="text-website-specials-400 text-[10px] uppercase">Skill Choices</h4>
+                                                        <span className="text-[10px] text-white bg-website-specials-600 px-2 py-0.5 rounded-full">
+                                                            Picked {(() => {
+                                                                const proficiencies = values.skills?.proficiencies || {};
+                                                                const skillOptions = selectedClass.choices.proficiencies.skills.options || [];
+                                                                return Object.keys(proficiencies).filter(key => skillOptions.includes(key)).length;
+                                                            })()} / {selectedClass.choices.proficiencies.skills.amount}
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                        {selectedClass.choices.proficiencies.skills.options?.map((skill) => {
+                                                            const proficiencies = values.skills?.proficiencies || {};
+                                                            const isSelected = proficiencies.hasOwnProperty(skill);
+                                                            return (
+                                                                <button
+                                                                    key={skill}
+                                                                    onClick={() => handleSkillToggle(skill)}
+                                                                    className={`text-[11px] flex items-center gap-1.5 capitalize p-1.5 rounded border transition-all ${
+                                                                        isSelected 
+                                                                        ? 'border-website-specials-500 bg-website-specials-900/40 text-white' 
+                                                                        : 'border-website-default-700 text-website-default-400 hover:border-website-default-500'
+                                                                    }`}
+                                                                >
+                                                                    <div className={`w-1 h-1 rotate-45 ${isSelected ? 'bg-website-specials-400' : 'bg-website-default-600'}`} />
+                                                                    {skill.replace(/([A-Z])/g, ' $1')}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </Card.Content>
+                                    </Card>
+
+                                    {/* Equipment Card */}
+                                    <Card className='bg-website-default-800 border-website-specials-500'>
+                                        <Card.Header className="border-b border-website-default-700/50">
+                                            <Card.Title className='text-website-default-100'>🎒 Equipment</Card.Title>
+                                            <Card.Description className='text-website-default-300'>Your starting gear and equipment choices.</Card.Description>
+                                        </Card.Header>
+                                        <Card.Content className="pt-6 space-y-6">
+                                            {/* Base Equipment */}
+                                            {selectedClass.baseEquipment && selectedClass.baseEquipment.length > 0 && (
+                                                <div>
+                                                    <h4 className="text-website-highlights-400 text-xs tracking-widest mb-3 uppercase">Base Equipment</h4>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {selectedClass.baseEquipment.map((item, idx) => {
+                                                            const parts = item.split(':');
+                                                            const itemName = parts.length === 3 ? parts[1] : parts[0];
+                                                            const quantity = parts.length === 3 ? parts[2] : parts[1] || '1';
+                                                            return (
+                                                                <div key={idx} className="bg-website-default-900 border border-website-default-700 px-3 py-2 rounded-lg text-sm">
+                                                                    <span className="text-website-specials-400 font-bold mr-1">{quantity}x</span>
+                                                                    <span className="text-website-default-100">{itemName.replace(/([A-Z])/g, ' $1')}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Equipment Choices */}
+                                            {selectedClass.choices?.equipment && Object.entries(selectedClass.choices.equipment).map(([choiceKey, options]) => (
+                                                <div key={choiceKey} className="space-y-3">
+                                                    <h4 className="text-website-specials-400 text-xs tracking-widest uppercase">
+                                                        {choiceKey.replace(/([A-Z])/g, ' $1').replace(/choice/i, 'Choice')}
+                                                    </h4>
+                                                    <div className="flex flex-col gap-3">
+                                                        {Object.entries(options).map(([optionKey, items]) => {
+                                                            const isActive = values.equipmentChoices?.[choiceKey]?.optionKey === optionKey;
+                                                            const hasAnyItems = Object.keys(items).some(key => isAnyItem(key));
+                                                            
+                                                            return (
+                                                                <div key={optionKey} className="space-y-2">
+                                                                    <button
+                                                                        onClick={() => handleEquipmentChoice(choiceKey, optionKey, items)}
+                                                                        className={`w-full p-4 text-left rounded-lg border transition-all ${
+                                                                            isActive 
+                                                                            ? 'bg-website-specials-900/40 border-website-specials-500' 
+                                                                            : 'bg-website-default-900 border-website-default-700 hover:border-website-default-500'
+                                                                        }`}
+                                                                    >
+                                                                        <div className="flex justify-between items-start">
+                                                                            <div className="text-sm flex-1">
+                                                                                {Object.entries(items).map(([itemName, quantity], idx) => {
+                                                                                    const isPack = isStartingPack(itemName);
+                                                                                    
+                                                                                    return (
+                                                                                        <div key={itemName} className={idx > 0 ? 'mt-2' : ''}>
+                                                                                            <div>
+                                                                                                <span className="text-website-specials-400 font-bold">{quantity}x</span>
+                                                                                                {' '}
+                                                                                                <span className="text-website-default-100">{itemName.replace(/([A-Z])/g, ' $1')}</span>
+                                                                                            </div>
+                                                                                            
+                                                                                            {/* Show pack contents */}
+                                                                                            {isPack && (
+                                                                                                <div className="ml-4 mt-1 text-xs text-website-default-400">
+                                                                                                    <div className="italic mb-1">Contains:</div>
+                                                                                                    <div className="flex flex-wrap gap-1">
+                                                                                                        {startingPacks[itemName].items.map((packItem, pIdx) => {
+                                                                                                            const [pName, pQty] = packItem.split(':');
+                                                                                                            return (
+                                                                                                                <span key={pIdx} className="bg-website-default-800/50 px-1.5 py-0.5 rounded">
+                                                                                                                    {pQty}x {pName.replace(/([A-Z])/g, ' $1')}
+                                                                                                                </span>
+                                                                                                            );
+                                                                                                        })}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                            {isActive && (
+                                                                                <span className="text-website-specials-400 font-bold text-lg ml-2">✓</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </button>
+                                                                    
+                                                                    {/* Show dropdowns for "any" items if this option is selected */}
+                                                                    {isActive && hasAnyItems && (
+                                                                        <div className="ml-4 space-y-2 p-3 bg-website-default-900/50 rounded border border-website-default-700">
+                                                                            {Object.entries(items).map(([itemName, quantity]) => {
+                                                                                if (!isAnyItem(itemName)) return null;
+                                                                                
+                                                                                const dropdownOptions = getAnyItemOptions(itemName);
+                                                                                const selectionKey = `${choiceKey}_${optionKey}_${itemName}`;
+                                                                                const currentSelection = values.anyItemSelections?.[selectionKey] || '';
+                                                                                
+                                                                                return (
+                                                                                    <div key={itemName} className="flex items-center gap-2">
+                                                                                        <span className="text-xs text-website-default-300">
+                                                                                            <span className="text-website-specials-400 font-bold">{quantity}x</span> {itemName.replace(/([A-Z])/g, ' $1')}:
+                                                                                        </span>
+                                                                                        <select
+                                                                                            className='flex-1 rounded border border-website-specials-500 bg-website-default-900 px-2 py-1 text-xs text-white focus:outline-none'
+                                                                                            value={currentSelection}
+                                                                                            onChange={(e) => handleAnyItemSelection(choiceKey, optionKey, itemName, e.target.value)}
+                                                                                        >
+                                                                                            <option value='' disabled>Select {itemName.replace(/any/i, '').replace(/([A-Z])/g, ' $1').trim()}</option>
+                                                                                            {dropdownOptions.map(opt => (
+                                                                                                <option key={opt} value={opt}>{opt.replace(/([A-Z])/g, ' $1')}</option>
+                                                                                            ))}
+                                                                                        </select>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </Card.Content>
+                                    </Card>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
-  }, [socket]);
-
-  const selected = values?.class || '';
-  const emit = (partial) => { if (typeof onChange === 'function') onChange(partial); };
-
-  // Memoize the selected class to avoid multiple find() calls
-  const selectedClass = useMemo(() => {
-    return classes.find(c => c._id === selected);
-  }, [classes, selected]);
-
-  return (
-    <div className='bg-website-default-900 min-h-screen grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr]'>
-      <div className='p-4 space-y-4  md:col-start-2'>
-
-        <div className='flex flex-row p-4 space-x-4 border-b border-website-specials-500'>
-          <CircleUser size={48} />
-          <div className='flex flex-col'>
-            <div className='text-left text-l font-semibold'>Character Name</div>
-            <input 
-              type="text"
-              placeholder='Name...'
-              className='border-b border-website-highlights-400 bg-website-default-900 focus:outline-none focus:bg-gradient-to-t from-website-highlights-500 to-website-default-900' 
-              value={values.name || ''}
-              onChange={(e) => emit({ name: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className='space-y-8 flex flex-col text-left'>
-          <div>
-            <h1 className="text-2xl font-semibold mb-4">Base Class</h1>
-
-            <div className="grid grid-cols-1 gap-6">
-              <Card className='bg-website-default-800 border-website-specials-500'>
-                <Card.Header>
-                  <Card.Title className='text-website-default-100'>Class</Card.Title>
-                  <Card.Description className='text-website-default-300'>Choose your base class.</Card.Description>
-                </Card.Header>
-                <Card.Content>
-                  <div className='flex flex-col'>
-                    <label className='text-sm text-website-default-300 mb-1'>Class</label>
-                    <select
-                      className='rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400'
-                      value={selected}
-                      onChange={(e) => emit({ class: e.target.value })}
-                    >
-                      <option value='' disabled>Select class</option>
-                      {classes.map(c => (
-                        <option key={c._id} value={c._id}>{c.name}</option>
-                      ))}
-                    </select>
-
-                    {selectedClass && (
-                      <div className='mt-4 p-4 border border-website-specials-500 rounded bg-website-default-800'>
-                        <div className='text-website-default-300'>
-                          {selectedClass.description || 'No description available.'}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card.Content>
-              </Card>
-
-              {selectedClass && (
-                <Card className='bg-website-default-800 border-website-specials-500 border'>
-  <Card.Header className="border-b border-website-default-700 pb-4">
-    <Card.Title className='text-website-default-100 flex items-center gap-2'>
-      <span className="text-website-specials-500">◈</span> Class Modifiers
-    </Card.Title>
-    <Card.Description className='text-website-default-300 italic'>
-      Innate bonuses and resource scaling for the {selectedClass.name} class.
-    </Card.Description>
-  </Card.Header>
-  
-  <Card.Content className="pt-6">
-    <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-      
-      {/* Stat Increases Section */}
-      <div className="bg-website-default-900/50 border border-website-default-700 p-4 rounded-lg">
-        <h4 className="text-website-specials-400 font-fantasy uppercase text-xs tracking-widest mb-3 border-b border-website-default-700 pb-1">
-          Stat Increases
-        </h4>
-        <ul className='space-y-2'>
-          {Object.entries(selectedClass.baseStatModifier).map(([stat, value]) => (
-            <li key={stat} className="flex justify-between items-center text-website-default-200">
-              <span className="font-bold text-website-default-100">{stat}</span>
-              <span className="text-website-specials-500 font-mono">+{value}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Resource Multipliers Section */}
-      <div className="bg-website-default-900/50 border border-website-default-700 p-4 rounded-lg">
-        <h4 className="text-website-highlights-400 font-fantasy uppercase text-xs tracking-widest mb-3 border-b border-website-default-700 pb-1">
-          Resource Multipliers
-        </h4>
-        <ul className='space-y-2'>
-          {Object.entries(selectedClass.resourcePoolModifier).map(([res, value]) => (
-            <li key={res} className="flex justify-between items-center text-website-default-200">
-              <span className="font-bold text-website-default-100">{res}</span>
-              <span className="text-website-highlights-500 font-mono">x{value.toFixed(1)}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-    </div>
-  </Card.Content>
-</Card>
-              )}
-
-              {selectedClass && (
-                <Card className='bg-website-default-800 border-website-specials-500' defaultOpen={true}>
-  <Card.Header className="border-b border-website-default-700/50">
-    <Card.Title className='text-website-default-100 flex items-center gap-2'>
-      <span className="text-website-specials-500">⚔</span> Class Proficiencies
-    </Card.Title>
-    <Card.Description className='text-website-default-300'>
-      Proficiencies granted by the {selectedClass?.name ?? 'selected'} class.
-    </Card.Description>
-  </Card.Header>
-
-  <Card.Content>
-    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-      
-      {/* 1. Base Proficiencies Breakdown */}
-      {selectedClass?.baseProficiencies ? (
-        Object.entries(selectedClass.baseProficiencies).map(([category, items]) => (
-          Array.isArray(items) && items.length > 0 && (
-            <div key={category} className="bg-website-default-900/50 border border-website-default-700 p-3 rounded-lg shadow-inner">
-              <h4 className="text-website-highlights-400 font-fantasy uppercase text-[10px] tracking-widest mb-2 border-b border-website-default-700/30 pb-1">
-                {category.replace(/([A-Z])/g, ' $1')}
-              </h4>
-              <div className="flex flex-wrap gap-1.5">
-                {items.map((item) => (
-                  <span 
-                    key={item} 
-                    className="px-2 py-0.5 bg-website-default-800 text-website-default-200 text-[10px] rounded border border-website-default-600 capitalize"
-                  >
-                    {item.replace(/([A-Z])/g, ' $1')}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )
-        ))
-      ) : (
-        <div className="text-website-default-400 text-xs italic p-2">Loading proficiency data...</div>
-      )}
-
-      {/* 2. Skill Selection Choices */}
-      {selectedClass?.choices?.proficiencies?.skills && (
-        <div className="bg-website-default-900/50 border border-website-specials-900/40 p-3 rounded-lg md:col-span-2">
-          <div className="flex justify-between items-end mb-2 border-b border-website-default-700/30 pb-1">
-            <h4 className="text-website-specials-400 font-fantasy uppercase text-[10px] tracking-widest">
-              Skill Selections
-            </h4>
-            <span className="text-website-default-400 text-[9px] uppercase font-bold bg-website-default-700 px-1.5 py-0.5 rounded">
-              Pick {selectedClass.choices.proficiencies.skills.amount}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
-            {selectedClass.choices.proficiencies.skills.options?.map((skill) => (
-              <span 
-                key={skill} 
-                className="text-[11px] text-website-default-300 flex items-center gap-1 hover:text-website-specials-300 transition-colors"
-              >
-                <span className="text-website-specials-500/50">•</span>
-                {skill.replace(/([A-Z])/g, ' $1')}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-    </div>
-  </Card.Content>
-</Card>
-                  )}
-
-                  {selectedClass && (
-                    <Card className='bg-website-default-800 border-website-specials-500'>
-                      <Card.Header>
-                        <Card.Title className='text-website-default-100'>Class Proficiencies</Card.Title>
-                        <Card.Description className='text-website-default-300'>Proficiencies granted by this class.</Card.Description>
-                      </Card.Header>
-                      <Card.Content>
-                        <div className='text-website-default-300'>
-                          {selectedClass.baseProficiencies && selectedClass.baseProficiencies.length > 0 ? (
-                            <ul className='list-disc list-inside'>
-                              {selectedClass.baseProficiencies.map((prof) => (
-                                <li key={prof}>{prof}</li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <div>No proficiencies available.</div>
-                          )}
-                        </div>
-                      </Card.Content>
-                    </Card>
-                  )}
-
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default Class;
