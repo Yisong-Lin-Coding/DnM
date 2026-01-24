@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Item = require('../data/mongooseDataStructure/item');
 const Class = require('../data/mongooseDataStructure/class');
+const Subclass = require('../data/mongooseDataStructure/subclass');
 const Race = require('../data/mongooseDataStructure/race');
 const Player = require('../data/mongooseDataStructure/player');
 const Character = require('../data/mongooseDataStructure/character');
@@ -10,6 +11,7 @@ const Background = require('../data/mongooseDataStructure/background');
 const MODELS = {
     items: Item,
     classes: Class,
+    subclasses: Subclass,
     races: Race,
     players: Player,
     characters: Character,

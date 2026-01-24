@@ -1,0 +1,85 @@
+{
+    "characters":[
+        {
+            "id":"char001",
+            "name":"Hero",
+            "stats":{
+                "STR":15,
+                "DEX":12,
+                "CON":14,
+                "INT":10,
+                "WIS":13,
+                "CHA":8,
+                "LUCK":0
+            },
+            "HP":{"max":30,"current":30, "temp":0},
+            "MP":{"max":10,"current":10, "temp":0},
+            "STA":{"max":20,"current":20, "temp":0},
+            "movement":30,
+            "perception":{
+                "range":60,
+                "angle":90,
+                "height":10
+            },
+            "position":{
+                "x":5,
+                "y":5,
+                "z":0
+            },
+            "statusEffects":[],
+            "inventory":[],
+            "abilities":[],
+            "eqiuppedItems":[],
+            "modifiers":[]
+            
+
+        }
+    ],
+    "emenies":[
+        {
+            "id":"enemy001",
+            "name":"Goblin",
+            "stats":{
+                "STR":10,
+                "DEX":14,
+                "CON":12,
+                "INT":8,
+                "WIS":10,
+                "CHA":6
+            },
+            "HP":{"max":15,"current":15},
+            "MP":{"max":5,"current":5},
+            "STA":{"max":10,"current":10},
+            "movement":25,
+            "perception":{
+                "range":50,
+                "angle":90,
+                "height":10
+            },
+            "position":{
+                "x":10,
+                "y":10
+            },
+            "statusEffects":[],
+            "inventory":[],
+            "abilities":[],
+            "eqiuppedItems":[],
+            "modifiers":{}
+        }
+    ],
+    "map":{
+        "id":"map001",
+        "name":"Dungeon Entrance",
+        "terrain":[
+        ],
+        "obstacles":[
+        ]
+    },
+    "combatState":{
+        "round":0,
+        "turnOrder":[],
+        "currentIndex":0,
+        "isRunning":false
+    }
+    
+}

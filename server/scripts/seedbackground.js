@@ -1,5 +1,5 @@
 /**
- * Seed script: Load backgrounds from backgrounds.json into MongoDB
+ * Seed script: Load backgrounds into MongoDB (UPSERT)
  * Run: node server/scripts/seedBackgrounds.js
  */
 
@@ -20,29 +20,36 @@ async function seedBackgrounds() {
     });
 
     console.log('✓ Connected to MongoDB');
+    console.log('Transforming backgrounds...');
 
-    // Clear existing backgrounds
-    const deleteResult = await Background.deleteMany({});
-    console.log(`✓ Deleted ${deleteResult.deletedCount} existing backgrounds`);
+    const bulkOps = backgroundsData.map(bg => ({
+      updateOne: {
+        filter: { backgroundID: bg.backgroundID }, // 👈 match on ID
+        update: {
+          $set: {
+            name: bg.name,
+            description: bg.description,
+            gp: bg.gp ?? 0,
 
-    console.log('Seeding backgrounds...');
+            baseStatModifier: bg.baseStatModifier || {},
+            baseProficiencies: bg.baseProficiencies || [],
+            baseEquipment: bg.baseEquipment || [],
 
-    const backgroundsToInsert = backgroundsData.map(bg => ({
-      name: bg.name,
-      backgroundID: bg.backgroundID,
-      description: bg.description,
-
-      baseStatModifier: bg.baseStatModifier || {},
-      baseProficiencies: bg.baseProficiencies || [],
-      baseEquipment: bg.baseEquipment || [],
-
-      features: bg.features || {},
-      choices: bg.choices || {},
-      gp: bg.gp ?? 0,
+            features: bg.features || {},
+            choices: bg.choices || {},
+          }
+        },
+        upsert: true // 👈 keep existing, insert missing
+      }
     }));
 
-    const result = await Background.insertMany(backgroundsToInsert);
-    console.log(`✓ Successfully seeded ${result.length} backgrounds`);
+    const result = await Background.bulkWrite(bulkOps);
+
+    console.log('✓ Backgrounds seeded successfully');
+    console.log({
+      inserted: result.upsertedCount,
+      modified: result.modifiedCount
+    });
 
     await mongoose.connection.close();
     console.log('✓ Connection closed');

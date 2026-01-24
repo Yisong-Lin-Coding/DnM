@@ -2,12 +2,24 @@ import React, { useContext, useEffect, useState, useMemo } from 'react';
 import { Card } from '../../../pageComponents/card';
 import { CircleUser } from 'lucide-react';
 import { SocketContext } from "../../../socket.io/context";
+import classFeatures from '../../../data/classfeatures';
+
+// Helper function to convert camelCase to Title Case
+const toTitleCase = (str) => {
+    return str
+        .replace(/([A-Z])/g, ' $1') // Add space before capitals
+        .replace(/^./, (char) => char.toUpperCase()) // Capitalize first letter
+        .trim();
+};
 
 export function Class({ values, onChange }) {
     const socket = useContext(SocketContext);
     const [classes, setClasses] = useState([]);
+    const [subclasses, setSubclasses] = useState([]);
+    const [allItems, setAllItems] = useState([]);
+    const allItemsRef = React.useRef([]);
 
-    // 1. Fetch classes on mount
+    // 1. Fetch classes, subclasses and items on mount
     useEffect(() => {
         socket.emit(
             'database_query',
@@ -21,15 +33,57 @@ export function Class({ values, onChange }) {
                 }
             }
         );
+
+        // Fetch subclasses
+        socket.emit(
+            'database_query',
+            {
+                collection: 'subclasses',
+                operation: 'findAll',
+            },
+            (response) => {
+                if (response.success) {
+                    setSubclasses(response.data);
+                }
+            }
+        );
+        
+        // Fetch all items
+        socket.emit(
+            'database_query',
+            {
+                collection: 'items',
+                operation: 'findAll',
+            },
+            (response) => {
+                if (response.success) {
+                    setAllItems(response.data);
+                    allItemsRef.current = response.data;
+                    console.log('Loaded items:', response.data.length);
+                }
+            }
+        );
     }, [socket]);
 
     const selected = values?.class || '';
+    const selectedSubclass = values?.subclass || '';
     const emit = (partial) => { if (typeof onChange === 'function') onChange(partial); };
 
     // Memoize the selected class object
     const selectedClass = useMemo(() => {
         return classes.find(c => c._id === selected);
     }, [classes, selected]);
+
+    // Memoize available subclasses for selected class
+    const availableSubclasses = useMemo(() => {
+        if (!selectedClass) return [];
+        return subclasses.filter(sc => sc.parentClass === selectedClass.name);
+    }, [selectedClass, subclasses]);
+
+    // Memoize the selected subclass object
+    const selectedSubclassObj = useMemo(() => {
+        return subclasses.find(sc => sc._id === selectedSubclass);
+    }, [subclasses, selectedSubclass]);
 
     // Define weapon and tool lists (all in camelCase)
     const simpleWeapons = [
@@ -127,52 +181,59 @@ export function Class({ values, onChange }) {
         return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     };
 
-    // Helper: Convert itemId (camelCase) to MongoDB _id by querying items collection
-    const addItemsToInventory = async (itemsArray, callback) => {
+    // Helper: Convert itemId (camelCase) to MongoDB _id using local items array
+    const addItemsToInventory = (itemsArray, callback, retryCount = 0) => {
         if (!itemsArray || itemsArray.length === 0) {
+            console.log('No items to add');
             callback({});
             return;
         }
         
-        // Batch query all items at once
-        const itemIds = [...new Set(itemsArray.map(item => item.itemId))];
+        const items = allItemsRef.current;
         
-        socket.emit(
-            'database_query',
-            {
-                collection: 'items',
-                operation: 'find',
-                query: { itemId: { $in: itemIds } }
-            },
-            (response) => {
-                if (response.success) {
-                    const itemsMap = {};
-                    response.data.forEach(item => {
-                        itemsMap[item.itemId] = item._id;
-                    });
-                    
-                    // Create inventory map with unique IDs
-                    const inventoryMap = {};
-                    itemsArray.forEach(({ itemId, quantity }) => {
-                        const itemMongoId = itemsMap[itemId];
-                        if (itemMongoId) {
-                            for (let i = 0; i < quantity; i++) {
-                                const uniqueId = generateUniqueId();
-                                inventoryMap[uniqueId] = {
-                                    equipped: false,
-                                    ItemID: itemMongoId
-                                };
-                            }
-                        }
-                    });
-                    
-                    callback(inventoryMap);
-                } else {
-                    console.error('Failed to fetch items:', response.error);
-                    callback({});
-                }
+        if (items.length === 0) {
+            if (retryCount > 50) { // Max 5 seconds of retrying
+                console.error('Items failed to load after 50 retries');
+                callback({});
+                return;
             }
-        );
+            console.log(`Items not loaded yet, waiting... (attempt ${retryCount + 1})`);
+            setTimeout(() => addItemsToInventory(itemsArray, callback, retryCount + 1), 100);
+            return;
+        }
+        
+        const itemIds = [...new Set(itemsArray.map(item => item.itemId))];
+        console.log('Looking up items:', itemIds);
+        
+        // Create item map from local data
+        const itemsMap = {};
+        items.forEach(item => {
+            itemsMap[item.itemId] = item._id;
+        });
+        
+        console.log('Items map created with', Object.keys(itemsMap).length, 'items');
+        
+        // Create inventory map with unique IDs
+        const inventoryMap = {};
+        itemsArray.forEach(({ itemId, quantity }) => {
+            const itemMongoId = itemsMap[itemId];
+            console.log(`Processing ${itemId} (qty: ${quantity}), found ID:`, itemMongoId);
+            
+            if (itemMongoId) {
+                for (let i = 0; i < quantity; i++) {
+                    const uniqueId = generateUniqueId();
+                    inventoryMap[uniqueId] = {
+                        equipped: false,
+                        ItemID: itemMongoId
+                    };
+                }
+            } else {
+                console.warn(`Item not found in database: ${itemId}`);
+            }
+        });
+        
+        console.log('Final inventory map with', Object.keys(inventoryMap).length, 'item instances');
+        callback(inventoryMap);
     };
 
     // 2. Logic: Handle Class Selection & Auto-populate Base Proficiencies + Resources
@@ -191,7 +252,8 @@ export function Class({ values, onChange }) {
             return { itemId: name, quantity: qty || 1 };
         });
 
-                        const applyUpdate = (inventoryMap) => {
+        // Reset subclass when class changes
+        const applyUpdate = (inventoryMap) => {
             // Convert proficiency arrays to Map format (key: proficiency name, value: boolean or level)
             const proficienciesMap = {};
             
@@ -217,6 +279,7 @@ export function Class({ values, onChange }) {
 
             const update = {
                 class: classId,
+                subclass: '', // Reset subclass when class changes
                 // Auto-calculate base resources (Example base: 10 * modifier)
                 HP: { ...values.HP, max: Math.floor(10 * (resMods.HP || 1)), current: Math.floor(10 * (resMods.HP || 1)) },
                 STA: { ...values.STA, max: Math.floor(10 * (resMods.STA || 1)), current: Math.floor(10 * (resMods.STA || 1)) },
@@ -444,6 +507,37 @@ export function Class({ values, onChange }) {
 
                             {selectedClass && (
                                 <>
+                                    {/* Subclass Selector */}
+                                    {availableSubclasses.length > 0 && (
+                                        <Card className='bg-website-default-800 border-website-specials-500'>
+                                            <Card.Header>
+                                                <Card.Title className='text-website-default-100'>Subclass</Card.Title>
+                                                <Card.Description className='text-website-default-300'>Choose your specialization.</Card.Description>
+                                            </Card.Header>
+                                            <Card.Content>
+                                                <div className='flex flex-col space-y-4'>
+                                                    <select
+                                                        className='rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 text-white focus:outline-none'
+                                                        value={selectedSubclass}
+                                                        onChange={(e) => emit({ subclass: e.target.value })}
+                                                    >
+                                                        <option value='' disabled>Select subclass (optional)</option>
+                                                        {availableSubclasses.map(sc => (
+                                                            <option key={sc._id} value={sc._id}>{sc.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    {selectedSubclassObj && (
+                                                        <div className='p-4 border border-website-specials-500 rounded bg-website-default-900/50'>
+                                                            <div className='text-website-default-300 text-sm'>
+                                                                {selectedSubclassObj.description}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </Card.Content>
+                                        </Card>
+                                    )}
+
                                     {/* Modifiers Card */}
                                     <Card className='bg-website-default-800 border-website-specials-500'>
                                         <Card.Header className="border-b border-website-default-700 pb-4">
@@ -489,7 +583,7 @@ export function Class({ values, onChange }) {
                                                             <div className="flex flex-wrap gap-1">
                                                                 {items.map(item => (
                                                                     <span key={item} className="px-2 py-0.5 bg-website-default-700 text-white text-[10px] rounded border border-website-default-600">
-                                                                        {item.replace(/([A-Z])/g, ' $1')}
+                                                                        {toTitleCase(item)}
                                                                     </span>
                                                                 ))}
                                                             </div>
@@ -526,7 +620,7 @@ export function Class({ values, onChange }) {
                                                                     }`}
                                                                 >
                                                                     <div className={`w-1 h-1 rotate-45 ${isSelected ? 'bg-website-specials-400' : 'bg-website-default-600'}`} />
-                                                                    {skill.replace(/([A-Z])/g, ' $1')}
+                                                                    {toTitleCase(skill)}
                                                                 </button>
                                                             );
                                                         })}
@@ -535,6 +629,122 @@ export function Class({ values, onChange }) {
                                             )}
                                         </Card.Content>
                                     </Card>
+
+                                    {/* Abilities Card */}
+                                    {selectedClass.featuresByLevel && Object.keys(selectedClass.featuresByLevel).length > 0 && (
+                                        <Card className='bg-website-default-800 border-website-specials-500'>
+                                            <Card.Header className="border-b border-website-default-700/50">
+                                                <Card.Title className='text-website-default-100'>⚡ Class Features</Card.Title>
+                                                <Card.Description className='text-website-default-300'>All features and abilities by level.</Card.Description>
+                                            </Card.Header>
+                                            <Card.Content className="pt-6">
+                                                <div className="space-y-4">
+                                                    {Object.entries(selectedClass.featuresByLevel)
+                                                        .filter(([level, features]) => features && features.length > 0)
+                                                        .sort((a, b) => {
+                                                            const aNum = parseInt(a[0].replace('level', ''));
+                                                            const bNum = parseInt(b[0].replace('level', ''));
+                                                            return aNum - bNum;
+                                                        })
+                                                        .map(([level, features]) => (
+                                                            <div key={level} className="space-y-2">
+                                                                <h4 className="text-website-specials-400 text-xs tracking-widest uppercase font-bold">
+                                                                    Level {level.replace('level', '')}
+                                                                </h4>
+                                                                <div className="space-y-2 ml-2">
+                                                                    {features.map((featureId, idx) => {
+                                                                        const feature = classFeatures[featureId];
+                                                                        if (!feature) {
+                                                                            return (
+                                                                                <div key={idx} className="text-website-default-400 text-sm">
+                                                                                    <span className="text-website-specials-400 font-bold">•</span> {toTitleCase(featureId)} (No data)
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return (
+                                                                            <div 
+                                                                                key={idx} 
+                                                                                className="p-3 bg-website-default-900/50 border border-website-default-700 rounded-lg hover:border-website-specials-500/50 transition-colors"
+                                                                            >
+                                                                                <div className="flex items-start gap-2">
+                                                                                    <span className="text-website-specials-400 font-bold mt-1">✦</span>
+                                                                                    <div className="flex-1">
+                                                                                        <h5 className="text-website-default-100 font-semibold text-sm">
+                                                                                            {feature.name}
+                                                                                        </h5>
+                                                                                        <p className="text-website-default-300 text-xs mt-1 leading-relaxed">
+                                                                                            {feature.description}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            </Card.Content>
+                                        </Card>
+                                    )}
+
+                                    {/* Subclass Features Card */}
+                                    {selectedSubclassObj && selectedSubclassObj.featuresByLevel && Object.keys(selectedSubclassObj.featuresByLevel).length > 0 && (
+                                        <Card className='bg-website-default-800 border-website-highlights-500'>
+                                            <Card.Header className="border-b border-website-default-700/50">
+                                                <Card.Title className='text-website-default-100'>✨ Subclass Features</Card.Title>
+                                                <Card.Description className='text-website-default-300'>Features from {selectedSubclassObj.name}</Card.Description>
+                                            </Card.Header>
+                                            <Card.Content className="pt-6">
+                                                <div className="space-y-4">
+                                                    {Object.entries(selectedSubclassObj.featuresByLevel)
+                                                        .filter(([level, features]) => features && features.length > 0)
+                                                        .sort((a, b) => {
+                                                            const aNum = parseInt(a[0].replace('level', ''));
+                                                            const bNum = parseInt(b[0].replace('level', ''));
+                                                            return aNum - bNum;
+                                                        })
+                                                        .map(([level, features]) => (
+                                                            <div key={level} className="space-y-2">
+                                                                <h4 className="text-website-highlights-400 text-xs tracking-widest uppercase font-bold">
+                                                                    Level {level.replace('level', '')}
+                                                                </h4>
+                                                                <div className="space-y-2 ml-2">
+                                                                    {features.map((featureId, idx) => {
+                                                                        const feature = classFeatures[featureId];
+                                                                        if (!feature) {
+                                                                            return (
+                                                                                <div key={idx} className="text-website-default-400 text-sm">
+                                                                                    <span className="text-website-highlights-400 font-bold">•</span> {toTitleCase(featureId)} (No data)
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return (
+                                                                            <div 
+                                                                                key={idx} 
+                                                                                className="p-3 bg-website-default-900/50 border border-website-default-700 rounded-lg hover:border-website-highlights-500/50 transition-colors"
+                                                                            >
+                                                                                <div className="flex items-start gap-2">
+                                                                                    <span className="text-website-highlights-400 font-bold mt-1">✦</span>
+                                                                                    <div className="flex-1">
+                                                                                        <h5 className="text-website-default-100 font-semibold text-sm">
+                                                                                            {feature.name}
+                                                                                        </h5>
+                                                                                        <p className="text-website-default-300 text-xs mt-1 leading-relaxed">
+                                                                                            {feature.description}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            </Card.Content>
+                                        </Card>
+                                    )}
 
                                     {/* Equipment Card */}
                                     <Card className='bg-website-default-800 border-website-specials-500'>
@@ -555,7 +765,7 @@ export function Class({ values, onChange }) {
                                                             return (
                                                                 <div key={idx} className="bg-website-default-900 border border-website-default-700 px-3 py-2 rounded-lg text-sm">
                                                                     <span className="text-website-specials-400 font-bold mr-1">{quantity}x</span>
-                                                                    <span className="text-website-default-100">{itemName.replace(/([A-Z])/g, ' $1')}</span>
+                                                                    <span className="text-website-default-100">{toTitleCase(itemName)}</span>
                                                                 </div>
                                                             );
                                                         })}
@@ -567,13 +777,53 @@ export function Class({ values, onChange }) {
                                             {selectedClass.choices?.equipment && Object.entries(selectedClass.choices.equipment).map(([choiceKey, options]) => (
                                                 <div key={choiceKey} className="space-y-3">
                                                     <h4 className="text-website-specials-400 text-xs tracking-widest uppercase">
-                                                        {choiceKey.replace(/([A-Z])/g, ' $1').replace(/choice/i, 'Choice')}
+                                                        {toTitleCase(choiceKey).replace(/choice/i, 'Choice')}
                                                     </h4>
                                                     <div className="flex flex-col gap-3">
                                                         {Object.entries(options).map(([optionKey, items]) => {
                                                             const isActive = values.equipmentChoices?.[choiceKey]?.optionKey === optionKey;
                                                             const hasAnyItems = Object.keys(items).some(key => isAnyItem(key));
+                                                            const onlyAnyItems = Object.keys(items).every(key => isAnyItem(key));
                                                             
+                                                            // If option only has "any" items, show dropdowns directly
+                                                            if (onlyAnyItems) {
+                                                                return (
+                                                                    <div key={optionKey} className="space-y-2 p-3 bg-website-default-900 rounded border border-website-default-700">
+                                                                        {Object.entries(items).map(([itemName, quantity]) => {
+                                                                            const dropdownOptions = getAnyItemOptions(itemName);
+                                                                            const selectionKey = `${choiceKey}_${optionKey}_${itemName}`;
+                                                                            const selectionData = values.anyItemSelections?.[selectionKey];
+                                                                            const currentSelection = selectionData?.itemId || '';
+                                                                            
+                                                                            return (
+                                                                                <div key={itemName} className="flex items-center gap-2">
+                                                                                    <span className="text-xs text-website-default-300">
+                                                                                        <span className="text-website-specials-400 font-bold">{quantity}x</span> {toTitleCase(itemName)}:
+                                                                                    </span>
+                                                                                    <select
+                                                                                        className='flex-1 rounded border border-website-specials-500 bg-website-default-900 px-2 py-1 text-xs text-white focus:outline-none'
+                                                                                        value={currentSelection}
+                                                                                        onChange={(e) => {
+                                                                                            handleAnyItemSelection(choiceKey, optionKey, itemName, e.target.value);
+                                                                                            // Auto-select this option when making a selection
+                                                                                            if (e.target.value && !isActive) {
+                                                                                                handleEquipmentChoice(choiceKey, optionKey, items);
+                                                                                            }
+                                                                                        }}
+                                                                                    >
+                                                                                        <option value='' disabled>Select {toTitleCase(itemName.replace(/any/i, '').trim())}</option>
+                                                                                        {dropdownOptions.map(opt => (
+                                                                                            <option key={opt} value={opt}>{toTitleCase(opt)}</option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            
+                                                            // Regular option with button and optional dropdowns
                                                             return (
                                                                 <div key={optionKey} className="space-y-2">
                                                                     <button
@@ -594,7 +844,7 @@ export function Class({ values, onChange }) {
                                                                                             <div>
                                                                                                 <span className="text-website-specials-400 font-bold">{quantity}x</span>
                                                                                                 {' '}
-                                                                                                <span className="text-website-default-100">{itemName.replace(/([A-Z])/g, ' $1')}</span>
+                                                                                                <span className="text-website-default-100">{toTitleCase(itemName)}</span>
                                                                                             </div>
                                                                                             
                                                                                             {/* Show pack contents */}
@@ -606,7 +856,7 @@ export function Class({ values, onChange }) {
                                                                                                             const [pName, pQty] = packItem.split(':');
                                                                                                             return (
                                                                                                                 <span key={pIdx} className="bg-website-default-800/50 px-1.5 py-0.5 rounded">
-                                                                                                                    {pQty}x {pName.replace(/([A-Z])/g, ' $1')}
+                                                                                                                    {pQty}x {toTitleCase(pName)}
                                                                                                                 </span>
                                                                                                             );
                                                                                                         })}
@@ -631,21 +881,22 @@ export function Class({ values, onChange }) {
                                                                                 
                                                                                 const dropdownOptions = getAnyItemOptions(itemName);
                                                                                 const selectionKey = `${choiceKey}_${optionKey}_${itemName}`;
-                                                                                const currentSelection = values.anyItemSelections?.[selectionKey] || '';
+                                                                                const selectionData = values.anyItemSelections?.[selectionKey];
+                                                                                const currentSelection = selectionData?.itemId || '';
                                                                                 
                                                                                 return (
                                                                                     <div key={itemName} className="flex items-center gap-2">
                                                                                         <span className="text-xs text-website-default-300">
-                                                                                            <span className="text-website-specials-400 font-bold">{quantity}x</span> {itemName.replace(/([A-Z])/g, ' $1')}:
+                                                                                            <span className="text-website-specials-400 font-bold">{quantity}x</span> {toTitleCase(itemName)}:
                                                                                         </span>
                                                                                         <select
                                                                                             className='flex-1 rounded border border-website-specials-500 bg-website-default-900 px-2 py-1 text-xs text-white focus:outline-none'
                                                                                             value={currentSelection}
                                                                                             onChange={(e) => handleAnyItemSelection(choiceKey, optionKey, itemName, e.target.value)}
                                                                                         >
-                                                                                            <option value='' disabled>Select {itemName.replace(/any/i, '').replace(/([A-Z])/g, ' $1').trim()}</option>
+                                                                                            <option value='' disabled>Select {toTitleCase(itemName.replace(/any/i, '').trim())}</option>
                                                                                             {dropdownOptions.map(opt => (
-                                                                                                <option key={opt} value={opt}>{opt.replace(/([A-Z])/g, ' $1')}</option>
+                                                                                                <option key={opt} value={opt}>{toTitleCase(opt)}</option>
                                                                                             ))}
                                                                                         </select>
                                                                                     </div>

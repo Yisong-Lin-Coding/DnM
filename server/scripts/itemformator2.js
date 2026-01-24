@@ -2,253 +2,218 @@ const fs = require('fs');
 const path = require('path');
 
 // ===== CONFIGURE THESE PATHS =====
-const INPUT_FILE = '../server/data/gameFiles/item/itemsimport.json';  // Path to your input JSON file
-const OUTPUT_FILE = '../server/data/gameFiles/item/items2.json'; // Path where you want the output saved
+const INPUT_FILE = '../server/data/gameFiles/item/itemsimport.json';
+const OUTPUT_FILE = '../server/data/gameFiles/item/items2.json';
 // =================================
 
 const VALID_RARITIES = ['common', 'uncommon', 'rare', 'veryRare', 'epic', 'legendary', 'artifact'];
 
+/* =========================
+   Utility Functions
+========================= */
+
 function normalizeRarity(rarity) {
   if (!rarity) return 'common';
-  
+
   const normalized = rarity.toLowerCase().trim();
-  
-  // Direct matches
-  if (VALID_RARITIES.includes(normalized)) {
-    return normalized;
-  }
-  
-  // Handle "very rare" -> "veryRare"
-  if (normalized === 'very rare') {
-    return 'veryRare';
-  }
-  
-  // If it's not a valid rarity, default to common
+  if (VALID_RARITIES.includes(normalized)) return normalized;
+  if (normalized === 'very rare') return 'veryRare';
+
   console.log(`  ⚠ Unknown rarity "${rarity}" - defaulting to "common"`);
   return 'common';
 }
 
-function convertDnDItems(inputArray) {
-  const output = {
-    items: []
+function parsePropertiesString(str = '') {
+  return str
+    .split(',')
+    .map(p => p.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function inferDamageUses(damageType = '', properties = []) {
+  const uses = new Set();
+
+  if (damageType.includes('piercing')) uses.add('stab');
+  if (damageType.includes('slashing')) uses.add('slash');
+  if (damageType.includes('bludgeoning')) uses.add('blunt');
+  if (properties.includes('thrown')) uses.add('throw');
+
+  return Array.from(uses);
+}
+
+function buildWeaponProperties(item) {
+  const props = item.properties || {};
+  const rawProps = parsePropertiesString(props["Properties"]);
+  const damageDie = props["Damage"];
+  const damageType = (props["Damage Type"] || '').toLowerCase();
+
+  const uses = inferDamageUses(damageType, rawProps);
+
+  const damage = {};
+  uses.forEach(use => {
+    damage[use] = damageDie;
+  });
+
+  return {
+    damage,
+    uses,
+    slot: { fist: 1 }
   };
-  
-  const seenIds = new Set(); // Track IDs we've already added
+}
+
+function inferAttributes(itemType = '', props = {}, damageType = '') {
+  const attributes = new Set();
+  const type = itemType.toLowerCase();
+  const rawProps = parsePropertiesString(props["Properties"]);
+
+  if (type.includes('weapon')) attributes.add('weapon');
+  if (type.includes('melee')) attributes.add('melee');
+  if (type.includes('ranged')) attributes.add('ranged');
+
+  if (rawProps.includes('thrown')) attributes.add('thrown');
+  if (rawProps.includes('finesse')) attributes.add('finesse');
+  if (rawProps.includes('light')) attributes.add('light');
+  if (rawProps.includes('heavy')) attributes.add('heavy');
+  if (rawProps.includes('two-handed')) attributes.add('two-handed');
+  if (rawProps.includes('versatile')) attributes.add('versatile');
+
+  if (damageType.includes('piercing')) attributes.add('pierce');
+  if (damageType.includes('slashing')) attributes.add('slash');
+  if (damageType.includes('bludgeoning')) attributes.add('blunt');
+
+  if (type.includes('simple')) attributes.add('simple');
+  if (type.includes('martial')) attributes.add('martial');
+
+  if (attributes.size === 0) attributes.add('item');
+  return Array.from(attributes);
+}
+
+/* =========================
+   Conversion Logic
+========================= */
+
+function convertDnDItems(inputArray) {
+  const output = { items: [] };
+  const seenIds = new Set();
+  const seenItemTypes = new Set();
+
   let duplicateCount = 0;
   let plusItemCount = 0;
 
   inputArray.forEach((item, index) => {
     try {
-      // Safety check for item structure
-      if (!item || !item.name) {
-        console.log(`  ⚠ Skipping item at index ${index}: missing name`);
-        return;
-      }
+      if (!item || !item.name) return;
 
-      // Check if name contains +1, +2, +3, etc. and skip it
+      // Skip +X items
       if (/\+\d/.test(item.name)) {
         plusItemCount++;
         return;
       }
 
-      // Check if name has more than 2 words
+      // Skip names longer than 2 words
       const wordCount = item.name.trim().split(/\s+/).length;
-      if (wordCount > 2) {
-        return; // Skip this item
-      }
+      if (wordCount > 2) return;
 
-      // Create a simple ID from the name (camelCase)
-      // Remove apostrophes and special characters from the ID
+      // Build ID
       const id = item.name
-        .replace(/['\+\-]/g, '') // Remove apostrophes, plus signs, and hyphens
+        .replace(/['\+\-]/g, '')
         .split(/\s+/)
-        .map((word, index) => 
-          index === 0 
-            ? word.toLowerCase() 
-            : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        )
+        .map((w, i) => i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())
         .join('');
 
-      // Skip if we've already seen this ID
       if (seenIds.has(id)) {
         duplicateCount++;
-        console.log(`  ⚠ Skipping duplicate ID: "${id}" (from item: "${item.name}")`);
         return;
       }
-      
-      // Add ID to our tracking set
       seenIds.add(id);
 
-      // Determine basic attributes based on item type and rarity
-      const attributes = [];
-      const itemType = item.properties?.["Item Type"] || item.type || "Item";
-      
-      // Add type-based attributes
-      if (itemType.toLowerCase().includes("weapon")) {
-        attributes.push("weapon");
-      }
-      if (itemType.toLowerCase().includes("armor")) {
-        attributes.push("armor");
-      }
-      if (itemType.toLowerCase().includes("scroll")) {
-        attributes.push("consumable", "scroll");
-      }
-      if (itemType.toLowerCase().includes("potion")) {
-        attributes.push("consumable", "potion");
-      }
+      const props = item.properties || {};
+      const itemType = props["Item Type"] || item.type || "Item";
 
-      // Get and normalize rarity
-      const rawRarity = item.properties?.["Item Rarity"] || "common";
-      const rarity = normalizeRarity(rawRarity);
-      
-      // Build the converted item
+      // Track raw item types
+      seenItemTypes.add(itemType);
+
+      const rarity = normalizeRarity(props["Item Rarity"]);
+      const isWeapon = itemType.toLowerCase().includes('weapon');
+
       const convertedItem = {
-        id: id,
-        name: item.name, // Keep apostrophe in name
+        id,
+        name: item.name,
         description: item.description || `A ${item.name}.`,
-        type: itemType.includes("Weapon") ? "Weapon" : 
-              itemType.includes("Armor") ? "Armor" : 
-              itemType.includes("Potion") || itemType.includes("Consumable") ? "Consumable" : "Item",
-        rarity: rarity,
-        weight: 64, // Default weight, adjust as needed
-        cost: 10,   // Default cost, adjust as needed
-        attributes: attributes.length > 0 ? attributes : ["item"],
+        type: isWeapon ? "Weapon" :
+              itemType.toLowerCase().includes("armor") ? "Armor" :
+              itemType.toLowerCase().includes("potion") ? "Consumable" :
+              "Item",
+        rarity,
+        weight: props.Weight ? props.Weight * 32 : 64,
+        cost: 10,
+        attributes: inferAttributes(
+          itemType,
+          props,
+          (props["Damage Type"] || '').toLowerCase()
+        ),
         properties: {}
       };
 
+      if (isWeapon && props["Damage"]) {
+        convertedItem.properties = buildWeaponProperties(item);
+      }
+
       output.items.push(convertedItem);
-    } catch (error) {
-      console.log(`  ⚠ Error processing item at index ${index}:`, error.message);
+
+    } catch (err) {
+      console.log(`⚠ Error processing item at index ${index}: ${err.message}`);
     }
   });
 
-  if (duplicateCount > 0) {
-    console.log(`\n  ℹ Skipped ${duplicateCount} duplicate ID(s)`);
-  }
-  
-  if (plusItemCount > 0) {
-    console.log(`  ℹ Skipped ${plusItemCount} item(s) with +1/+2/+3 modifiers`);
-  }
+  // ---- Summary Logs ----
+  if (duplicateCount) console.log(`ℹ Skipped ${duplicateCount} duplicate ID(s)`);
+  if (plusItemCount) console.log(`ℹ Skipped ${plusItemCount} +X item(s)`);
+
+  console.log('\n=== Item Types Found ===');
+  Array.from(seenItemTypes)
+    .sort()
+    .forEach(type => console.log(` - ${type}`));
 
   return output;
 }
 
+/* =========================
+   Runner
+========================= */
+
 function main() {
   console.log('=== D&D Item Converter Starting ===');
-  console.log(`Current directory: ${process.cwd()}`);
-  console.log(`Input file: ${path.resolve(INPUT_FILE)}`);
-  console.log(`Output file: ${path.resolve(OUTPUT_FILE)}`);
-  console.log('');
-  
-  try {
-    // Check if input file exists
-    if (!fs.existsSync(INPUT_FILE)) {
-      console.error(`ERROR: Input file not found: ${INPUT_FILE}`);
-      console.error('Please create the file or update the INPUT_FILE path');
-      process.exit(1);
-    }
-    
-    console.log('✓ Input file found');
-    console.log('Reading input file...');
-    const inputData = fs.readFileSync(INPUT_FILE, 'utf8');
-    
-    console.log('Parsing JSON...');
-    const parsed = JSON.parse(inputData);
-    
-    // Handle both array and object with items property
-    let items;
-    if (Array.isArray(parsed)) {
-      items = parsed;
-    } else if (parsed.items && Array.isArray(parsed.items)) {
-      items = parsed.items;
-    } else {
-      console.error('ERROR: Expected an array or object with "items" array');
-      console.error('Found:', typeof parsed);
-      process.exit(1);
-    }
-    
-    console.log(`✓ Found ${items.length} items in input file`);
-    
-    console.log('Converting items...');
-    const converted = convertDnDItems(items);
-    
-    console.log(`✓ Converted ${converted.items.length} items`);
-    console.log(`  (filtered out ${items.length - converted.items.length} items total)`);
-    
-    console.log('Writing output file...');
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(converted, null, 2), 'utf8');
-    
-    console.log(`✓ Success! Output written to: ${OUTPUT_FILE}`);
-    console.log('=== Conversion Complete ===');
-  } catch (error) {
-    console.error('');
-    console.error('=== ERROR ===');
-    console.error('Error:', error.message);
-    console.error('Stack:', error.stack);
+  console.log(`Input:  ${path.resolve(INPUT_FILE)}`);
+  console.log(`Output: ${path.resolve(OUTPUT_FILE)}\n`);
+
+  if (!fs.existsSync(INPUT_FILE)) {
+    console.error(`ERROR: Input file not found: ${INPUT_FILE}`);
     process.exit(1);
   }
+
+  const raw = fs.readFileSync(INPUT_FILE, 'utf8');
+  const parsed = JSON.parse(raw);
+
+  const items = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray(parsed.items)
+      ? parsed.items
+      : null;
+
+  if (!items) {
+    console.error('ERROR: Input JSON must be an array or { items: [] }');
+    process.exit(1);
+  }
+
+  console.log(`✓ Loaded ${items.length} items`);
+  const converted = convertDnDItems(items);
+
+  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(converted, null, 2), 'utf8');
+  console.log(`\n✓ Converted ${converted.items.length} items`);
+  console.log('=== Conversion Complete ===');
 }
 
-// Only run if this file is executed directly (not imported)
 if (require.main === module) {
   main();
 }
-
-function main() {
-  console.log('=== D&D Item Converter Starting ===');
-  console.log(`Current directory: ${process.cwd()}`);
-  console.log(`Input file: ${path.resolve(INPUT_FILE)}`);
-  console.log(`Output file: ${path.resolve(OUTPUT_FILE)}`);
-  console.log('');
-  
-  try {
-    // Check if input file exists
-    if (!fs.existsSync(INPUT_FILE)) {
-      console.error(`ERROR: Input file not found: ${INPUT_FILE}`);
-      console.error('Please create the file or update the INPUT_FILE path');
-      process.exit(1);
-    }
-    
-    console.log('✓ Input file found');
-    console.log('Reading input file...');
-    const inputData = fs.readFileSync(INPUT_FILE, 'utf8');
-    
-    console.log('Parsing JSON...');
-    const parsed = JSON.parse(inputData);
-    
-    // Handle both array and object with items property
-    let items;
-    if (Array.isArray(parsed)) {
-      items = parsed;
-    } else if (parsed.items && Array.isArray(parsed.items)) {
-      items = parsed.items;
-    } else {
-      console.error('ERROR: Expected an array or object with "items" array');
-      console.error('Found:', typeof parsed);
-      process.exit(1);
-    }
-    
-    console.log(`✓ Found ${items.length} items in input file`);
-    
-    console.log('Converting items...');
-    const converted = convertDnDItems(items);
-    
-    console.log(`✓ Converted ${converted.items.length} items`);
-    console.log(`  (filtered out ${items.length - converted.items.length} items with >2 word names or duplicate IDs)`);
-    
-    console.log('Writing output file...');
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(converted, null, 2), 'utf8');
-    
-    console.log(`✓ Success! Output written to: ${OUTPUT_FILE}`);
-    console.log('=== Conversion Complete ===');
-  } catch (error) {
-    console.error('');
-    console.error('=== ERROR ===');
-    console.error('Error:', error.message);
-    console.error('Stack:', error.stack);
-    process.exit(1);
-  }
-}
-
-// Run the script
-main();

@@ -1,0 +1,856 @@
+[
+  {
+    "name": "Acolyte",
+    "backgroundID": "acolyte",
+    "description": "Acolytes are shaped by their experience in temples or other religious communities. Their study of the history and tenets of their faith affect their mannerisms and ideals.",
+    "gp": 15,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "insight",
+      "religion"
+    ],
+    "baseEquipment": [
+      "prayerBook",
+      "incenseStick5",
+      "vestments",
+      "commonClothes",
+      "pouch"
+    ],
+    "features": {
+      "shelterOfTheFaithful": [
+        "You command the respect of those who share your faith and can perform religious ceremonies.",
+        "You and companions receive free healing and care at temples of your faith.",
+        "You have a residence at your specific temple and can call upon priests for non-hazardous assistance."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "languages": {
+          "amount": 2,
+          "options": [
+            "any"
+          ]
+        }
+      },
+      "equipment": {
+        "choice1": {
+          "option1": {
+            "holySymbol": 1
+          }
+        },
+        "choice2": {
+          "option1": {
+            "prayerBook": 1
+          },
+          "option2": {
+            "prayerWheel": 1
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "Charlatan",
+    "backgroundID": "charlatan",
+    "description": "Charlatans are colorful characters who conceal their true selves behind the masks they construct.",
+    "gp": 15,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "deception",
+      "sleightOfHand",
+      "disguiseKit",
+      "forgeryKit"
+    ],
+    "baseEquipment": [
+      "fineClothes",
+      "disguiseKit",
+      "pouch"
+    ],
+    "features": {
+      "falseIdentity": [
+        "You have created a second identity with documentation and established acquaintances.",
+        "You can forge documents if you have seen an example of the handwriting."
+      ]
+    },
+    "choices": {
+      "equipment": {
+        "choice1": {
+          "option1": {
+            "stopperedBottlesColoredLiquid": 10
+          },
+          "option2": {
+            "weightedDice": 1
+          },
+          "option3": {
+            "deckOfMarkedCards": 1
+          },
+          "option4": {
+            "signetRingImaginaryDuke": 1
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "City Watch",
+    "backgroundID": "cityWatch",
+    "description": "Your experience in enforcing the law gives you a feel for local laws and criminals.",
+    "gp": 10,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "athletics",
+      "insight"
+    ],
+    "baseEquipment": [
+      "unitUniform",
+      "horn",
+      "manacles",
+      "pouch"
+    ],
+    "features": {
+      "watchersEye": [
+        "You can easily find local watch outposts and pick out dens of criminal activity."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "languages": {
+          "amount": 2,
+          "options": [
+            "any"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Clan Crafter",
+    "backgroundID": "clanCrafter",
+    "description": "You are a skilled artisan, esteemed especially by dwarves for your craftsmanship.",
+    "gp": 5,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "history",
+      "insight"
+    ],
+    "baseEquipment": [
+      "makersMarkChisel",
+      "travelersClothes",
+      "pouch",
+      "gem10gp"
+    ],
+    "features": {
+      "respectOfTheStoutFolk": [
+        "You have free room and board where shield or gold dwarves dwell."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "tools": {
+          "amount": 1,
+          "options": [
+            "artisansToolsAny"
+          ]
+        },
+        "languages": {
+          "amount": 1,
+          "options": [
+            "dwarvish",
+            "any"
+          ]
+        }
+      },
+      "equipment": {
+        "choice1": {
+          "option1": {
+            "artisansToolsAny": 1
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "Cloistered Scholar",
+    "backgroundID": "cloisteredScholar",
+    "description": "You have a working knowledge of your cloister's personnel and navigate archives with ease.",
+    "gp": 10,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "history"
+    ],
+    "baseEquipment": [
+      "scholarRobes",
+      "writingKit",
+      "borrowedBook",
+      "pouch"
+    ],
+    "features": {
+      "libraryAccess": [
+        "You have free and easy access to the majority of your library.",
+        "You gain preferential treatment at other libraries as a professional courtesy."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "skills": {
+          "amount": 1,
+          "options": [
+            "arcana",
+            "nature",
+            "religion"
+          ]
+        },
+        "languages": {
+          "amount": 2,
+          "options": [
+            "any"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Courtier",
+    "backgroundID": "courtier",
+    "description": "Your knowledge of bureaucracies lets you navigate noble courts and government records.",
+    "gp": 5,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "insight",
+      "persuasion"
+    ],
+    "baseEquipment": [
+      "fineClothes",
+      "pouch"
+    ],
+    "features": {
+      "courtFunctionary": [
+        "You gain access to records and inner workings of noble courts and governments."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "languages": {
+          "amount": 2,
+          "options": [
+            "any"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Criminal",
+    "backgroundID": "criminal",
+    "description": "You have a reliable contact who acts as your liaison to a network of other criminals.",
+    "gp": 15,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "deception",
+      "stealth",
+      "thievesTools"
+    ],
+    "baseEquipment": [
+      "crowbar",
+      "darkCommonClothesHooded",
+      "pouch"
+    ],
+    "features": {
+      "criminalContact": [
+        "You know how to get messages to and from a network of criminals via seedy liaisons."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "tools": {
+          "amount": 1,
+          "options": [
+            "gamingSetAny"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Entertainer",
+    "backgroundID": "entertainer",
+    "description": "You can always find a place to perform and receive free lodging and food in exchange.",
+    "gp": 15,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "acrobatics",
+      "performance",
+      "disguiseKit"
+    ],
+    "baseEquipment": [
+      "admirerFavor",
+      "costume",
+      "pouch"
+    ],
+    "features": {
+      "byPopularDemand": [
+        "You receive free lodging and food in exchange for performing nightly.",
+        "Local recognition makes strangers typically take a liking to you."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "tools": {
+          "amount": 1,
+          "options": [
+            "musicalInstrumentAny"
+          ]
+        }
+      },
+      "equipment": {
+        "choice1": {
+          "option1": {
+            "musicalInstrumentAny": 1
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "Faction Agent",
+    "backgroundID": "factionAgent",
+    "description": "You have access to a secret network of supporters who provide safe houses and info.",
+    "gp": 15,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "insight"
+    ],
+    "baseEquipment": [
+      "factionBadge",
+      "factionText",
+      "commonClothes",
+      "pouch"
+    ],
+    "features": {
+      "safeHaven": [
+        "Secret signs allow you to identify operatives for safe houses and free room/board."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "skills": {
+          "amount": 1,
+          "options": [
+            "arcana",
+            "history",
+            "investigation",
+            "nature",
+            "religion",
+            "animalHandling",
+            "insight",
+            "medicine",
+            "perception",
+            "survival",
+            "deception",
+            "intimidation",
+            "performance",
+            "persuasion"
+          ]
+        },
+        "languages": {
+          "amount": 2,
+          "options": [
+            "any"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Far Traveler",
+    "backgroundID": "farTraveler",
+    "description": "Your foreign nature earns you the interest of scholars and access to high society.",
+    "gp": 5,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "insight",
+      "perception"
+    ],
+    "baseEquipment": [
+      "travelersClothes",
+      "homelandMaps",
+      "jewelrySmall10gp",
+      "pouch"
+    ],
+    "features": {
+      "allEyesOnYou": [
+        "Your foreign mannerisms gain you access to people and places others might not reach."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "tools": {
+          "amount": 1,
+          "options": [
+            "musicalInstrumentAny",
+            "gamingSetAny"
+          ]
+        },
+        "languages": {
+          "amount": 1,
+          "options": [
+            "any"
+          ]
+        }
+      },
+      "equipment": {
+        "choice1": {
+          "option1": {
+            "musicalInstrumentAny": 1
+          },
+          "option2": {
+            "gamingSetAny": 1
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "Folk Hero",
+    "backgroundID": "folkHero",
+    "description": "Commoners will shield you from the law and provide a place to hide.",
+    "gp": 10,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "animalHandling",
+      "survival",
+      "vehiclesLand"
+    ],
+    "baseEquipment": [
+      "shovel",
+      "ironPot",
+      "commonClothes",
+      "pouch"
+    ],
+    "features": {
+      "rusticHospitality": [
+        "Common folk will hide, rest, or recuperate you unless you are a danger to them."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "tools": {
+          "amount": 1,
+          "options": [
+            "artisansToolsAny"
+          ]
+        }
+      },
+      "equipment": {
+        "choice1": {
+          "option1": {
+            "artisansToolsAny": 1
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "Guild Artisan",
+    "backgroundID": "guildArtisan",
+    "description": "Your guild provides lodging, legal support, and access to political figures.",
+    "gp": 15,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "insight",
+      "persuasion"
+    ],
+    "baseEquipment": [
+      "guildLetterOfIntroduction",
+      "travelersClothes",
+      "pouch"
+    ],
+    "features": {
+      "guildMembership": [
+        "Guild members provide lodging and food. Guilds provide legal and political support.",
+        "Requires 5 gp monthly dues to remain in good standing."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "tools": {
+          "amount": 1,
+          "options": [
+            "artisansToolsAny"
+          ]
+        }
+      },
+      "equipment": {
+        "choice1": {
+          "option1": {
+            "artisansToolsAny": 1
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "Hermit",
+    "backgroundID": "hermit",
+    "description": "You lived in seclusion—either in a sheltered community or entirely alone—for a formative part of your life. In that time, you discovered a unique and powerful truth.",
+    "gp": 5,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "medicine",
+      "religion",
+      "herbalismKit"
+    ],
+    "baseEquipment": [
+      "scrollCaseFilledWithNotes",
+      "winterBlanket",
+      "commonClothes",
+      "herbalismKit"
+    ],
+    "features": {
+      "discovery": [
+        "The quiet seclusion of your hermitage gave you access to a unique and powerful discovery. The nature of this revelation is for you to determine with your DM."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "languages": {
+          "amount": 1,
+          "options": [
+            "any"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Inheritor",
+    "backgroundID": "inheritor",
+    "description": "You are the heir to something of great value—not of gold or jewels, but an object, a message, or a secret that marks you for a grand destiny.",
+    "gp": 15,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "survival"
+    ],
+    "baseEquipment": [
+      "inheritance",
+      "travelersClothes",
+      "pouch"
+    ],
+    "features": {
+      "inheritance": [
+        "You are the rightful owner of a special item, perhaps a map, a deed, or a letter, that was left to you by someone important."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "skills": {
+          "amount": 1,
+          "options": [
+            "arcana",
+            "history",
+            "religion"
+          ]
+        },
+        "tools": {
+          "amount": 1,
+          "options": [
+            "gamingSetAny",
+            "musicalInstrumentAny"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Noble",
+    "backgroundID": "noble",
+    "description": "You understand wealth, power, and privilege. You carry a noble title, and your family owns land, collects taxes, and wields significant political influence.",
+    "gp": 25,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "history",
+      "persuasion"
+    ],
+    "baseEquipment": [
+      "fineClothes",
+      "signetRing",
+      "scrollOfPedigree",
+      "purse"
+    ],
+    "features": {
+      "positionOfPrivilege": [
+        "Thanks to your noble birth, people are inclined to think the best of you. You are welcome in high society, and people assume you have the right to be wherever you are."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "tools": {
+          "amount": 1,
+          "options": [
+            "gamingSetAny"
+          ]
+        },
+        "languages": {
+          "amount": 1,
+          "options": [
+            "any"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Outlander",
+    "backgroundID": "outlander",
+    "description": "You grew up in the wilds, far from civilization and the comforts of town and technology.",
+    "gp": 10,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "athletics",
+      "survival"
+    ],
+    "baseEquipment": [
+      "staff",
+      "huntingTrap",
+      "animalTrophy",
+      "travelersClothes",
+      "pouch"
+    ],
+    "features": {
+      "wanderer": [
+        "You have an excellent memory for maps and geography, and you can always recall the general layout of terrain and settlements around you.",
+        "You can find food and fresh water for yourself and up to five other people each day, provided that the land offers berries, small game, water, and so forth."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "tools": {
+          "amount": 1,
+          "options": [
+            "musicalInstrumentAny"
+          ]
+        },
+        "languages": {
+          "amount": 1,
+          "options": [
+            "any"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Sage",
+    "backgroundID": "sage",
+    "description": "You spent years learning the lore of the multiverse. You scoured manuscripts, studied scrolls, and listened to the greatest experts on the subjects that interest you.",
+    "gp": 10,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "arcana",
+      "history"
+    ],
+    "baseEquipment": [
+      "inkBottle",
+      "quill",
+      "smallKnife",
+      "letterFromDeadColleague",
+      "commonClothes",
+      "pouch"
+    ],
+    "features": {
+      "researcher": [
+        "When you attempt to learn or recall a piece of lore, if you do not know that information, you often know where and from whom you can obtain it."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "languages": {
+          "amount": 2,
+          "options": [
+            "any"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Sailor",
+    "backgroundID": "sailor",
+    "description": "You sailed on a seagoing vessel for years. In that time, you faced mighty storms, monsters of the deep, and those who wanted to sink your craft.",
+    "gp": 10,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "athletics",
+      "perception",
+      "navigatorsTools",
+      "vehiclesWater"
+    ],
+    "baseEquipment": [
+      "belayingPinClub",
+      "silkRope50ft",
+      "luckyCharm",
+      "commonClothes",
+      "pouch"
+    ],
+    "features": {
+      "shipsPassage": [
+        "When you need to, you can secure free passage on a sailing ship for yourself and your adventuring companions."
+      ]
+    },
+    "choices": {}
+  },
+  {
+    "name": "Soldier",
+    "backgroundID": "soldier",
+    "description": "War has been your life for as long as you care to remember. You were trained as a youth, studied the use of weapons and armor, and learned basic survival techniques.",
+    "gp": 10,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "athletics",
+      "intimidation",
+      "vehiclesLand"
+    ],
+    "baseEquipment": [
+      "rankInsignia",
+      "fallenEnemyTrophy",
+      "boneDice",
+      "commonClothes",
+      "pouch"
+    ],
+    "features": {
+      "militaryRank": [
+        "You have a military rank from your career as a soldier.",
+        "Soldiers loyal to your former military organization still recognize your authority and influence.",
+        "You can gain access to friendly military encampments and fortresses where your rank is recognized."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "tools": {
+          "amount": 1,
+          "options": [
+            "gamingSetAny"
+          ]
+        }
+      },
+      "equipment": {
+        "choice1": {
+          "option1": {
+            "boneDice": 1
+          },
+          "option2": {
+            "deckOfCards": 1
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "Urchin",
+    "backgroundID": "urchin",
+    "description": "You grew up on the streets alone, orphaned, and poor. You had no one to watch over you or to provide for you, so you learned to provide for yourself.",
+    "gp": 10,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "sleightOfHand",
+      "stealth",
+      "disguiseKit",
+      "thievesTools"
+    ],
+    "baseEquipment": [
+      "smallKnife",
+      "cityMap",
+      "petMouse",
+      "tokenToRememberParents",
+      "commonClothes",
+      "pouch"
+    ],
+    "features": {
+      "citySecrets": [
+        "You know the secret patterns and flow to cities and can find passages through the urban sprawl that others would miss.",
+        "When you are not in combat, you (and companions you lead) can travel between any two locations in the city twice as fast as your speed would normally allow."
+      ]
+    },
+    "choices": {}
+  },
+  {
+    "name": "Uthgardt Tribesmember",
+    "backgroundID": "uthgardtTribesmember",
+    "description": "You are steeped in the traditions of your people and have deep knowledge of the wilderness of the North.",
+    "gp": 10,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "athletics",
+      "survival"
+    ],
+    "baseEquipment": [
+      "huntingTrap",
+      "totemicToken",
+      "travelersClothes",
+      "pouch"
+    ],
+    "features": {
+      "uthgardtHeritage": [
+        "You have a unique knowledge of the terrain and resources of the North.",
+        "You can find food and fresh water for yourself and up to five other people each day in the wild."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "tools": {
+          "amount": 1,
+          "options": [
+            "musicalInstrumentAny",
+            "artisansToolsAny"
+          ]
+        },
+        "languages": {
+          "amount": 1,
+          "options": [
+            "any"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "Waterdhavian Noble",
+    "backgroundID": "waterdhavianNoble",
+    "description": "You are a scion of one of the great noble families of Waterdeep. You are well known for your status and your family's history.",
+    "gp": 20,
+    "baseStatModifier": {},
+    "baseProficiencies": [
+      "history",
+      "persuasion"
+    ],
+    "baseEquipment": [
+      "fineClothes",
+      "signetRing",
+      "scrollOfPedigree",
+      "pouch"
+    ],
+    "features": {
+      "keptInStyle": [
+        "While you are in Waterdeep or elsewhere in the North, your house sees to your everyday needs.",
+        "Your name and signet are sufficient to cover most of your expenses at inns and taverns."
+      ]
+    },
+    "choices": {
+      "proficiencies": {
+        "languages": {
+          "amount": 1,
+          "options": [
+            "any"
+          ]
+        },
+        "tools": {
+          "amount": 1,
+          "options": [
+            "gamingSetAny",
+            "musicalInstrumentAny"
+          ]
+        }
+      }
+    }
+  }
+]

@@ -1,13 +1,12 @@
 const gameEvents = require('../handlers/gameEventEmitter');
 
 class CombatEngine {
-    constructor(characters = [], map = null) {
-        this.characters = Array.isArray(characters) ? characters : [];
-        this.map = map;
-        this.round = 0;
-        this.turnOrder = []; // [{ character, initiative }]
-        this.currentIndex = 0; // index into turnOrder
+    constructor(data) {
+        this.characters = data.characters || {}; // array of character objects
+        this.round = data.round || 0
+        this.currentIndex = 0; // index in turn order
         this.isRunning = false;
+        this.turnOrder = []; // array of {character, initiative} objects
     }
 
     // roll a single d20

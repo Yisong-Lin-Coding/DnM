@@ -1,0 +1,641 @@
+{
+  "pathOfWrath": {
+    "name": "Path of Wrath",
+    "classID": "pathOfWrath",
+    "description": "A barbarian subclass focusing on pure destructive power and combat fury",
+    "parentClass": "Barbarian",
+    "featuresByLevel": {}
+  },
+
+  "pathOfMadness": {
+    "name": "Path of Madness",
+    "classID": "pathOfMadness",
+    "description": "A barbarian subclass drawing power from chaotic impulses and unpredictable fury",
+    "parentClass": "Barbarian",
+    "featuresByLevel": {}
+  },
+
+  "pathOfDespair": {
+    "name": "Path of Despair",
+    "classID": "pathOfDespair",
+    "description": "A barbarian subclass channeling sorrow and anguish into devastating force",
+    "parentClass": "Barbarian",
+    "featuresByLevel": {}
+  },
+
+  "pathOfEnvy": {
+    "name": "Path of Envy",
+    "classID": "pathOfEnvy",
+    "description": "A barbarian subclass driven by jealousy and a desire to possess what others have",
+    "parentClass": "Barbarian",
+    "featuresByLevel": {}
+  },
+
+  "pathOfGlee": {
+    "name": "Path of Glee",
+    "classID": "pathOfGlee",
+    "description": "A barbarian subclass that finds joy and power in chaos and revelry",
+    "parentClass": "Barbarian",
+    "featuresByLevel": {}
+  },
+
+  "pathOfDevotion": {
+    "name": "Path of Devotion",
+    "classID": "pathOfDevotion",
+    "description": "A barbarian subclass devoted to a deity, cause, or ideal that fuels their rage",
+    "parentClass": "Barbarian",
+    "featuresByLevel": {}
+  },
+
+  "pathOfTemperance": {
+    "name": "Path of Temperance",
+    "classID": "pathOfTemperance",
+    "description": "A barbarian subclass that channels discipline and control within their fury",
+    "parentClass": "Barbarian",
+    "featuresByLevel": {}
+  },
+
+  "rushE": {
+    "name": "Rush E",
+    "classID": "rushE",
+    "description": "A bard subclass of high-energy performance and rapid musical execution",
+    "parentClass": "Bard",
+    "featuresByLevel": {}
+  },
+
+  "beethovensSymphony": {
+    "name": "Beethoven's Symphony",
+    "classID": "beethovensSymphony",
+    "description": "A bard subclass channeling the power of grand orchestral composition",
+    "parentClass": "Bard",
+    "featuresByLevel": {}
+  },
+
+  "panisAngelicus": {
+    "name": "Panis Angelicus",
+    "classID": "panisAngelicus",
+    "description": "A bard subclass focused on divine and spiritual music",
+    "parentClass": "Bard",
+    "featuresByLevel": {}
+  },
+
+  "bohemianRhapsody": {
+    "name": "Bohemian Rhapsody",
+    "classID": "bohemianRhapsody",
+    "description": "A bard subclass mastering complex, multi-part musical narratives",
+    "parentClass": "Bard",
+    "featuresByLevel": {}
+  },
+
+  "requiemOfSilence": {
+    "name": "Requiem of Silence",
+    "classID": "requiemOfSilence",
+    "description": "A bard subclass that finds power in absence and the spaces between notes",
+    "parentClass": "Bard",
+    "featuresByLevel": {}
+  },
+
+  "moonlightSonata": {
+    "name": "Moonlight Sonata",
+    "classID": "moonlightSonata",
+    "description": "A bard subclass drawing on melancholy beauty and nocturnal inspiration",
+    "parentClass": "Bard",
+    "featuresByLevel": {}
+  },
+
+  "diesIrae": {
+    "name": "Dies Irae",
+    "classID": "diesIrae",
+    "description": "A bard subclass channeling apocalyptic and judgmental musical power",
+    "parentClass": "Bard",
+    "featuresByLevel": {}
+  },
+
+  "mandateOfHeaven": {
+    "name": "Mandate of Heaven",
+    "classID": "mandateOfHeaven",
+    "description": "A cleric subclass devoted to divine right and celestial authority",
+    "parentClass": "Cleric",
+    "featuresByLevel": {}
+  },
+
+  "domainOfCommunion": {
+    "name": "Domain of Communion",
+    "classID": "domainOfCommunion",
+    "description": "A cleric subclass focused on connection with the divine and spiritual communion",
+    "parentClass": "Cleric",
+    "featuresByLevel": {}
+  },
+
+  "liturgyOfEmbers": {
+    "name": "Liturgy of Embers",
+    "classID": "liturgyOfEmbers",
+    "description": "A cleric subclass commanding fire and purifying flames",
+    "parentClass": "Cleric",
+    "featuresByLevel": {}
+  },
+
+  "creedOfSerenity": {
+    "name": "Creed of Serenity",
+    "classID": "creedOfSerenity",
+    "description": "A cleric subclass seeking peace, balance, and inner tranquility",
+    "parentClass": "Cleric",
+    "featuresByLevel": {}
+  },
+
+  "edictOfJudgment": {
+    "name": "Edict of Judgment",
+    "classID": "edictOfJudgment",
+    "description": "A cleric subclass dispensing divine justice and righteous retribution",
+    "parentClass": "Cleric",
+    "featuresByLevel": {}
+  },
+
+  "orderOfTheAnoited": {
+    "name": "Order of the Anointed",
+    "classID": "orderOfTheAnoited",
+    "description": "A cleric subclass blessed with sacred unctions and divine favor",
+    "parentClass": "Cleric",
+    "featuresByLevel": {}
+  },
+
+  "covenantOfRevelation": {
+    "name": "Covenant of Revelation",
+    "classID": "covenantOfRevelation",
+    "description": "A cleric subclass uncovering divine secrets and hidden truths",
+    "parentClass": "Cleric",
+    "featuresByLevel": {}
+  },
+
+  "sacramentOfWar": {
+    "name": "Sacrament of War",
+    "classID": "sacramentOfWar",
+    "description": "A cleric subclass channeling divine wrath in sacred combat",
+    "parentClass": "Cleric",
+    "featuresByLevel": {}
+  },
+
+  "fruitOfTheLand": {
+    "name": "Fruit of the Land",
+    "classID": "fruitOfTheLand",
+    "description": "A druid subclass commanding the bounty and growth of the earth",
+    "parentClass": "Druid",
+    "featuresByLevel": {}
+  },
+
+  "fruitOfTheSeasons": {
+    "name": "Fruit of the Seasons",
+    "classID": "fruitOfTheSeasons",
+    "description": "A druid subclass channeling the power of natural cycles and seasonal change",
+    "parentClass": "Druid",
+    "featuresByLevel": {}
+  },
+
+  "fruitOfSpores": {
+    "name": "Fruit of Spores",
+    "classID": "fruitOfSpores",
+    "description": "A druid subclass commanding decay, fungi, and decomposition",
+    "parentClass": "Druid",
+    "featuresByLevel": {}
+  },
+
+  "fruitOfTheMoon": {
+    "name": "Fruit of the Moon",
+    "classID": "fruitOfTheMoon",
+    "description": "A druid subclass drawing power from lunar cycles and nocturnal magic",
+    "parentClass": "Druid",
+    "featuresByLevel": {}
+  },
+
+  "fruitOfTheHidden": {
+    "name": "Fruit of the Hidden",
+    "classID": "fruitOfTheHidden",
+    "description": "A druid subclass accessing forbidden and occult natural magic",
+    "parentClass": "Druid",
+    "featuresByLevel": {}
+  },
+
+  "legacyOfTheGreatKhan": {
+    "name": "Legacy of the Great Khan",
+    "classID": "legacyOfTheGreatKhan",
+    "description": "A fighter subclass embodying the tactical genius and commanding presence of a great military leader",
+    "parentClass": "Fighter",
+    "featuresByLevel": {}
+  },
+
+  "alexandersLegacy": {
+    "name": "Alexander's Legacy",
+    "classID": "alexandersLegacy",
+    "description": "A fighter subclass following the path of conquest and rapid military victory",
+    "parentClass": "Fighter",
+    "featuresByLevel": {}
+  },
+
+  "legacyOfTheRajputs": {
+    "name": "Legacy of the Rajputs",
+    "classID": "legacyOfTheRajputs",
+    "description": "A fighter subclass honoring chivalry, honor, and noble combat prowess",
+    "parentClass": "Fighter",
+    "featuresByLevel": {}
+  },
+
+  "joanOfArcsLegacy": {
+    "name": "Joan of Arc's Legacy",
+    "classID": "joanOfArcsLegacy",
+    "description": "A fighter subclass driven by divine purpose and unwavering conviction in battle",
+    "parentClass": "Fighter",
+    "featuresByLevel": {}
+  },
+
+  "legacyOfBismark": {
+    "name": "Legacy of Bismark",
+    "classID": "legacyOfBismark",
+    "description": "A fighter subclass mastering political intrigue and calculated strategic warfare",
+    "parentClass": "Fighter",
+    "featuresByLevel": {}
+  },
+
+  "lionheartsLegacy": {
+    "name": "Lionheart's Legacy",
+    "classID": "lionheartsLegacy",
+    "description": "A fighter subclass embodying courage, nobility, and legendary combat skill",
+    "parentClass": "Fighter",
+    "featuresByLevel": {}
+  },
+
+  "legacyOfTheSettingSun": {
+    "name": "Legacy of the Setting Sun",
+    "classID": "legacyOfTheSettingSun",
+    "description": "A fighter subclass mastering ancient Eastern martial traditions and discipline",
+    "parentClass": "Fighter",
+    "featuresByLevel": {}
+  },
+
+  "wayOfTheStoic": {
+    "name": "Way of the Stoic",
+    "classID": "wayOfTheStoic",
+    "description": "A monk subclass seeking mastery through discipline, reason, and acceptance",
+    "parentClass": "Monk",
+    "featuresByLevel": {}
+  },
+
+  "wayOfTheBuddha": {
+    "name": "Way of the Buddha",
+    "classID": "wayOfTheBuddha",
+    "description": "A monk subclass pursuing enlightenment through meditation and spiritual awakening",
+    "parentClass": "Monk",
+    "featuresByLevel": {}
+  },
+
+  "wayOfTheTao": {
+    "name": "Way of the Tao",
+    "classID": "wayOfTheTao",
+    "description": "A monk subclass balancing opposing forces and flowing with natural harmony",
+    "parentClass": "Monk",
+    "featuresByLevel": {}
+  },
+
+  "wayOfTheNihilist": {
+    "name": "Way of the Nihilist",
+    "classID": "wayOfTheNihilist",
+    "description": "A monk subclass rejecting conventional morality and seeking liberation through negation",
+    "parentClass": "Monk",
+    "featuresByLevel": {}
+  },
+
+  "wayOfTheAbsurdist": {
+    "name": "Way of the Absurdist",
+    "classID": "wayOfTheAbsurdist",
+    "description": "A monk subclass finding power in paradox, contradiction, and embracing the absurd",
+    "parentClass": "Monk",
+    "featuresByLevel": {}
+  },
+
+  "wayOfTheExistentialist": {
+    "name": "Way of the Existentialist",
+    "classID": "wayOfTheExistentialist",
+    "description": "A monk subclass defining their own purpose and freedom through choice and action",
+    "parentClass": "Monk",
+    "featuresByLevel": {}
+  },
+
+  "wayOfTheHedon": {
+    "name": "Way of the Hedon",
+    "classID": "wayOfTheHedon",
+    "description": "A monk subclass pursuing pleasure, experience, and the richness of sensory existence",
+    "parentClass": "Monk",
+    "featuresByLevel": {}
+  },
+
+  "sacredOath": {
+    "name": "Sacred Oath",
+    "classID": "sacredOath",
+    "description": "A paladin subclass bound by solemn vows to a higher power or cause",
+    "parentClass": "Paladin",
+    "featuresByLevel": {}
+  },
+
+  "oathOfDecotion": {
+    "name": "Oath of Devotion",
+    "classID": "oathOfDecotion",
+    "description": "A paladin subclass devoted to virtue, honesty, and compassion",
+    "parentClass": "Paladin",
+    "featuresByLevel": {}
+  },
+
+  "oathOfHeresy": {
+    "name": "Oath of Heresy",
+    "classID": "oathOfHeresy",
+    "description": "A paladin subclass rebelling against dogma and forging their own righteous path",
+    "parentClass": "Paladin",
+    "featuresByLevel": {}
+  },
+
+  "oathOfSilence": {
+    "name": "Oath of Silence",
+    "classID": "oathOfSilence",
+    "description": "A paladin subclass bound by vows of secrecy and hidden justice",
+    "parentClass": "Paladin",
+    "featuresByLevel": {}
+  },
+
+  "oathOfMagic": {
+    "name": "Oath of Magic",
+    "classID": "oathOfMagic",
+    "description": "A paladin subclass channeling arcane power alongside divine authority",
+    "parentClass": "Paladin",
+    "featuresByLevel": {}
+  },
+
+  "markOfTheHunter": {
+    "name": "Mark of the Hunter",
+    "classID": "markOfTheHunter",
+    "description": "A ranger subclass specialized in stalking and eliminating specific prey",
+    "parentClass": "Ranger",
+    "featuresByLevel": {}
+  },
+
+  "markOfTheTracker": {
+    "name": "Mark of the Tracker",
+    "classID": "markOfTheTracker",
+    "description": "A ranger subclass mastering pursuit and tracking through any terrain",
+    "parentClass": "Ranger",
+    "featuresByLevel": {}
+  },
+
+  "markOfTheNightStalker": {
+    "name": "Mark of the Night Stalker",
+    "classID": "markOfTheNightStalker",
+    "description": "A ranger subclass hunting under cover of darkness with supreme stealth",
+    "parentClass": "Ranger",
+    "featuresByLevel": {}
+  },
+
+  "markOfTheSurvivor": {
+    "name": "Mark of the Survivor",
+    "classID": "markOfTheSurvivor",
+    "description": "A ranger subclass enduring any environment and overcoming the harshest conditions",
+    "parentClass": "Ranger",
+    "featuresByLevel": {}
+  },
+
+  "markOfTheBeast": {
+    "name": "Mark of the Beast",
+    "classID": "markOfTheBeast",
+    "description": "A ranger subclass bonding with wild creatures and channeling their primal power",
+    "parentClass": "Ranger",
+    "featuresByLevel": {}
+  },
+
+  "assassin": {
+    "name": "Assassin",
+    "classID": "assassin",
+    "description": "A rogue subclass specializing in precision kills and surprise attacks",
+    "parentClass": "Rogue",
+    "featuresByLevel": {}
+  },
+
+  "ripper": {
+    "name": "Ripper",
+    "classID": "ripper",
+    "description": "A rogue subclass focusing on brutal, efficient, and devastating strikes",
+    "parentClass": "Rogue",
+    "featuresByLevel": {}
+  },
+
+  "stalker": {
+    "name": "Stalker",
+    "classID": "stalker",
+    "description": "A rogue subclass mastering patience, tracking, and hunting from the shadows",
+    "parentClass": "Rogue",
+    "featuresByLevel": {}
+  },
+
+  "ninja": {
+    "name": "Ninja",
+    "classID": "ninja",
+    "description": "A rogue subclass trained in Eastern martial arts and shadow magic",
+    "parentClass": "Rogue",
+    "featuresByLevel": {}
+  },
+
+  "spy": {
+    "name": "Spy",
+    "classID": "spy",
+    "description": "A rogue subclass specializing in espionage, infiltration, and information gathering",
+    "parentClass": "Rogue",
+    "featuresByLevel": {}
+  },
+
+  "clown": {
+    "name": "Clown",
+    "classID": "clown",
+    "description": "A rogue subclass using misdirection, humor, and chaos to confound enemies",
+    "parentClass": "Rogue",
+    "featuresByLevel": {}
+  },
+
+  "scout": {
+    "name": "Scout",
+    "classID": "scout",
+    "description": "A rogue subclass specializing in reconnaissance and swift exploration",
+    "parentClass": "Rogue",
+    "featuresByLevel": {}
+  },
+
+  "inquisitor": {
+    "name": "Inquisitor",
+    "classID": "inquisitor",
+    "description": "A rogue subclass dedicated to rooting out deception and uncovering truth",
+    "parentClass": "Rogue",
+    "featuresByLevel": {}
+  },
+
+  "bloodOfInferna": {
+    "name": "Blood of Inferna",
+    "classID": "bloodOfInferna",
+    "description": "A sorcerer subclass descended from infernal ancestry and commanding hellfire",
+    "parentClass": "Sorcerer",
+    "featuresByLevel": {}
+  },
+
+  "bloodOfTempestas": {
+    "name": "Blood of Tempestas",
+    "classID": "bloodOfTempestas",
+    "description": "A sorcerer subclass channeling storm magic and tempestuous power",
+    "parentClass": "Sorcerer",
+    "featuresByLevel": {}
+  },
+
+  "bloodOfInundatio": {
+    "name": "Blood of Inundatio",
+    "classID": "bloodOfInundatio",
+    "description": "A sorcerer subclass commanding water, waves, and aquatic devastation",
+    "parentClass": "Sorcerer",
+    "featuresByLevel": {}
+  },
+
+  "bloodOfTerraeMotus": {
+    "name": "Blood of Terrae Motus",
+    "classID": "bloodOfTerraeMotus",
+    "description": "A sorcerer subclass channeling earth magic and seismic power",
+    "parentClass": "Sorcerer",
+    "featuresByLevel": {}
+  },
+
+  "bloodfAbyssus": {
+    "name": "Blood of Abyssus",
+    "classID": "bloodfAbyssus",
+    "description": "A sorcerer subclass drawing power from the deepest abyss and void",
+    "parentClass": "Sorcerer",
+    "featuresByLevel": {}
+  },
+
+  "bloodOfCorporaCaelestia": {
+    "name": "Blood of Corpora Caelestia",
+    "classID": "bloodOfCorporaCaelestia",
+    "description": "A sorcerer subclass infused with celestial and heavenly power",
+    "parentClass": "Sorcerer",
+    "featuresByLevel": {}
+  },
+
+  "bloodOfVacuus": {
+    "name": "Blood of Vacuus",
+    "classID": "bloodOfVacuus",
+    "description": "A sorcerer subclass commanding void magic and the space between things",
+    "parentClass": "Sorcerer",
+    "featuresByLevel": {}
+  },
+
+  "bloodOfPrisma": {
+    "name": "Blood of Prisma",
+    "classID": "bloodOfPrisma",
+    "description": "A sorcerer subclass controlling light, color, and prismatic magic",
+    "parentClass": "Sorcerer",
+    "featuresByLevel": {}
+  },
+
+  "temptationOfLove": {
+    "name": "Temptation of Love",
+    "classID": "temptationOfLove",
+    "description": "A warlock subclass pacted with entities of passion and desire",
+    "parentClass": "Warlock",
+    "featuresByLevel": {}
+  },
+
+  "temptationOfThought": {
+    "name": "Temptation of Thought",
+    "classID": "temptationOfThought",
+    "description": "A warlock subclass bound to entities of knowledge and forbidden wisdom",
+    "parentClass": "Warlock",
+    "featuresByLevel": {}
+  },
+
+  "temptationOfHope": {
+    "name": "Temptation of Hope",
+    "classID": "temptationOfHope",
+    "description": "A warlock subclass pacted with entities of aspiration and possibility",
+    "parentClass": "Warlock",
+    "featuresByLevel": {}
+  },
+
+  "temptationOfSacrifice": {
+    "name": "Temptation of Sacrifice",
+    "classID": "temptationOfSacrifice",
+    "description": "A warlock subclass bound to entities that demand offerings and devotion",
+    "parentClass": "Warlock",
+    "featuresByLevel": {}
+  },
+
+  "temptationOfSelf": {
+    "name": "Temptation of Self",
+    "classID": "temptationOfSelf",
+    "description": "A warlock subclass pacted with entities of ego and personal ambition",
+    "parentClass": "Warlock",
+    "featuresByLevel": {}
+  },
+
+  "schoolOfElements": {
+    "name": "School of Elements",
+    "classID": "schoolOfElements",
+    "description": "A wizard subclass mastering elemental magic and the forces of nature",
+    "parentClass": "Wizard",
+    "featuresByLevel": {}
+  },
+
+  "schoolOfArcane": {
+    "name": "School of Arcane",
+    "classID": "schoolOfArcane",
+    "description": "A wizard subclass focused on pure arcane theory and magical manipulation",
+    "parentClass": "Wizard",
+    "featuresByLevel": {}
+  },
+
+  "schoolOfTheDivine": {
+    "name": "School of the Divine",
+    "classID": "schoolOfTheDivine",
+    "description": "A wizard subclass channeling divine magic and celestial power",
+    "parentClass": "Wizard",
+    "featuresByLevel": {}
+  },
+
+  "schoolOfTheBladesigner": {
+    "name": "School of the Bladesigner",
+    "classID": "schoolOfTheBladesigner",
+    "description": "A wizard subclass combining martial combat with blade-based magic",
+    "parentClass": "Wizard",
+    "featuresByLevel": {}
+  },
+
+  "schoolOfTheAbyss": {
+    "name": "School of the Abyss",
+    "classID": "schoolOfTheAbyss",
+    "description": "A wizard subclass delving into forbidden abyssal magic and dark power",
+    "parentClass": "Wizard",
+    "featuresByLevel": {}
+  },
+
+  "schoolOfIllusions": {
+    "name": "School of Illusions",
+    "classID": "schoolOfIllusions",
+    "description": "A wizard subclass mastering illusion magic and deception through arcane means",
+    "parentClass": "Wizard",
+    "featuresByLevel": {}
+  },
+
+  "schoolOfGravitas": {
+    "name": "School of Gravitas",
+    "classID": "schoolOfGravitas",
+    "description": "A wizard subclass commanding gravity and the forces of attraction",
+    "parentClass": "Wizard",
+    "featuresByLevel": {}
+  },
+
+  "schoolOfTheWild": {
+    "name": "School of the Wild",
+    "classID": "schoolOfTheWild",
+    "description": "A wizard subclass channeling primal and untamed magical forces",
+    "parentClass": "Wizard",
+    "featuresByLevel": {}
+  }
+}
