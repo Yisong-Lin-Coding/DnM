@@ -1,5 +1,5 @@
 import Skeleton from "../../pageComponents/skeleton"
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { createDefaultCharacter } from '../../data/characterDefaults';
 import { Tabs } from '../../pageComponents/tabs'
 import { CircleUser, ArrowBigLeftDash, ArrowBigRightDash  } from 'lucide-react';
@@ -17,6 +17,56 @@ export default function Test2(){
 
   // Single source of truth for the entire character draft
   const [characterDraft, setCharacterDraft] = useState(() => createDefaultCharacter());
+
+  // Load all game data on component mount
+  const [gameData, setGameData] = useState({
+    classes: [],
+    subclasses: [],
+    races: [],
+    subraces: [],
+    backgrounds: [],
+    items: []
+  });
+
+  useEffect(() => {
+    const collections = ['classes', 'subclasses', 'races', 'subraces', 'backgrounds', 'items'];
+    const results = {};
+    let loadedCount = 0;
+
+    console.log('Starting data load...');
+
+    collections.forEach(collection => {
+      socket.emit(
+        'database_query',
+        {
+          collection: collection,
+          operation: 'findAll',
+        },
+        (response) => {
+          console.log(`Loaded ${collection}:`, response.success ? `${response.data.length} items` : response.message);
+          if (response.success) {
+            results[collection] = response.data;
+            loadedCount += 1;
+            console.log(`Progress: ${loadedCount}/${collections.length}`);
+            // Update state when we have all collections
+            if (loadedCount === collections.length) {
+              console.log('All data loaded, updating state');
+              setGameData({
+                classes: results.classes || [],
+                subclasses: results.subclasses || [],
+                races: results.races || [],
+                subraces: results.subraces || [],
+                backgrounds: results.backgrounds || [],
+                items: results.items || []
+              });
+            }
+          } else {
+            console.error(`Failed to load ${collection}:`, response.message);
+          }
+        }
+      );
+    });
+  }, [socket]);
 
   // Deep-merge helper to apply partial patches from child pages
   const deepMerge = (t, s) => {
@@ -87,15 +137,15 @@ export default function Test2(){
             </Tabs.Panel>
 
             <Tabs.Panel index={1}>
-              <Class values={characterDraft} onChange={updateDraft} />
+              <Class values={characterDraft} onChange={updateDraft} classes={gameData.classes} subclasses={gameData.subclasses} />
             </Tabs.Panel>
 
             <Tabs.Panel index={2}>
-              <Background values={characterDraft} onChange={updateDraft} />
+              <Background values={characterDraft} onChange={updateDraft} backgrounds={gameData.backgrounds} items={gameData.items} />
             </Tabs.Panel>
 
             <Tabs.Panel index={3}>
-              <Race values={characterDraft} onChange={updateDraft} />
+              <Race values={characterDraft} onChange={updateDraft} races={gameData.races} subraces={gameData.subraces} />
             </Tabs.Panel>
 
             <Tabs.Panel index={4}>

@@ -1,104 +1,306 @@
 import React from 'react';
 import { Card } from '../../../pageComponents/card';
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useMemo } from "react";
 import { SocketContext } from "../../../socket.io/context";
-import { CircleUser, Shuffle } from 'lucide-react';
-// Minimal, controlled Race selection component
-// Props:
-// - values: the parent-held character draft object
-// - onChange: function(partial) to merge updates into the parent draft
-export function Race({ values, onChange }) {
+import { CircleUser } from 'lucide-react';
 
+// Helper function to convert camelCase to Title Case
+const toTitleCase = (str) => {
+    return str
+        .replace(/([A-Z])/g, ' $1') // Add space before capitals
+        .replace(/^./, (char) => char.toUpperCase()) // Capitalize first letter
+        .trim();
+};
 
+export function Race({ values, onChange, races = [], subraces = [] }) {
+    const socket = useContext(SocketContext);
 
-  const socket = useContext(SocketContext);
-  const [races, setRaces] = useState([]);
+    const selectedRace = values?.race || '';
+    const selectedSubrace = values?.subrace || '';
+    const selectedSize = values?.model?.size || '';
+    const emit = (partial) => {
+        if (typeof onChange === 'function') onChange(partial);
+    };
 
-useEffect(() => {
-  socket.emit(
-    'database_query',
-    {
-      collection: 'races',
-      operation: 'findAll',
-    },
-    (response) => {
-      if (response.success) {
-        setRaces(response.data);
-      }
-    }
-  );
-}, []);
+    // Memoize the selected race object
+    const selectedRaceObj = useMemo(() => {
+        return races.find(r => r._id === selectedRace);
+    }, [races, selectedRace]);
 
-  const selectedRace = values?.race || '';
-  const emit = (partial) => {
-    if (typeof onChange === 'function') onChange(partial);
-  };
+    // Filter races based on selected size
+    const filteredRaces = useMemo(() => {
+        if (!selectedSize) return []; // Return empty array if no size selected
+        // Normalize size for comparison: tiny -> T, small -> S, medium -> M, large -> L, huge -> H, gargantuan -> G
+        const sizeMap = {
+            'tiny': 'T',
+            'small': 'S',
+            'medium': 'M',
+            'large': 'L',
+            'huge': 'H',
+            'gargantuan': 'G'
+        };
+        const normalizedSize = sizeMap[selectedSize.toLowerCase()] || selectedSize.toUpperCase();
+        return races.filter(r => r.size === normalizedSize);
+    }, [races, selectedSize]);
 
-  return (
-    <div className='bg-website-default-900 min-h-screen grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr]'>
-      <div className='p-4 space-y-4  md:col-start-2'>
+    // Memoize available subraces for selected race
+    const availableSubraces = useMemo(() => {
+        if (!selectedRaceObj) return [];
+        const subracesForRace = selectedRaceObj.subraces || [];
+        // Match by subraceID - the race object stores subraceID values
+        return subraces.filter(sr => subracesForRace.some(sub => sub.subraceID === sr.subraceID));
+    }, [selectedRaceObj, subraces]);
 
+    // Memoize the selected subrace object
+    const selectedSubraceObj = useMemo(() => {
+        return subraces.find(sr => sr._id === selectedSubrace);
+    }, [subraces, selectedSubrace]);
 
-        <div className='flex flex-row p-4 space-x-4 border-b border-website-specials-500'>
-          <CircleUser size={48} />
-          <div className='flex flex-col'>
-            <div className='text-left text-l font-semibold'>Character Name</div>
-            <input 
-              type="text"
-              placeholder='Name...'
-              className='border-b border-website-highlights-400 bg-website-default-900 focus:outline-none focus:bg-gradient-to-t from-website-highlights-500 to-website-default-900' 
-              value={values.name || ''}
-              onChange={(e) => emit({ name: e.target.value })}
-            />
-          </div>
-        </div>
+    return (
+        <div className='bg-website-default-900 min-h-screen grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr]'>
+            <div className='p-4 space-y-4 md:col-start-2'>
 
+                {/* Name Input */}
+                <div className='flex flex-row p-4 space-x-4 border-b border-website-specials-500'>
+                    <CircleUser size={48} />
+                    <div className='flex flex-col'>
+                        <div className='text-left text-l font-semibold'>Character Name</div>
+                        <input
+                            type="text"
+                            placeholder='Name...'
+                            className='border-b border-website-highlights-400 bg-website-default-900 focus:outline-none focus:bg-gradient-to-t from-website-highlights-500 to-website-default-900'
+                            value={values.name || ''}
+                            onChange={(e) => emit({ name: e.target.value })}
+                        />
+                    </div>
+                </div>
 
-        <Card className='bg-website-default-800 border-website-specials-500'>
-          <Card.Header>
-            <Card.Title className='text-website-default-100'>Race</Card.Title>
-            <Card.Description className='text-website-default-300'>
-              Choose your character's race.
-            </Card.Description>
-          </Card.Header>
-          <Card.Content>
-            <div className='grid grid-cols-1 gap-4 items-end'>
-              <div className='flex flex-col'>
-                <label className='text-sm text-website-default-300 mb-1'>Race</label>
-                <select
-                  className='rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400'
-                  value={selectedRace}
-                  onChange={(e) => emit({ race: e.target.value })}
-                >
-                  <option value='' disabled>Select race</option>
-                  {races.map(r => (
-                    <option key={r._id} value={r._id}>{r.name}</option>
-                  ))}
-                </select>
-              </div>
+                <div className='space-y-8 flex flex-col text-left'>
+                    {/* RACE SECTION */}
+                    <div>
+                        <h1 className="text-2xl font-semibold mb-4 text-white">Race</h1>
+
+                        <div className="grid grid-cols-1 gap-6">
+                            {/* Size Filter Notice - Always Display */}
+                            <Card className={selectedSize ? 'bg-website-highlights-900/20 border-website-highlights-500' : 'bg-website-specials-900/20 border-website-specials-500'}>
+                                <Card.Content className='pt-6 pb-6'>
+                                    <div className={`flex items-center gap-3 ${selectedSize ? 'text-website-highlights-300' : 'text-website-specials-300'}`}>
+                                        {selectedSize ? (
+                                            <span className='text-sm'>Showing races matching your selected size: <span className='font-semibold text-website-highlights-400'>{selectedSize.charAt(0).toUpperCase() + selectedSize.slice(1)}</span></span>
+                                        ) : (
+                                            <span className='text-sm'>💡 <span className='font-semibold'>Tip:</span> Select a size in Customization to filter available races by size.</span>
+                                        )}
+                                    </div>
+                                </Card.Content>
+                            </Card>
+
+                            {/* Race Selector - Always show, but filtered by size if selected */}
+                            <Card className='bg-website-default-800 border-website-specials-500'>
+                                <Card.Header>
+                                    <Card.Title className='text-website-default-100'>Race</Card.Title>
+                                    <Card.Description className='text-website-default-300'>Choose your character's race.</Card.Description>
+                                </Card.Header>
+                                <Card.Content>
+                                    <div className='flex flex-col'>
+                                        <select
+                                            className='rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 text-white focus:outline-none'
+                                            value={selectedRace}
+                                            onChange={(e) => emit({ race: e.target.value, subrace: '' })}
+                                        >
+                                            <option value='' disabled>Select race</option>
+                                            {filteredRaces.length > 0 ? (
+                                                filteredRaces.map(r => (
+                                                    <option key={r._id} value={r._id}>{r.name}</option>
+                                                ))
+                                            ) : (
+                                                <option disabled>No races match this size</option>
+                                            )}
+                                        </select>
+                                        {selectedRaceObj && (
+                                            <div className='mt-4 p-4 border border-website-specials-500 rounded bg-website-default-900/50'>
+                                                <div className='text-website-default-300 text-sm'>
+                                                    {selectedRaceObj.description}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </Card.Content>
+                            </Card>
+
+                            {/* Ability Score Modifiers Card */}
+                            {selectedRaceObj && selectedRaceObj.abilityScoreModifiers && Object.keys(selectedRaceObj.abilityScoreModifiers).length > 0 && (
+                                <Card className='bg-website-default-800 border-website-specials-500'>
+                                    <Card.Header className="border-b border-website-default-700 pb-4">
+                                        <Card.Title className='text-website-default-100'>◈ Ability Score Modifiers</Card.Title>
+                                    </Card.Header>
+                                    <Card.Content className="pt-6">
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {Object.entries(selectedRaceObj.abilityScoreModifiers).map(([ability, modifier]) => (
+                                                <div key={ability} className="bg-website-default-900/50 p-4 rounded-lg border border-website-default-700 text-center">
+                                                    <h4 className="text-website-specials-400 text-xs tracking-widest mb-2 uppercase">{toTitleCase(ability)}</h4>
+                                                    <p className="text-website-specials-500 font-bold text-lg">+{modifier}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Card.Content>
+                                </Card>
+                            )}
+
+                            {/* Race Traits Card */}
+                            {selectedRaceObj && selectedRaceObj.traits && selectedRaceObj.traits.length > 0 && (
+                                <Card className='bg-website-default-800 border-website-specials-500'>
+                                    <Card.Header className="border-b border-website-default-700/50">
+                                        <Card.Title className='text-website-default-100'>✨ Racial Traits</Card.Title>
+                                    </Card.Header>
+                                    <Card.Content className="pt-6 space-y-2">
+                                        {selectedRaceObj.traits.map((trait, idx) => (
+                                            <div key={idx} className="p-3 bg-website-default-900/50 border border-website-default-700 rounded-lg">
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-website-specials-400 font-bold">•</span>
+                                                    <span className="text-website-default-100">{toTitleCase(trait)}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </Card.Content>
+                                </Card>
+                            )}
+
+                            {/* Languages Card */}
+                            {selectedRaceObj && selectedRaceObj.languages && selectedRaceObj.languages.length > 0 && (
+                                <Card className='bg-website-default-800 border-website-specials-500'>
+                                    <Card.Header className="border-b border-website-default-700/50">
+                                        <Card.Title className='text-website-default-100'>🗣️ Languages</Card.Title>
+                                    </Card.Header>
+                                    <Card.Content className="pt-6">
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedRaceObj.languages.map((lang, idx) => (
+                                                <span key={idx} className="px-3 py-2 bg-website-default-900 border border-website-default-700 rounded-lg text-sm text-website-default-100">
+                                                    {toTitleCase(lang)}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </Card.Content>
+                                </Card>
+                            )}
+
+                            {/* Size and Speed Card */}
+                            {selectedRaceObj && (
+                                <Card className='bg-website-default-800 border-website-specials-500'>
+                                    <Card.Header className="border-b border-website-default-700/50">
+                                        <Card.Title className='text-website-default-100'>⚡ Physical Traits</Card.Title>
+                                    </Card.Header>
+                                    <Card.Content className="pt-6 grid grid-cols-2 gap-4">
+                                        <div className="bg-website-default-900/50 p-4 rounded-lg border border-website-default-700">
+                                            <h4 className="text-website-highlights-400 text-xs tracking-widest mb-2 uppercase">Size</h4>
+                                            <p className="text-website-default-100 font-semibold">{selectedRaceObj.size === 'M' ? 'Medium' : toTitleCase(selectedRaceObj.size)}</p>
+                                        </div>
+                                        <div className="bg-website-default-900/50 p-4 rounded-lg border border-website-default-700">
+                                            <h4 className="text-website-highlights-400 text-xs tracking-widest mb-2 uppercase">Speed</h4>
+                                            <p className="text-website-default-100 font-semibold">{selectedRaceObj.speed} ft.</p>
+                                        </div>
+                                    </Card.Content>
+                                </Card>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* SUBRACE SECTION */}
+                    {selectedRaceObj && availableSubraces.length > 0 && (
+                        <div>
+                            <h1 className="text-2xl font-semibold mb-4 text-white">Subrace</h1>
+
+                            <div className="grid grid-cols-1 gap-6">
+                                {/* Subrace Selector */}
+                                <Card className='bg-website-default-800 border-website-highlights-500'>
+                                    <Card.Header>
+                                        <Card.Title className='text-website-default-100'>Subrace</Card.Title>
+                                        <Card.Description className='text-website-default-300'>Choose your subrace specialization (optional).</Card.Description>
+                                    </Card.Header>
+                                    <Card.Content>
+                                        <div className='flex flex-col space-y-4'>
+                                            <select
+                                                className='rounded border border-website-highlights-500 bg-website-default-900 px-3 py-2 text-white focus:outline-none'
+                                                value={selectedSubrace}
+                                                onChange={(e) => emit({ subrace: e.target.value })}
+                                            >
+                                                <option value=''>None (Optional)</option>
+                                                {availableSubraces.map(sr => (
+                                                    <option key={sr._id} value={sr._id}>{sr.name}</option>
+                                                ))}
+                                            </select>
+                                            {selectedSubraceObj && (
+                                                <div className='p-4 border border-website-highlights-500 rounded bg-website-default-900/50'>
+                                                    <div className='text-website-default-300 text-sm'>
+                                                        {selectedSubraceObj.description}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Card.Content>
+                                </Card>
+
+                                {/* Subrace Ability Modifiers */}
+                                {selectedSubraceObj && selectedSubraceObj.abilityScoreModifiers && Object.keys(selectedSubraceObj.abilityScoreModifiers).length > 0 && (
+                                    <Card className='bg-website-default-800 border-website-highlights-500'>
+                                        <Card.Header className="border-b border-website-default-700 pb-4">
+                                            <Card.Title className='text-website-default-100'>◈ Ability Score Modifiers</Card.Title>
+                                        </Card.Header>
+                                        <Card.Content className="pt-6">
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                {Object.entries(selectedSubraceObj.abilityScoreModifiers).map(([ability, modifier]) => (
+                                                    <div key={ability} className="bg-website-default-900/50 p-4 rounded-lg border border-website-default-700 text-center">
+                                                        <h4 className="text-website-highlights-400 text-xs tracking-widest mb-2 uppercase">{toTitleCase(ability)}</h4>
+                                                        <p className="text-website-highlights-500 font-bold text-lg">+{modifier}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </Card.Content>
+                                    </Card>
+                                )}
+
+                                {/* Subrace Traits Card */}
+                                {selectedSubraceObj && selectedSubraceObj.traits && selectedSubraceObj.traits.length > 0 && (
+                                    <Card className='bg-website-default-800 border-website-highlights-500'>
+                                        <Card.Header className="border-b border-website-default-700/50">
+                                            <Card.Title className='text-website-default-100'>✨ Subrace Traits</Card.Title>
+                                        </Card.Header>
+                                        <Card.Content className="pt-6 space-y-2">
+                                            {selectedSubraceObj.traits.map((trait, idx) => (
+                                                <div key={idx} className="p-3 bg-website-default-900/50 border border-website-default-700 rounded-lg">
+                                                    <div className="flex items-start gap-2">
+                                                        <span className="text-website-highlights-400 font-bold">•</span>
+                                                        <span className="text-website-default-100">{toTitleCase(trait)}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </Card.Content>
+                                    </Card>
+                                )}
+
+                                {/* Subrace Languages Card */}
+                                {selectedSubraceObj && selectedSubraceObj.languages && selectedSubraceObj.languages.length > 0 && (
+                                    <Card className='bg-website-default-800 border-website-highlights-500'>
+                                        <Card.Header className="border-b border-website-default-700/50">
+                                            <Card.Title className='text-website-default-100'>🗣️ Languages</Card.Title>
+                                        </Card.Header>
+                                        <Card.Content className="pt-6">
+                                            <div className="flex flex-wrap gap-2">
+                                                {selectedSubraceObj.languages.map((lang, idx) => (
+                                                    <span key={idx} className="px-3 py-2 bg-website-default-900 border border-website-default-700 rounded-lg text-sm text-website-default-100">
+                                                        {toTitleCase(lang)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </Card.Content>
+                                    </Card>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
-          </Card.Content>
-        </Card>
-
-        {selectedRace && (
-          <Card className='bg-website-default-800 border-website-specials-500'>
-            <Card.Header>
-              <Card.Title className='text-website-default-100'>Race details</Card.Title>
-              <Card.Description className='text-website-default-300'>
-                Placeholder for traits, subrace, and languages.
-              </Card.Description>
-            </Card.Header>
-            <Card.Content>
-              <div className='text-website-default-300'>
-                Selected: {races.find(r => r.id === selectedRace)?.name}
-              </div>
-            </Card.Content>
-          </Card>
-        )}
-      </div>
-      <div></div>
-    </div>
-  );
+        </div>
+    );
 }
 
 export default Race;

@@ -1,29 +1,24 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
-const fs = require('fs');
 const path = require('path');
 const Subclass = require('../data/mongooseDataStructure/subclass');
 
-// MongoDB connection string
-const MONGODB_URI = 'mongodb://localhost:27017/d-and-d-game';
+const subclassesData = require('../data/gameFiles/class/subclasses.json');
+
+const MONGO_URI = process.env.MONGO_URI;
 
 async function seedSubclasses() {
     try {
-        // Connect to MongoDB
-        await mongoose.connect(MONGODB_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
-        console.log('✅ Connected to MongoDB');
-
-        // Read subclasses.json
-        const subclassesPath = path.join(__dirname, '../data/gameFiles/class/subclasses.json');
-        const subclassesData = JSON.parse(fs.readFileSync(subclassesPath, 'utf8'));
+        console.log('Connecting to MongoDB...');
+        await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 30000 });
+        console.log('✓ Connected to MongoDB');
 
         // Clear existing subclasses
-        await Subclass.deleteMany({});
-        console.log('🗑️ Cleared existing subclasses');
+        const deleteResult = await Subclass.deleteMany({});
+        console.log(`✓ Deleted ${deleteResult.deletedCount} existing subclasses`);
 
         // Prepare subclass documents
+        console.log('Seeding subclasses...');
         const subclassDocuments = Object.values(subclassesData).map(subclass => ({
             name: subclass.name,
             classID: subclass.classID,
@@ -34,7 +29,7 @@ async function seedSubclasses() {
 
         // Insert subclasses
         const result = await Subclass.insertMany(subclassDocuments);
-        console.log(`✅ Seeded ${result.length} subclasses`);
+        console.log(`✓ Inserted ${result.length} subclasses`);
 
         // Log sample
         console.log('\n📋 Sample subclasses:');
@@ -42,10 +37,12 @@ async function seedSubclasses() {
             console.log(`  - ${sc.name} (${sc.parentClass})`);
         });
 
-        console.log('\n✅ Subclass seeding completed successfully!');
+        await mongoose.connection.close();
+        console.log('✓ Connection closed');
         process.exit(0);
-    } catch (error) {
-        console.error('❌ Error seeding subclasses:', error);
+    } catch (err) {
+        console.error('Seed error:', err);
+        await mongoose.connection.close();
         process.exit(1);
     }
 }

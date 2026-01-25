@@ -11,43 +11,15 @@ const toTitleCase = (str) => {
         .trim();
 };
 
-export function Background({ values, onChange }) {
+export function Background({ values, onChange, backgrounds = [], items = [] }) {
     const socket = useContext(SocketContext);
-    const [backgrounds, setBackgrounds] = useState([]);
-    const [allItems, setAllItems] = useState([]);
-    const allItemsRef = React.useRef([]);
+    const allItemsRef = React.useRef(items);
 
-    // 1. Fetch backgrounds and items on mount
+    // Update the ref when items prop changes
     useEffect(() => {
-        socket.emit(
-            'database_query',
-            {
-                collection: 'backgrounds',
-                operation: 'findAll',
-            },
-            (response) => {
-                if (response.success) {
-                    setBackgrounds(response.data);
-                }
-            }
-        );
-        
-        // Fetch all items
-        socket.emit(
-            'database_query',
-            {
-                collection: 'items',
-                operation: 'findAll',
-            },
-            (response) => {
-                if (response.success) {
-                    setAllItems(response.data);
-                    allItemsRef.current = response.data;
-                    console.log('Loaded items:', response.data.length);
-                }
-            }
-        );
-    }, [socket]);
+        allItemsRef.current = items;
+        console.log('Loaded items:', items.length);
+    }, [items]);
 
     const selected = values?.background || '';
     const emit = (partial) => { if (typeof onChange === 'function') onChange(partial); };
@@ -215,12 +187,14 @@ export function Background({ values, onChange }) {
 
     // 3. Logic: Handle Skill/Language/Tool Choice Toggles
     const handleProficiencyToggle = (category, option) => {
-        if (!selectedBackground?.choices?.proficiencies?.[category]) return;
+        // Special handling for tools which might be under proficiencies
+        const choiceData = selectedBackground?.choices?.proficiencies?.[category];
+        if (!choiceData) return;
 
         const currentProficiencies = values.skills?.proficiencies || {};
         const choiceKey = `${category}_${option}`;
         const currentChoices = values.proficiencyChoices || {};
-        const maxAllowed = selectedBackground.choices.proficiencies[category].amount;
+        const maxAllowed = choiceData.amount;
         
         // Count how many from this category are chosen
         const categoryChoices = Object.keys(currentChoices).filter(key => 
@@ -256,11 +230,11 @@ export function Background({ values, onChange }) {
     };
 
     // 3b. Logic: Handle "Any" Proficiency Selection (Dropdown)
-    const handleAnyProficiencySelection = (category, anyOption, selectedValue) => {
+    const handleAnyProficiencySelection = (category, anyOption, slotIndex, selectedValue) => {
         if (!selectedValue) return;
 
         const currentProficiencies = values.skills?.proficiencies || {};
-        const choiceKey = `${category}_${anyOption}`;
+        const choiceKey = `${category}_${anyOption}_${slotIndex}`;
         const currentChoices = values.proficiencyChoices || {};
         
         // Remove previous selection if exists
@@ -470,7 +444,9 @@ export function Background({ values, onChange }) {
                                             )}
 
                                             {/* Proficiency Choices */}
-                                            {selectedBackground.choices?.proficiencies && Object.entries(selectedBackground.choices.proficiencies).map(([category, choiceData]) => (
+                                            {selectedBackground.choices?.proficiencies && Object.entries(selectedBackground.choices.proficiencies)
+                                                .filter(([category]) => category !== 'tools') // Filter out tools from proficiencies
+                                                .map(([category, choiceData]) => (
                                                 <div key={category} className="bg-website-specials-900/20 border border-website-specials-700/30 p-3 rounded-lg">
                                                     <div className="flex justify-between items-center mb-3">
                                                         <h4 className="text-website-specials-400 text-[10px] uppercase capitalize">
@@ -510,35 +486,146 @@ export function Background({ values, onChange }) {
                                                     {/* Dropdowns for "any" proficiencies */}
                                                     {choiceData.options.some(isAnyOption) && (
                                                         <div className="mt-3 space-y-2 p-3 bg-website-default-900/50 rounded border border-website-default-700">
-                                                            {choiceData.options.map((option) => {
-                                                                if (!isAnyOption(option)) return null;
+                                                            {(() => {
+                                                                // Create slots based on amount
+                                                                const slots = Array.from({ length: choiceData.amount }, (_, idx) => idx);
+                                                                const anyOption = choiceData.options.find(isAnyOption);
+                                                                if (!anyOption) return null;
                                                                 
-                                                                const dropdownOptions = getAnyOptions(option);
-                                                                const choiceKey = `${category}_${option}`;
-                                                                const currentSelection = (values.proficiencyChoices || {})[choiceKey] || '';
-                                                                
-                                                                return (
-                                                                    <div key={option} className="flex items-center gap-2">
-                                                                        <span className="text-xs text-website-default-300">
-                                                                            {toTitleCase(option)}:
-                                                                        </span>
-                                                                        <select
-                                                                            className='flex-1 rounded border border-website-specials-500 bg-website-default-900 px-2 py-1 text-xs text-white focus:outline-none'
-                                                                            value={currentSelection}
-                                                                            onChange={(e) => handleAnyProficiencySelection(category, option, e.target.value)}
-                                                                        >
-                                                                            <option value='' disabled>Select {toTitleCase(option.replace(/any/i, '').trim())}</option>
-                                                                            {dropdownOptions.map(opt => (
-                                                                                <option key={opt} value={opt}>{toTitleCase(opt)}</option>
-                                                                            ))}
-                                                                        </select>
-                                                                    </div>
+                                                                const dropdownOptions = getAnyOptions(anyOption);
+                                                                // Get already selected values for this category
+                                                                const selectedValues = new Set(
+                                                                    Object.entries(values.proficiencyChoices || {})
+                                                                        .filter(([key, value]) => key.startsWith(`${category}_${anyOption}_`))
+                                                                        .map(([_, value]) => value)
                                                                 );
-                                                            })}
+                                                                
+                                                                return slots.map((slotIndex) => {
+                                                                    const choiceKey = `${category}_${anyOption}_${slotIndex}`;
+                                                                    const currentSelection = (values.proficiencyChoices || {})[choiceKey] || '';
+                                                                    
+                                                                    // Filter options to exclude already selected values
+                                                                    const availableOptions = dropdownOptions.filter(opt => 
+                                                                        !selectedValues.has(opt) || opt === currentSelection
+                                                                    );
+                                                                    
+                                                                    return (
+                                                                        <div key={choiceKey} className="flex items-center gap-2">
+                                                                            <span className="text-xs text-website-default-300">
+                                                                                {(() => {
+                                                                                    if (choiceData.amount > 1) return `Choice ${slotIndex + 1}`;
+                                                                                    const cleaned = toTitleCase(anyOption.replace(/any/i, '').trim());
+                                                                                    return cleaned || 'Language';
+                                                                                })()} :
+                                                                            </span>
+                                                                            <select
+                                                                                className='flex-1 rounded border border-website-specials-500 bg-website-default-900 px-2 py-1 text-xs text-white focus:outline-none'
+                                                                                value={currentSelection}
+                                                                                onChange={(e) => handleAnyProficiencySelection(category, anyOption, slotIndex, e.target.value)}
+                                                                            >
+                                                                                <option value='' disabled>Select {toTitleCase(anyOption.replace(/any/i, '').trim())}</option>
+                                                                                {availableOptions.map(opt => (
+                                                                                    <option key={opt} value={opt}>{toTitleCase(opt)}</option>
+                                                                                ))}
+                                                                            </select>
+                                                                        </div>
+                                                                    );
+                                                                });
+                                                            })()}
                                                         </div>
                                                     )}
                                                 </div>
                                             ))}
+                                            
+                                            {/* Tool Proficiency Choices - Render separately */}
+                                            {selectedBackground.choices?.proficiencies?.tools && (
+                                                <div className="bg-website-specials-900/20 border border-website-specials-700/30 p-3 rounded-lg">
+                                                    <div className="flex justify-between items-center mb-3">
+                                                        <h4 className="text-website-specials-400 text-[10px] uppercase">Tool Proficiency Choices</h4>
+                                                        <span className="text-[10px] text-white bg-website-specials-600 px-2 py-0.5 rounded-full">
+                                                            Picked {Object.keys(values.proficiencyChoices || {}).filter(k => k.startsWith('tools_')).length} / {selectedBackground.choices.proficiencies.tools.amount}
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                        {selectedBackground.choices.proficiencies.tools.options.map((option) => {
+                                                            const choiceKey = `tools_${option}`;
+                                                            const isSelected = (values.proficiencyChoices || {})[choiceKey];
+                                                            const isAny = isAnyOption(option);
+                                                            
+                                                            if (isAny) {
+                                                                return null;
+                                                            }
+                                                            
+                                                            return (
+                                                                <button
+                                                                    key={option}
+                                                                    onClick={() => handleProficiencyToggle('tools', option)}
+                                                                    className={`text-[11px] flex items-center gap-1.5 capitalize p-1.5 rounded border transition-all ${
+                                                                        isSelected 
+                                                                        ? 'border-website-specials-500 bg-website-specials-900/40 text-white' 
+                                                                        : 'border-website-default-700 text-website-default-400 hover:border-website-default-500'
+                                                                    }`}
+                                                                >
+                                                                    <div className={`w-1 h-1 rotate-45 ${isSelected ? 'bg-website-specials-400' : 'bg-website-default-600'}`} />
+                                                                    {toTitleCase(option)}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    
+                                                    {/* Dropdowns for "any" tool proficiencies */}
+                                                    {selectedBackground.choices.proficiencies.tools.options.some(isAnyOption) && (
+                                                        <div className="mt-3 space-y-2 p-3 bg-website-default-900/50 rounded border border-website-default-700">
+                                                            {(() => {
+                                                                // Create slots based on amount
+                                                                const slots = Array.from({ length: selectedBackground.choices.proficiencies.tools.amount }, (_, idx) => idx);
+                                                                const anyOption = selectedBackground.choices.proficiencies.tools.options.find(isAnyOption);
+                                                                if (!anyOption) return null;
+                                                                
+                                                                const dropdownOptions = getAnyOptions(anyOption);
+                                                                // Get already selected values for tools
+                                                                const selectedValues = new Set(
+                                                                    Object.entries(values.proficiencyChoices || {})
+                                                                        .filter(([key, value]) => key.startsWith(`tools_${anyOption}_`))
+                                                                        .map(([_, value]) => value)
+                                                                );
+                                                                
+                                                                return slots.map((slotIndex) => {
+                                                                    const choiceKey = `tools_${anyOption}_${slotIndex}`;
+                                                                    const currentSelection = (values.proficiencyChoices || {})[choiceKey] || '';
+                                                                    
+                                                                    // Filter options to exclude already selected values
+                                                                    const availableOptions = dropdownOptions.filter(opt => 
+                                                                        !selectedValues.has(opt) || opt === currentSelection
+                                                                    );
+                                                                    
+                                                                    return (
+                                                                        <div key={choiceKey} className="flex items-center gap-2">
+                                                                            <span className="text-xs text-website-default-300">
+                                                                                {(() => {
+                                                                                    if (selectedBackground.choices.proficiencies.tools.amount > 1) return `Choice ${slotIndex + 1}`;
+                                                                                    const cleaned = toTitleCase(anyOption.replace(/[Aa]ny/, '').trim());
+                                                                                    return cleaned || 'Tool';
+                                                                                })()} :
+                                                                            </span>
+                                                                            <select
+                                                                                className='flex-1 rounded border border-website-specials-500 bg-website-default-900 px-2 py-1 text-xs text-white focus:outline-none'
+                                                                                value={currentSelection}
+                                                                                onChange={(e) => handleAnyProficiencySelection('tools', anyOption, slotIndex, e.target.value)}
+                                                                            >
+                                                                                <option value='' disabled>Select {toTitleCase(anyOption.replace(/any/i, '').trim())}</option>
+                                                                                {availableOptions.map(opt => (
+                                                                                    <option key={opt} value={opt}>{toTitleCase(opt)}</option>
+                                                                                ))}
+                                                                            </select>
+                                                                        </div>
+                                                                    );
+                                                                });
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </Card.Content>
                                     </Card>
 

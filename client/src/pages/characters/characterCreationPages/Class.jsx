@@ -12,41 +12,13 @@ const toTitleCase = (str) => {
         .trim();
 };
 
-export function Class({ values, onChange }) {
+export function Class({ values, onChange, classes = [], subclasses = [] }) {
     const socket = useContext(SocketContext);
-    const [classes, setClasses] = useState([]);
-    const [subclasses, setSubclasses] = useState([]);
     const [allItems, setAllItems] = useState([]);
     const allItemsRef = React.useRef([]);
 
-    // 1. Fetch classes, subclasses and items on mount
+    // Fetch items on mount (if not passed as prop)
     useEffect(() => {
-        socket.emit(
-            'database_query',
-            {
-                collection: 'classes',
-                operation: 'findAll',
-            },
-            (response) => {
-                if (response.success) {
-                    setClasses(response.data);
-                }
-            }
-        );
-
-        // Fetch subclasses
-        socket.emit(
-            'database_query',
-            {
-                collection: 'subclasses',
-                operation: 'findAll',
-            },
-            (response) => {
-                if (response.success) {
-                    setSubclasses(response.data);
-                }
-            }
-        );
         
         // Fetch all items
         socket.emit(
@@ -472,6 +444,7 @@ export function Class({ values, onChange }) {
                 </div>
 
                 <div className='space-y-8 flex flex-col text-left'>
+                    {/* BASE CLASS SECTION */}
                     <div>
                         <h1 className="text-2xl font-semibold mb-4 text-white">Base Class</h1>
 
@@ -507,37 +480,6 @@ export function Class({ values, onChange }) {
 
                             {selectedClass && (
                                 <>
-                                    {/* Subclass Selector */}
-                                    {availableSubclasses.length > 0 && (
-                                        <Card className='bg-website-default-800 border-website-specials-500'>
-                                            <Card.Header>
-                                                <Card.Title className='text-website-default-100'>Subclass</Card.Title>
-                                                <Card.Description className='text-website-default-300'>Choose your specialization.</Card.Description>
-                                            </Card.Header>
-                                            <Card.Content>
-                                                <div className='flex flex-col space-y-4'>
-                                                    <select
-                                                        className='rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 text-white focus:outline-none'
-                                                        value={selectedSubclass}
-                                                        onChange={(e) => emit({ subclass: e.target.value })}
-                                                    >
-                                                        <option value='' disabled>Select subclass (optional)</option>
-                                                        {availableSubclasses.map(sc => (
-                                                            <option key={sc._id} value={sc._id}>{sc.name}</option>
-                                                        ))}
-                                                    </select>
-                                                    {selectedSubclassObj && (
-                                                        <div className='p-4 border border-website-specials-500 rounded bg-website-default-900/50'>
-                                                            <div className='text-website-default-300 text-sm'>
-                                                                {selectedSubclassObj.description}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </Card.Content>
-                                        </Card>
-                                    )}
-
                                     {/* Modifiers Card */}
                                     <Card className='bg-website-default-800 border-website-specials-500'>
                                         <Card.Header className="border-b border-website-default-700 pb-4">
@@ -629,122 +571,6 @@ export function Class({ values, onChange }) {
                                             )}
                                         </Card.Content>
                                     </Card>
-
-                                    {/* Abilities Card */}
-                                    {selectedClass.featuresByLevel && Object.keys(selectedClass.featuresByLevel).length > 0 && (
-                                        <Card className='bg-website-default-800 border-website-specials-500'>
-                                            <Card.Header className="border-b border-website-default-700/50">
-                                                <Card.Title className='text-website-default-100'>⚡ Class Features</Card.Title>
-                                                <Card.Description className='text-website-default-300'>All features and abilities by level.</Card.Description>
-                                            </Card.Header>
-                                            <Card.Content className="pt-6">
-                                                <div className="space-y-4">
-                                                    {Object.entries(selectedClass.featuresByLevel)
-                                                        .filter(([level, features]) => features && features.length > 0)
-                                                        .sort((a, b) => {
-                                                            const aNum = parseInt(a[0].replace('level', ''));
-                                                            const bNum = parseInt(b[0].replace('level', ''));
-                                                            return aNum - bNum;
-                                                        })
-                                                        .map(([level, features]) => (
-                                                            <div key={level} className="space-y-2">
-                                                                <h4 className="text-website-specials-400 text-xs tracking-widest uppercase font-bold">
-                                                                    Level {level.replace('level', '')}
-                                                                </h4>
-                                                                <div className="space-y-2 ml-2">
-                                                                    {features.map((featureId, idx) => {
-                                                                        const feature = classFeatures[featureId];
-                                                                        if (!feature) {
-                                                                            return (
-                                                                                <div key={idx} className="text-website-default-400 text-sm">
-                                                                                    <span className="text-website-specials-400 font-bold">•</span> {toTitleCase(featureId)} (No data)
-                                                                                </div>
-                                                                            );
-                                                                        }
-                                                                        return (
-                                                                            <div 
-                                                                                key={idx} 
-                                                                                className="p-3 bg-website-default-900/50 border border-website-default-700 rounded-lg hover:border-website-specials-500/50 transition-colors"
-                                                                            >
-                                                                                <div className="flex items-start gap-2">
-                                                                                    <span className="text-website-specials-400 font-bold mt-1">✦</span>
-                                                                                    <div className="flex-1">
-                                                                                        <h5 className="text-website-default-100 font-semibold text-sm">
-                                                                                            {feature.name}
-                                                                                        </h5>
-                                                                                        <p className="text-website-default-300 text-xs mt-1 leading-relaxed">
-                                                                                            {feature.description}
-                                                                                        </p>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                </div>
-                                            </Card.Content>
-                                        </Card>
-                                    )}
-
-                                    {/* Subclass Features Card */}
-                                    {selectedSubclassObj && selectedSubclassObj.featuresByLevel && Object.keys(selectedSubclassObj.featuresByLevel).length > 0 && (
-                                        <Card className='bg-website-default-800 border-website-highlights-500'>
-                                            <Card.Header className="border-b border-website-default-700/50">
-                                                <Card.Title className='text-website-default-100'>✨ Subclass Features</Card.Title>
-                                                <Card.Description className='text-website-default-300'>Features from {selectedSubclassObj.name}</Card.Description>
-                                            </Card.Header>
-                                            <Card.Content className="pt-6">
-                                                <div className="space-y-4">
-                                                    {Object.entries(selectedSubclassObj.featuresByLevel)
-                                                        .filter(([level, features]) => features && features.length > 0)
-                                                        .sort((a, b) => {
-                                                            const aNum = parseInt(a[0].replace('level', ''));
-                                                            const bNum = parseInt(b[0].replace('level', ''));
-                                                            return aNum - bNum;
-                                                        })
-                                                        .map(([level, features]) => (
-                                                            <div key={level} className="space-y-2">
-                                                                <h4 className="text-website-highlights-400 text-xs tracking-widest uppercase font-bold">
-                                                                    Level {level.replace('level', '')}
-                                                                </h4>
-                                                                <div className="space-y-2 ml-2">
-                                                                    {features.map((featureId, idx) => {
-                                                                        const feature = classFeatures[featureId];
-                                                                        if (!feature) {
-                                                                            return (
-                                                                                <div key={idx} className="text-website-default-400 text-sm">
-                                                                                    <span className="text-website-highlights-400 font-bold">•</span> {toTitleCase(featureId)} (No data)
-                                                                                </div>
-                                                                            );
-                                                                        }
-                                                                        return (
-                                                                            <div 
-                                                                                key={idx} 
-                                                                                className="p-3 bg-website-default-900/50 border border-website-default-700 rounded-lg hover:border-website-highlights-500/50 transition-colors"
-                                                                            >
-                                                                                <div className="flex items-start gap-2">
-                                                                                    <span className="text-website-highlights-400 font-bold mt-1">✦</span>
-                                                                                    <div className="flex-1">
-                                                                                        <h5 className="text-website-default-100 font-semibold text-sm">
-                                                                                            {feature.name}
-                                                                                        </h5>
-                                                                                        <p className="text-website-default-300 text-xs mt-1 leading-relaxed">
-                                                                                            {feature.description}
-                                                                                        </p>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                </div>
-                                            </Card.Content>
-                                        </Card>
-                                    )}
 
                                     {/* Equipment Card */}
                                     <Card className='bg-website-default-800 border-website-specials-500'>
@@ -912,10 +738,164 @@ export function Class({ values, onChange }) {
                                             ))}
                                         </Card.Content>
                                     </Card>
+
+                                    {/* Abilities Card */}
+                                    {selectedClass.featuresByLevel && Object.keys(selectedClass.featuresByLevel).length > 0 && (
+                                        <Card className='bg-website-default-800 border-website-specials-500'>
+                                            <Card.Header className="border-b border-website-default-700/50">
+                                                <Card.Title className='text-website-default-100'>⚡ Class Features</Card.Title>
+                                                <Card.Description className='text-website-default-300'>All features and abilities by level.</Card.Description>
+                                            </Card.Header>
+                                            <Card.Content className="pt-6">
+                                                <div className="space-y-4">
+                                                    {Object.entries(selectedClass.featuresByLevel)
+                                                        .filter(([level, features]) => features && features.length > 0)
+                                                        .sort((a, b) => {
+                                                            const aNum = parseInt(a[0].replace('level', ''));
+                                                            const bNum = parseInt(b[0].replace('level', ''));
+                                                            return aNum - bNum;
+                                                        })
+                                                        .map(([level, features]) => (
+                                                            <div key={level} className="space-y-2">
+                                                                <h4 className="text-website-specials-400 text-xs tracking-widest uppercase font-bold">
+                                                                    Level {level.replace('level', '')}
+                                                                </h4>
+                                                                <div className="space-y-2 ml-2">
+                                                                    {features.map((featureId, idx) => {
+                                                                        const feature = classFeatures[featureId];
+                                                                        if (!feature) {
+                                                                            return (
+                                                                                <div key={idx} className="text-website-default-400 text-sm">
+                                                                                    <span className="text-website-specials-400 font-bold">•</span> {toTitleCase(featureId)} (No data)
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return (
+                                                                            <div 
+                                                                                key={idx} 
+                                                                                className="p-3 bg-website-default-900/50 border border-website-default-700 rounded-lg hover:border-website-specials-500/50 transition-colors"
+                                                                            >
+                                                                                <div className="flex items-start gap-2">
+                                                                                    <span className="text-website-specials-400 font-bold mt-1">✦</span>
+                                                                                    <div className="flex-1">
+                                                                                        <h5 className="text-website-default-100 font-semibold text-sm">
+                                                                                            {feature.name}
+                                                                                        </h5>
+                                                                                        <p className="text-website-default-300 text-xs mt-1 leading-relaxed">
+                                                                                            {feature.description}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            </Card.Content>
+                                        </Card>
+                                    )}
                                 </>
                             )}
                         </div>
                     </div>
+
+                    {/* SUBCLASS SECTION */}
+                    {selectedClass && availableSubclasses.length > 0 && (
+                        <div>
+                            <h1 className="text-2xl font-semibold mb-4 text-white">Subclass</h1>
+
+                            <div className="grid grid-cols-1 gap-6">
+                                {/* Subclass Selector */}
+                                <Card className='bg-website-default-800 border-website-highlights-500'>
+                                    <Card.Header>
+                                        <Card.Title className='text-website-default-100'>Subclass</Card.Title>
+                                        <Card.Description className='text-website-default-300'>Choose your specialization.</Card.Description>
+                                    </Card.Header>
+                                    <Card.Content>
+                                        <div className='flex flex-col space-y-4'>
+                                            <select
+                                                className='rounded border border-website-highlights-500 bg-website-default-900 px-3 py-2 text-white focus:outline-none'
+                                                value={selectedSubclass}
+                                                onChange={(e) => emit({ subclass: e.target.value })}
+                                            >
+                                                <option value='' disabled>Select subclass (optional)</option>
+                                                {availableSubclasses.map(sc => (
+                                                    <option key={sc._id} value={sc._id}>{sc.name}</option>
+                                                ))}
+                                            </select>
+                                            {selectedSubclassObj && (
+                                                <div className='p-4 border border-website-highlights-500 rounded bg-website-default-900/50'>
+                                                    <div className='text-website-default-300 text-sm'>
+                                                        {selectedSubclassObj.description}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Card.Content>
+                                </Card>
+
+                                {/* Subclass Features Card */}
+                                {selectedSubclassObj && selectedSubclassObj.featuresByLevel && Object.keys(selectedSubclassObj.featuresByLevel).length > 0 && (
+                                    <Card className='bg-website-default-800 border-website-highlights-500'>
+                                        <Card.Header className="border-b border-website-default-700/50">
+                                            <Card.Title className='text-website-default-100'>✨ Subclass Features</Card.Title>
+                                            <Card.Description className='text-website-default-300'>Features from {selectedSubclassObj.name}</Card.Description>
+                                        </Card.Header>
+                                        <Card.Content className="pt-6">
+                                            <div className="space-y-4">
+                                                {Object.entries(selectedSubclassObj.featuresByLevel)
+                                                    .filter(([level, features]) => features && features.length > 0)
+                                                    .sort((a, b) => {
+                                                        const aNum = parseInt(a[0].replace('level', ''));
+                                                        const bNum = parseInt(b[0].replace('level', ''));
+                                                        return aNum - bNum;
+                                                    })
+                                                    .map(([level, features]) => (
+                                                        <div key={level} className="space-y-2">
+                                                            <h4 className="text-website-highlights-400 text-xs tracking-widest uppercase font-bold">
+                                                                Level {level.replace('level', '')}
+                                                            </h4>
+                                                            <div className="space-y-2 ml-2">
+                                                                {features.map((featureId, idx) => {
+                                                                    const feature = classFeatures[featureId];
+                                                                    if (!feature) {
+                                                                        return (
+                                                                            <div key={idx} className="text-website-default-400 text-sm">
+                                                                                <span className="text-website-highlights-400 font-bold">•</span> {toTitleCase(featureId)} (No data)
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    return (
+                                                                        <div 
+                                                                            key={idx} 
+                                                                            className="p-3 bg-website-default-900/50 border border-website-default-700 rounded-lg hover:border-website-highlights-500/50 transition-colors"
+                                                                        >
+                                                                            <div className="flex items-start gap-2">
+                                                                                <span className="text-website-highlights-400 font-bold mt-1">✦</span>
+                                                                                <div className="flex-1">
+                                                                                    <h5 className="text-website-default-100 font-semibold text-sm">
+                                                                                        {feature.name}
+                                                                                    </h5>
+                                                                                    <p className="text-website-default-300 text-xs mt-1 leading-relaxed">
+                                                                                        {feature.description}
+                                                                                    </p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </Card.Content>
+                                    </Card>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
