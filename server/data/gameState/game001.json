@@ -16,11 +16,6 @@
             "MP":{"max":10,"current":10, "temp":0},
             "STA":{"max":20,"current":20, "temp":0},
             "movement":30,
-            "perception":{
-                "range":60,
-                "angle":90,
-                "height":10
-            },
             "position":{
                 "x":5,
                 "y":5,

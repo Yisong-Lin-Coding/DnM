@@ -20,34 +20,32 @@ async function seedBackgrounds() {
     });
 
     console.log('✓ Connected to MongoDB');
-    console.log('Transforming backgrounds...');
+    console.log('Updating backgrounds...');
 
     const bulkOps = backgroundsData.map(bg => ({
-      updateOne: {
-        filter: { backgroundID: bg.backgroundID }, // 👈 match on ID
-        update: {
-          $set: {
-            name: bg.name,
-            description: bg.description,
-            gp: bg.gp ?? 0,
-
-            baseStatModifier: bg.baseStatModifier || {},
-            baseProficiencies: bg.baseProficiencies || [],
-            baseEquipment: bg.baseEquipment || [],
-
-            features: bg.features || {},
-            choices: bg.choices || {},
-          }
+      replaceOne: {
+        filter: { backgroundID: bg.backgroundID },
+        replacement: {
+          backgroundID: bg.backgroundID,
+          name: bg.name,
+          description: bg.description,
+          gp: bg.gp ?? 0,
+          baseStatModifier: bg.baseStatModifier || {},
+          baseProficiencies: bg.baseProficiencies || [],
+          baseEquipment: bg.baseEquipment || [],
+          features: bg.features || {},
+          choices: bg.choices || {}
         },
-        upsert: true // 👈 keep existing, insert missing
+        upsert: true
       }
     }));
 
     const result = await Background.bulkWrite(bulkOps);
 
-    console.log('✓ Backgrounds seeded successfully');
+    console.log('✓ Backgrounds updated successfully');
     console.log({
       inserted: result.upsertedCount,
+      matched: result.matchedCount,
       modified: result.modifiedCount
     });
 

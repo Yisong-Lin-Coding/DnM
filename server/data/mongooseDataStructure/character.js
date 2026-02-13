@@ -12,6 +12,7 @@ const characterSchema   = new mongoose.Schema({
     class: { type: mongoose.Schema.Types.ObjectId,ref:'Class', default: null },
     subclass: { type: mongoose.Schema.Types.ObjectId, ref: 'Subclass', default: null },
     race: { type: mongoose.Schema.Types.ObjectId, ref: 'Race', default: null },
+    subrace: { type: mongoose.Schema.Types.ObjectId, ref: 'SubRace', default: null },
     background: { type: mongoose.Schema.Types.ObjectId, ref: 'Background', default: null },
     level: { type: Number, default: 1 },
     experience: {current: { type: Number, default: 0 }, nextLevel: { type: Number, default: 300 }},

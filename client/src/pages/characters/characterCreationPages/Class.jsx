@@ -1,45 +1,26 @@
-import React, { useContext, useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card } from '../../../pageComponents/card';
 import { CircleUser } from 'lucide-react';
-import { SocketContext } from "../../../socket.io/context";
 import classFeatures from '../../../data/classfeatures';
-
-// Helper function to convert camelCase to Title Case
-const toTitleCase = (str) => {
-    return str
-        .replace(/([A-Z])/g, ' $1') // Add space before capitals
-        .replace(/^./, (char) => char.toUpperCase()) // Capitalize first letter
-        .trim();
-};
+import { useGameData } from '../../../data/gameDataContext';
+import {
+    toTitleCase,
+    startingPacks,
+    isStartingPack,
+    isAnyItem,
+    addItemsToInventory,
+    getAnyItemOptions
+} from '../utils/inventory';
 
 export function Class({ values, onChange, classes = [], subclasses = [] }) {
-    const socket = useContext(SocketContext);
-    const [allItems, setAllItems] = useState([]);
-    const allItemsRef = React.useRef([]);
-
-    // Fetch items on mount (if not passed as prop)
-    useEffect(() => {
-        
-        // Fetch all items
-        socket.emit(
-            'database_query',
-            {
-                collection: 'items',
-                operation: 'findAll',
-            },
-            (response) => {
-                if (response.success) {
-                    setAllItems(response.data);
-                    allItemsRef.current = response.data;
-                    console.log('Loaded items:', response.data.length);
-                }
-            }
-        );
-    }, [socket]);
+    // Get game data from context (items, maps, selectors)
+    const { maps, selectors } = useGameData();
 
     const selected = values?.class || '';
     const selectedSubclass = values?.subclass || '';
-    const emit = (partial) => { if (typeof onChange === 'function') onChange(partial); };
+    const emit = (partial) => { 
+        if (typeof onChange === 'function') onChange(partial); 
+    };
 
     // Memoize the selected class object
     const selectedClass = useMemo(() => {
@@ -57,156 +38,8 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
         return subclasses.find(sc => sc._id === selectedSubclass);
     }, [subclasses, selectedSubclass]);
 
-    // Define weapon and tool lists (all in camelCase)
-    const simpleWeapons = [
-        'club', 'dagger', 'greatclub', 'handaxe', 'javelin', 'lightHammer', 'mace', 
-        'quarterstaff', 'sickle', 'spear', 'lightCrossbow', 'dart', 'shortbow', 'sling'
-    ];
-
-    const martialWeapons = [
-        'battleaxe', 'flail', 'glaive', 'greataxe', 'greatsword', 'halberd', 'lance', 
-        'longsword', 'maul', 'morningstar', 'pike', 'rapier', 'scimitar', 'shortsword', 
-        'trident', 'warPick', 'warhammer', 'whip', 'blowgun', 'handCrossbow', 
-        'heavyCrossbow', 'longbow', 'net'
-    ];
-
-    const simpleMeleeWeapons = [
-        'club', 'dagger', 'greatclub', 'handaxe', 'javelin', 'lightHammer', 'mace', 
-        'quarterstaff', 'sickle', 'spear'
-    ];
-
-    const musicalInstruments = [
-        'bagpipes', 'drum', 'dulcimer', 'flute', 'lute', 'lyre', 'horn', 'panFlute', 
-        'shawm', 'viol'
-    ];
-
-    const artisansTools = [
-        'alchemistsSupplies', 'brewersSupplies', 'calligraphersSupplies', 'carpentersTools',
-        'cartographersTools', 'cobblersTools', 'cooksUtensils', 'glassblowersTools',
-        'jewelersTools', 'leatherworkersTools', 'masonsTools', 'paintersSupplies',
-        'pottersTools', 'smithsTools', 'tinkersTools', 'weaversTools', 'woodcarversTools'
-    ];
-
-    // Define starting packs with their contents
-    const startingPacks = {
-        burglarsPack: {
-            name: "Burglar's Pack",
-            items: ['backpack:1', 'ballBearings:1000', 'string:10', 'bell:1', 'candle:5', 
-                   'crowbar:1', 'hammer:1', 'piton:10', 'hoodedLantern:1', 'oilFlask:2', 
-                   'rations:5', 'tinderbox:1', 'waterskin:1', 'hempenRope:1']
-        },
-        diplomatsPack: {
-            name: "Diplomat's Pack",
-            items: ['chest:1', 'mapCase:2', 'fineClothes:1', 'inkBottle:1', 'inkPen:1', 
-                   'lamp:1', 'oilFlask:2', 'paper:5', 'perfume:1', 'sealingWax:1', 'soap:1']
-        },
-        dungeoneersPack: {
-            name: "Dungeoneer's Pack",
-            items: ['backpack:1', 'crowbar:1', 'hammer:1', 'piton:10', 'torch:10', 
-                   'tinderbox:1', 'rations:10', 'waterskin:1', 'hempenRope:1']
-        },
-        entertainersPack: {
-            name: "Entertainer's Pack",
-            items: ['backpack:1', 'bedroll:1', 'costume:2', 'candle:5', 'rations:5', 
-                   'waterskin:1', 'disguiseKit:1']
-        },
-        explorersPack: {
-            name: "Explorer's Pack",
-            items: ['backpack:1', 'bedroll:1', 'messKit:1', 'tinderbox:1', 'torch:10', 
-                   'rations:10', 'waterskin:1', 'hempenRope:1']
-        },
-        priestsPack: {
-            name: "Priest's Pack",
-            items: ['backpack:1', 'blanket:1', 'candle:10', 'tinderbox:1', 'almsBox:1', 
-                   'incense:2', 'censer:1', 'vestments:1', 'rations:2', 'waterskin:1']
-        },
-        scholarsPack: {
-            name: "Scholar's Pack",
-            items: ['backpack:1', 'bookLore:1', 'inkBottle:1', 'inkPen:1', 'parchment:10', 
-                   'littleBagSand:1', 'smallKnife:1']
-        }
-    };
-
-    // Helper: Check if an item is a starting pack
-    const isStartingPack = (itemKey) => {
-        return startingPacks.hasOwnProperty(itemKey);
-    };
-
-    // Helper: Check if an item key starts with "any"
-    const isAnyItem = (itemKey) => {
-        return itemKey.toLowerCase().startsWith('any');
-    };
-
-    // Helper: Get dropdown options based on "any" type
-    const getAnyItemOptions = (itemKey) => {
-        const lowerKey = itemKey.toLowerCase();
-        if (lowerKey.includes('simpleweapon')) return simpleWeapons;
-        if (lowerKey.includes('martialweapon')) return martialWeapons;
-        if (lowerKey.includes('simplemelee')) return simpleMeleeWeapons;
-        if (lowerKey.includes('musicalinstrument')) return musicalInstruments;
-        if (lowerKey.includes('artisanstool')) return artisansTools;
-        return [];
-    };
-
-    // Helper: Generate unique ID for inventory items
-    const generateUniqueId = () => {
-        return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    };
-
-    // Helper: Convert itemId (camelCase) to MongoDB _id using local items array
-    const addItemsToInventory = (itemsArray, callback, retryCount = 0) => {
-        if (!itemsArray || itemsArray.length === 0) {
-            console.log('No items to add');
-            callback({});
-            return;
-        }
-        
-        const items = allItemsRef.current;
-        
-        if (items.length === 0) {
-            if (retryCount > 50) { // Max 5 seconds of retrying
-                console.error('Items failed to load after 50 retries');
-                callback({});
-                return;
-            }
-            console.log(`Items not loaded yet, waiting... (attempt ${retryCount + 1})`);
-            setTimeout(() => addItemsToInventory(itemsArray, callback, retryCount + 1), 100);
-            return;
-        }
-        
-        const itemIds = [...new Set(itemsArray.map(item => item.itemId))];
-        console.log('Looking up items:', itemIds);
-        
-        // Create item map from local data
-        const itemsMap = {};
-        items.forEach(item => {
-            itemsMap[item.itemId] = item._id;
-        });
-        
-        console.log('Items map created with', Object.keys(itemsMap).length, 'items');
-        
-        // Create inventory map with unique IDs
-        const inventoryMap = {};
-        itemsArray.forEach(({ itemId, quantity }) => {
-            const itemMongoId = itemsMap[itemId];
-            console.log(`Processing ${itemId} (qty: ${quantity}), found ID:`, itemMongoId);
-            
-            if (itemMongoId) {
-                for (let i = 0; i < quantity; i++) {
-                    const uniqueId = generateUniqueId();
-                    inventoryMap[uniqueId] = {
-                        equipped: false,
-                        ItemID: itemMongoId
-                    };
-                }
-            } else {
-                console.warn(`Item not found in database: ${itemId}`);
-            }
-        });
-        
-        console.log('Final inventory map with', Object.keys(inventoryMap).length, 'item instances');
-        callback(inventoryMap);
-    };
+    // Note: Inventory helper functions are now imported from shared utility module above
+    // This includes: toTitleCase, isStartingPack, isAnyItem, getAnyItemOptions, addItemsToInventory
 
     // 2. Logic: Handle Class Selection & Auto-populate Base Proficiencies + Resources
     const handleClassChange = (classId) => {
@@ -268,62 +101,81 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
                     equipment: values.inv?.equipment || {}
                 },
                 // Reset equipment choices
-                equipmentChoices: {},
+                classEquipmentChoices: {},
                 // Reset any item selections
-                anyItemSelections: {}
+                classAnyItemSelections: {}
             };
 
             emit(update);
         };
 
-        // Convert items to inventory format
+        // Convert items to inventory format using context-provided items map
         if (fixedItems.length > 0) {
-            addItemsToInventory(fixedItems, applyUpdate);
+            const inventoryMap = addItemsToInventory(fixedItems, { itemsByItemId: maps.itemsByItemId });
+            applyUpdate(inventoryMap);
         } else {
             applyUpdate({});
         }
     };
 
     // 3. Logic: Handle Skill Choice Toggles (Pick X)
-    const handleSkillToggle = (skillName) => {
-        if (!selectedClass?.choices?.proficiencies?.skills) return;
+const handleSkillToggle = (skillName) => {
+    if (!selectedClass?.choices?.proficiencies?.skills) return;
 
-        const currentProficiencies = values.skills?.proficiencies || {};
-        const maxAllowed = selectedClass.choices.proficiencies.skills.amount;
+    const currentProficiencies = values.skills?.proficiencies || {};
+    const maxAllowed = selectedClass.choices.proficiencies.skills.amount;
 
-        // Count how many skill proficiencies are already chosen (excluding armor, weapons, etc.)
-        const skillOptions = selectedClass.choices.proficiencies.skills.options || [];
-        const currentSkillCount = Object.keys(currentProficiencies).filter(key => 
-            skillOptions.includes(key)
-        ).length;
+    const skillOptions = selectedClass.choices.proficiencies.skills.options || [];
+    const currentSkillCount = Object.keys(currentProficiencies).filter(key => 
+        skillOptions.includes(key)
+    ).length;
 
-        // Create new proficiencies map
-        const newProficiencies = { ...currentProficiencies };
+    console.log('=== BEFORE TOGGLE ===');
+    console.log('Skill:', skillName);
+    console.log('values.skills.proficiencies:', values.skills?.proficiencies);
+    console.log('Is selected?', currentProficiencies[skillName]);
 
-        if (newProficiencies[skillName]) {
-            // Remove the skill
-            delete newProficiencies[skillName];
+    const newProficiencies = { ...currentProficiencies };
+
+    if (newProficiencies[skillName]) {
+        delete newProficiencies[skillName];
+        console.log('DELETED:', skillName);
+    } else {
+        if (currentSkillCount < maxAllowed) {
+            newProficiencies[skillName] = 'proficient';
+            console.log('ADDED:', skillName);
         } else {
-            // Add the skill if limit not reached
-            if (currentSkillCount < maxAllowed) {
-                newProficiencies[skillName] = 'proficient';
-            } else {
-                return; // Limit reached
-            }
+            console.log('LIMIT REACHED');
+            return;
         }
+    }
 
-        emit({
-            skills: {
-                ...values.skills,
-                proficiencies: newProficiencies
-            }
-        });
+    console.log('=== EMITTING ===');
+    console.log('New proficiencies:', newProficiencies);
+    
+    const updatePayload = {
+        skills: {
+            active: values.skills?.active || {},
+            passive: values.skills?.passive || {},
+            proficiencies: newProficiencies
+        }
     };
+    
+    console.log('Full payload:', updatePayload);
+    
+    onChange(updatePayload);
+    
+    // Check after a tick to see if state updated
+    setTimeout(() => {
+        console.log('=== AFTER UPDATE (next tick) ===');
+        console.log('values.skills.proficiencies:', values.skills?.proficiencies);
+    }, 0);
+};
 
     // 4. Logic: Handle Equipment Choice Selection
     const handleEquipmentChoice = (choiceKey, optionKey, items) => {
         const currentItems = { ...(values.inv?.items || {}) };
-        const previousChoices = values.equipmentChoices || {};
+        const previousChoices = values.classEquipmentChoices || {};
         
         // Remove items from previous choice if exists
         if (previousChoices[choiceKey]) {
@@ -365,28 +217,27 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
             }
         });
         
-        // Convert items to inventory format
-        addItemsToInventory(itemsToAdd, (newInventoryItems) => {
-            const addedIds = Object.keys(newInventoryItems);
-            const updatedItems = { ...currentItems, ...newInventoryItems };
-            
-            emit({
-                equipmentChoices: { 
-                    ...previousChoices, 
-                    [choiceKey]: { optionKey, items, addedIds }
-                },
-                inv: { 
-                    ...values.inv, 
-                    items: updatedItems 
-                }
-            });
+        // Convert items to inventory format using context-provided items map
+        const newInventoryItems = addItemsToInventory(itemsToAdd, { itemsByItemId: maps.itemsByItemId });
+        const addedIds = Object.keys(newInventoryItems);
+        const updatedItems = { ...currentItems, ...newInventoryItems };
+        
+        emit({
+            classEquipmentChoices: { 
+                ...previousChoices, 
+                [choiceKey]: { optionKey, items, addedIds }
+            },
+            inv: { 
+                ...values.inv, 
+                items: updatedItems 
+            }
         });
     };
 
     // 5. Logic: Handle "Any" Item Selection (Dropdown)
     const handleAnyItemSelection = (choiceKey, optionKey, anyItemKey, selectedItem) => {
         const currentItems = { ...(values.inv?.items || {}) };
-        const previousSelections = values.anyItemSelections || {};
+        const previousSelections = values.classAnyItemSelections || {};
         
         // Remove previous "any" selection for this specific key if exists
         const prevSelectionKey = `${choiceKey}_${optionKey}_${anyItemKey}`;
@@ -403,24 +254,22 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
         
         // Add the newly selected item
         const itemsToAdd = [{ itemId: selectedItem, quantity }];
+        const newInventoryItems = addItemsToInventory(itemsToAdd, { itemsByItemId: maps.itemsByItemId });
+        const uniqueIds = Object.keys(newInventoryItems);
+        const updatedItems = { ...currentItems, ...newInventoryItems };
         
-        addItemsToInventory(itemsToAdd, (newInventoryItems) => {
-            const uniqueIds = Object.keys(newInventoryItems);
-            const updatedItems = { ...currentItems, ...newInventoryItems };
-            
-            emit({
-                anyItemSelections: {
-                    ...previousSelections,
-                    [prevSelectionKey]: {
-                        itemId: selectedItem,
-                        uniqueId: uniqueIds[0] // Store the first unique ID for removal later
-                    }
-                },
-                inv: { 
-                    ...values.inv, 
-                    items: updatedItems 
+        emit({
+            classAnyItemSelections: {
+                ...previousSelections,
+                [prevSelectionKey]: {
+                    itemId: selectedItem,
+                    uniqueId: uniqueIds[0] // Store the first unique ID for removal later
                 }
-            });
+            },
+            inv: { 
+                ...values.inv, 
+                items: updatedItems 
+            }
         });
     };
 
@@ -551,6 +400,10 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
                                                         {selectedClass.choices.proficiencies.skills.options?.map((skill) => {
                                                             const proficiencies = values.skills?.proficiencies || {};
                                                             const isSelected = proficiencies.hasOwnProperty(skill);
+                                                            
+                                                            // Add this console log to debug
+                                                            
+                                                            
                                                             return (
                                                                 <button
                                                                     key={skill}
@@ -607,7 +460,7 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
                                                     </h4>
                                                     <div className="flex flex-col gap-3">
                                                         {Object.entries(options).map(([optionKey, items]) => {
-                                                            const isActive = values.equipmentChoices?.[choiceKey]?.optionKey === optionKey;
+                                                            const isActive = values.classEquipmentChoices?.[choiceKey]?.optionKey === optionKey;
                                                             const hasAnyItems = Object.keys(items).some(key => isAnyItem(key));
                                                             const onlyAnyItems = Object.keys(items).every(key => isAnyItem(key));
                                                             
@@ -618,7 +471,7 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
                                                                         {Object.entries(items).map(([itemName, quantity]) => {
                                                                             const dropdownOptions = getAnyItemOptions(itemName);
                                                                             const selectionKey = `${choiceKey}_${optionKey}_${itemName}`;
-                                                                            const selectionData = values.anyItemSelections?.[selectionKey];
+                                                                            const selectionData = values.classAnyItemSelections?.[selectionKey];
                                                                             const currentSelection = selectionData?.itemId || '';
                                                                             
                                                                             return (
@@ -707,7 +560,7 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
                                                                                 
                                                                                 const dropdownOptions = getAnyItemOptions(itemName);
                                                                                 const selectionKey = `${choiceKey}_${optionKey}_${itemName}`;
-                                                                                const selectionData = values.anyItemSelections?.[selectionKey];
+                                                                                const selectionData = values.classAnyItemSelections?.[selectionKey];
                                                                                 const currentSelection = selectionData?.itemId || '';
                                                                                 
                                                                                 return (

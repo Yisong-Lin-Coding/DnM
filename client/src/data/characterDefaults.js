@@ -14,8 +14,10 @@ export const defaultCharacter = {
   race: '',
   class: '',
   subclass: '',
+  subrace: '',
   background: '',
   stats: { str: '', dex: '', con: '', int: '', wis: '', cha: '', luck: '' },
+  abilityScoreMethod: 'manual',
   inv: {
     gp: 0,
     items: {},
@@ -42,7 +44,13 @@ export const defaultCharacter = {
   },
   effects: {},
   level: 1,
-  editing:"true"
+  editing:"true",
+  // Equipment and item choices state
+  classEquipmentChoices: {},
+  classAnyItemSelections: {},
+  backgroundEquipmentChoices: {},
+  backgroundAnyItemSelections: {},
+  proficiencyChoices: {}
 };
 
 export function createDefaultCharacter() {

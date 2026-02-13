@@ -6,5 +6,5 @@ client/.env
 node_modules/
 .qodo/
 /node_modules
-
+test.ts
 newsletter.jsx

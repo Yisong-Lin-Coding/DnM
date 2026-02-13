@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card } from '../../../pageComponents/card';
 import { useContext, useEffect, useState, useMemo } from "react";
-import { SocketContext } from "../../../socket.io/context";
+import { useGameData } from "../../../data/gameDataContext";
 import { CircleUser } from 'lucide-react';
 
 // Helper function to convert camelCase to Title Case
@@ -12,8 +12,9 @@ const toTitleCase = (str) => {
         .trim();
 };
 
-export function Race({ values, onChange, races = [], subraces = [] }) {
-    const socket = useContext(SocketContext);
+export function Race({ values, onChange }) {
+    const { maps } = useGameData();
+    const { racesById, subracesById } = maps;
 
     const selectedRace = values?.race || '';
     const selectedSubrace = values?.subrace || '';
@@ -22,10 +23,10 @@ export function Race({ values, onChange, races = [], subraces = [] }) {
         if (typeof onChange === 'function') onChange(partial);
     };
 
-    // Memoize the selected race object
+    // Memoize the selected race object - get from context maps
     const selectedRaceObj = useMemo(() => {
-        return races.find(r => r._id === selectedRace);
-    }, [races, selectedRace]);
+        return racesById[selectedRace] || null;
+    }, [racesById, selectedRace]);
 
     // Filter races based on selected size
     const filteredRaces = useMemo(() => {
@@ -40,21 +41,24 @@ export function Race({ values, onChange, races = [], subraces = [] }) {
             'gargantuan': 'G'
         };
         const normalizedSize = sizeMap[selectedSize.toLowerCase()] || selectedSize.toUpperCase();
-        return races.filter(r => r.size === normalizedSize);
-    }, [races, selectedSize]);
+        // Convert racesById map to array and filter by size
+        return Object.values(racesById).filter(r => r && r.size === normalizedSize);
+    }, [racesById, selectedSize]);
 
     // Memoize available subraces for selected race
     const availableSubraces = useMemo(() => {
         if (!selectedRaceObj) return [];
         const subracesForRace = selectedRaceObj.subraces || [];
         // Match by subraceID - the race object stores subraceID values
-        return subraces.filter(sr => subracesForRace.some(sub => sub.subraceID === sr.subraceID));
-    }, [selectedRaceObj, subraces]);
+        return Object.values(subracesById).filter(sr => 
+            sr && subracesForRace.some(sub => sub.subraceID === sr.subraceID)
+        );
+    }, [selectedRaceObj, subracesById]);
 
-    // Memoize the selected subrace object
+    // Memoize the selected subrace object - get from context maps
     const selectedSubraceObj = useMemo(() => {
-        return subraces.find(sr => sr._id === selectedSubrace);
-    }, [subraces, selectedSubrace]);
+        return subracesById[selectedSubrace] || null;
+    }, [subracesById, selectedSubrace]);
 
     return (
         <div className='bg-website-default-900 min-h-screen grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr]'>
