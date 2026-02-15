@@ -10,9 +10,15 @@ module.exports = (socket) => {
     
     socket.on('character_builder', async (data, callback) => {
         const { characterID } = data;
+        const startedAt = Date.now();
+        console.log('[character_builder] request start', {
+            socketId: socket.id,
+            characterID
+        });
         
         // Validate input
         if (!characterID) {
+            console.warn('[character_builder] missing characterID', { socketId: socket.id });
             return callback({ 
                 success: false, 
                 message: 'characterID is required' 
@@ -27,13 +33,23 @@ module.exports = (socket) => {
             const character = await builder.buildFromId(characterID);
             
             // Return success
+            console.log('[character_builder] request success', {
+                socketId: socket.id,
+                characterID,
+                durationMs: Date.now() - startedAt
+            });
             callback({ 
                 success: true, 
                 character: character 
             });
             
         } catch (error) {
-            console.error(`Error building character ${characterID}:`, error.message);
+            console.error('[character_builder] request failed', {
+                socketId: socket.id,
+                characterID,
+                durationMs: Date.now() - startedAt,
+                error: error.message
+            });
             
             callback({ 
                 success: false, 

@@ -53,6 +53,7 @@ export default function CharacterMenu() {
     const [error, setError] = useState(null);
     const playerID = localStorage.getItem("player_ID");
     const [builtCharacters, setBuiltCharacters] = useState({}); // { [id]: builtCharacter }
+    const logPrefix = "[CharacterMenu]";
 
     const handleDeleteCharacter = (characterID) => {
         
@@ -81,15 +82,20 @@ export default function CharacterMenu() {
     if (!socket || !playerID) return null;
 
     // 2. Wrap the socket emit in a Promise
-    return new Promise((resolve, reject) => {
+    const startedAt = performance.now();
+    console.log(`${logPrefix} build start`, { characterID });
+
+    return new Promise((resolve) => {
         socket.emit("character_builder", { characterID }, (response) => {
+            const durationMs = Math.round(performance.now() - startedAt);
             if (response && response.success) {
                 // Success: Resolve the promise with the data
+                console.log(`${logPrefix} build success`, { characterID, durationMs });
                 resolve(response.character);
             } else {
                 // Failure: Log and Reject
                 const errorMsg = response?.message || 'Failed to build character';
-                console.error(errorMsg);
+                console.error(`${logPrefix} build failed`, { characterID, durationMs, errorMsg });
                 resolve(null); // Or use reject(errorMsg) if you want to use try/catch
             }
         });
@@ -129,12 +135,21 @@ useEffect(() => {
 
     // 1. Define an async function inside the effect
     const loadAndBuildCharacters = async () => {
+        const menuLoadStartedAt = performance.now();
         setLoading(true); // Start loading
 
         try {
             // A. Get the list of character IDs
+            const listStartedAt = performance.now();
+            console.log(`${logPrefix} list fetch start`, { playerID });
             const listResponse = await new Promise((resolve) => {
                 socket.emit("playerData_getCharacter", { playerID }, resolve);
+            });
+            console.log(`${logPrefix} list fetch done`, {
+                playerID,
+                durationMs: Math.round(performance.now() - listStartedAt),
+                success: !!listResponse?.success,
+                count: listResponse?.characters?.length || 0,
             });
 
             if (!listResponse || !listResponse.success) {
@@ -148,19 +163,29 @@ useEffect(() => {
             const builtMap = {};
             
             // Use Promise.all to fetch all characters in parallel for speed
+            const buildAllStartedAt = performance.now();
             await Promise.all(
                 charList.map(async (char) => {
                     const builtChar = await buildCharacter(char.id); // Using your new async function
                     builtMap[char.id] = normalizeCharacterForCard(builtChar, char);
                 })
             );
+            console.log(`${logPrefix} build all done`, {
+                count: charList.length,
+                durationMs: Math.round(performance.now() - buildAllStartedAt),
+            });
 
             // C. Update state once all are built
             setBuiltCharacters(builtMap);
             setError(null);
         } catch (err) {
+            console.error(`${logPrefix} load failed`, { message: err.message });
             setError(err.message);
         } finally {
+            console.log(`${logPrefix} load complete`, {
+                playerID,
+                totalDurationMs: Math.round(performance.now() - menuLoadStartedAt),
+            });
             setLoading(false); // Stop loading regardless of success/failure
         }
     };

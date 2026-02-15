@@ -16,6 +16,7 @@ class CharacterBuilder {
         
         this.socket = socket;
         this.data = null;
+        this.logPrefix = '[CharacterBuilder]';
         
         // ==================================================
         // TODO: REPLACE THESE WITH YOUR ACTUAL FILE PATHS
@@ -33,6 +34,7 @@ class CharacterBuilder {
      * Helper to query MongoDB via socket
      */
     async _queryDatabase(collection, operation, filter = {}) {
+        const startedAt = Date.now();
         return new Promise((resolve, reject) => {
             this.socket.emit('database_query', {
                 collection,
@@ -40,8 +42,19 @@ class CharacterBuilder {
                 filter
             }, (response) => {
                 if (response.success) {
+                    console.log(`${this.logPrefix} db query success`, {
+                        collection,
+                        operation,
+                        durationMs: Date.now() - startedAt
+                    });
                     resolve(response.data);
                 } else {
+                    console.warn(`${this.logPrefix} db query failed`, {
+                        collection,
+                        operation,
+                        durationMs: Date.now() - startedAt,
+                        message: response.message
+                    });
                     reject(new Error(response.message || 'Database query failed'));
                 }
             });
@@ -540,7 +553,14 @@ class CharacterBuilder {
         }
 
         try {
+            const startedAt = Date.now();
+            console.log(`${this.logPrefix} build start`, {
+                characterID: this.data.id,
+                level: this.data.level
+            });
+
             // Fetch all associated data in parallel
+            const fetchStartedAt = Date.now();
             await Promise.all([
                 this.fetchRace(),
                 this.fetchSubrace(),
@@ -549,12 +569,24 @@ class CharacterBuilder {
                 this.fetchBackground(),
                 this.fetchEquippedItems(rawCharacterData)
             ]);
+            console.log(`${this.logPrefix} build fetches done`, {
+                characterID: this.data.id,
+                durationMs: Date.now() - fetchStartedAt
+            });
 
             // Create CHARACTER instance
+            const instantiateStartedAt = Date.now();
             const character = new CHARACTER(this.data);
+            console.log(`${this.logPrefix} character instantiated`, {
+                characterID: this.data.id,
+                durationMs: Date.now() - instantiateStartedAt
+            });
 
             // Clean up
             this.data = null;
+            console.log(`${this.logPrefix} build done`, {
+                durationMs: Date.now() - startedAt
+            });
 
             return character;
             
@@ -569,6 +601,9 @@ class CharacterBuilder {
      */
     async buildFromId(characterId) {
         try {
+            const startedAt = Date.now();
+            console.log(`${this.logPrefix} buildFromId start`, { characterId });
+
             // Fetch the character document from MongoDB
             const characterData = await this._queryDatabase('characters', 'findById', { _id: characterId });
             
@@ -580,7 +615,12 @@ class CharacterBuilder {
             this.loadCharacterData(characterData);
             
             // Build with original data
-            return await this.build(characterData);
+            const builtCharacter = await this.build(characterData);
+            console.log(`${this.logPrefix} buildFromId done`, {
+                characterId,
+                durationMs: Date.now() - startedAt
+            });
+            return builtCharacter;
             
         } catch (error) {
             console.error('Error in buildFromId:', error);
