@@ -3,8 +3,7 @@ import React, { useContext, useState, useEffect } from 'react';
 import { createDefaultCharacter } from '../../data/characterDefaults';
 import { GameDataProvider } from '../../data/gameDataContext';
 import { Tabs } from '../../pageComponents/tabs'
-import { CircleUser, ArrowBigLeftDash, ArrowBigRightDash  } from 'lucide-react';
-import { Card } from "../../pageComponents/card";
+import { ArrowBigLeftDash, ArrowBigRightDash  } from 'lucide-react';
 import { SocketContext } from "../../socket.io/context";
 import { Customization } from "../characters/characterCreationPages/Customization"
 import { Race } from "../characters/characterCreationPages/Race"
@@ -30,9 +29,11 @@ export default function Test2(){
   });
 
   useEffect(() => {
+    if (!socket) return;
+
     const collections = ['classes', 'subclasses', 'races', 'subraces', 'backgrounds', 'items'];
     const results = {};
-    let loadedCount = 0;
+    let completedCount = 0;
 
     console.log('Starting data load...');
 
@@ -44,25 +45,30 @@ export default function Test2(){
           operation: 'findAll',
         },
         (response) => {
-          console.log(`Loaded ${collection}:`, response.success ? `${response.data.length} items` : response.message);
-          if (response.success) {
-            results[collection] = response.data;
-            loadedCount += 1;
-            console.log(`Progress: ${loadedCount}/${collections.length}`);
-            // Update state when we have all collections
-            if (loadedCount === collections.length) {
-              console.log('All data loaded, updating state');
-              setGameData({
-                classes: results.classes || [],
-                subclasses: results.subclasses || [],
-                races: results.races || [],
-                subraces: results.subraces || [],
-                backgrounds: results.backgrounds || [],
-                items: results.items || []
-              });
-            }
+          const success = !!response?.success;
+          console.log(`Loaded ${collection}:`, success ? `${response.data.length} items` : response?.message);
+
+          if (success) {
+            results[collection] = response.data || [];
           } else {
-            console.error(`Failed to load ${collection}:`, response.message);
+            results[collection] = [];
+            console.error(`Failed to load ${collection}:`, response?.message);
+          }
+
+          completedCount += 1;
+          console.log(`Progress: ${completedCount}/${collections.length}`);
+
+          // Update state when all collections complete (success or failure)
+          if (completedCount === collections.length) {
+            console.log('All data requests completed, updating state');
+            setGameData({
+              classes: results.classes || [],
+              subclasses: results.subclasses || [],
+              races: results.races || [],
+              subraces: results.subraces || [],
+              backgrounds: results.backgrounds || [],
+              items: results.items || []
+            });
           }
         }
       );
@@ -102,19 +108,6 @@ const updateDraft = React.useCallback((partial) => {
 }, []);
 
   // Dot-path setter for use inside this parent
-  const setCharacter = (path, value) => {
-    const keys = Array.isArray(path) ? path : String(path).split('.');
-    const partial = {};
-    let cur = partial;
-    for (let i = 0; i < keys.length - 1; i++) {
-      const k = keys[i];
-      cur[k] = {};
-      cur = cur[k];
-    }
-    cur[keys[keys.length - 1]] = value;
-    updateDraft(partial);
-  };
-
   const playerID = localStorage.getItem("player_ID")
 
   // Compute final stats, features, and resources before saving
@@ -123,7 +116,6 @@ const updateDraft = React.useCallback((partial) => {
 
     const level = parseInt(characterDraft.level, 10) || 1;
     const cls = getById(gameData.classes, characterDraft.class);
-    const subcls = getById(gameData.subclasses, characterDraft.subclass);
     const race = getById(gameData.races, characterDraft.race);
     const subrace = getById(gameData.subraces, characterDraft.subrace);
 
@@ -144,32 +136,8 @@ const updateDraft = React.useCallback((partial) => {
       if (!STAT_KEYS.includes(k)) finalStats[k] = parseInt(baseStats[k], 10) || 0;
     });
 
-    // Collect abilities/passives
-    const collectFeaturesUpToLevel = (featuresByLevel) => {
-      if (!featuresByLevel) return [];
-      return Object.entries(featuresByLevel)
-        .map(([lvlKey, feats]) => {
-          const n = parseInt(String(lvlKey).replace(/[^0-9]/g, ''), 10) || 0;
-          return n <= level ? (feats || []) : [];
-        })
-        .flat();
-    };
-
-    const classFeatures = collectFeaturesUpToLevel(cls?.featuresByLevel);
-    const subclassFeatures = collectFeaturesUpToLevel(subcls?.featuresByLevel);
-    const racialTraits = Array.isArray(race?.traits) ? race.traits : [];
-    const subracialTraits = Array.isArray(subrace?.traits) ? subrace.traits : [];
-
-    // Prepare abilities structure (kept descriptive for clarity and engine alignment)
-    const abilities = {
-      class: classFeatures,
-      subclass: subclassFeatures,
-      racial: racialTraits,
-      subracial: subracialTraits,
-    };
-
     // Resource computation parameters (base and per-level increments may be provided by mods outside classes)
-    const resourceBase = (cls && cls.resourceBase) || { HP: 0, MP: 0, STA: 0 };
+    const resourceBase = (cls && (cls.resourceBase || cls.resourcePoolModifier)) || { HP: 0, MP: 0, STA: 0 };
     const resourceLevelUp = (cls && cls.resourceLevelUp) || { HP: 0, MP: 0, STA: 0 };
 
     const DEX = finalStats.dex || 0;
@@ -183,25 +151,15 @@ const updateDraft = React.useCallback((partial) => {
     // max HP = CON * (1 + Base HP + (level / 2 * HP level up))
     const maxHP = Math.floor(CON * (1 + (resourceBase.HP || 0) + ((level / 2) * (resourceLevelUp.HP || 0))));
 
-    // Transform proficiencies to server schema arrays
-    const profOut = {
-      armor: Array.isArray(cls?.baseProficiencies?.armor) ? cls.baseProficiencies.armor : [],
-      weapons: Array.isArray(cls?.baseProficiencies?.weapons) ? cls.baseProficiencies.weapons : [],
-      tools: Array.isArray(cls?.baseProficiencies?.tools) ? cls.baseProficiencies.tools : [],
-      abilityScore: Array.isArray(cls?.baseProficiencies?.abilityScore) ? cls.baseProficiencies.abilityScore : [],
-      skills: [],
-    };
-    const chosenMap = characterDraft.skills?.proficiencies || {};
-    const skillOptions = cls?.choices?.proficiencies?.skills?.options || [];
-    profOut.skills = Object.keys(chosenMap).filter(k => skillOptions.includes(k));
-
-    // Build languages map from race/subrace
+    // Merge explicit language choices with race/subrace grants
     const langsArr = [
       ...(Array.isArray(race?.languages) ? race.languages : []),
       ...(Array.isArray(subrace?.languages) ? subrace.languages : []),
     ];
-    const langsMap = {};
-    langsArr.forEach(l => { langsMap[l] = 'native'; });
+    const langsMap = { ...(characterDraft.skills?.languages || {}) };
+    langsArr.forEach(l => {
+      if (!langsMap[l]) langsMap[l] = 'native';
+    });
 
     // Prepare payload aligned with server schema
     const payload = {
@@ -214,18 +172,35 @@ const updateDraft = React.useCallback((partial) => {
       skills: {
         active: characterDraft.skills?.active || {},
         passive: characterDraft.skills?.passive || {},
-        proficiencies: profOut,
+        proficiencies: characterDraft.skills?.proficiencies || {},
         languages: langsMap,
       },
     };
 
-    console.log({ character: payload, playerID });
-    socket.emit('playerData_saveCharacter', { character: payload, playerID }, (response) => {
-      if (!response) {
-        console.log('no response :(');
-      }
-      console.log(response.message);
-      console.log(response);
+    if (!socket) {
+      return Promise.resolve({ success: false, message: 'Socket unavailable' });
+    }
+    if (!playerID) {
+      return Promise.resolve({ success: false, message: 'Missing player ID' });
+    }
+
+    return new Promise((resolve) => {
+      console.log({ character: payload, playerID });
+      socket.emit('playerData_saveCharacter', { character: payload, playerID }, (response) => {
+        if (!response) {
+          const noResponse = { success: false, message: 'No server response' };
+          console.error(noResponse.message);
+          resolve(noResponse);
+          return;
+        }
+
+        if (!response.success) {
+          console.error('Character save failed:', response.message);
+        } else {
+          console.log('Character save success');
+        }
+        resolve(response);
+      });
     });
   };
 
@@ -237,7 +212,7 @@ const updateDraft = React.useCallback((partial) => {
           <Tabs.Prev className="fixed left-20 top-1/2 -translate-y-1/2 z-50">
             <ArrowBigLeftDash />
           </Tabs.Prev>
-          <Tabs.Next max={6} className="fixed right-20 top-1/2 -translate-y-1/2 z-50">
+          <Tabs.Next max={5} className="fixed right-20 top-1/2 -translate-y-1/2 z-50">
             <ArrowBigRightDash  />
           </Tabs.Next>
           <Tabs.Nav className='flex flex-row justify-center items-center'>

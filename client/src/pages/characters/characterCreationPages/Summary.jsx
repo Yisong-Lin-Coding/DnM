@@ -1,6 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card } from '../../../pageComponents/card';
-import { CircleUser } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const LABELS = {
@@ -12,17 +11,35 @@ const LABELS = {
   cha: 'Charisma',
 };
 
-export function Summary({ values, onChange, onSave, classes = [], subclasses = [], races = [], subraces = [], backgrounds = [] }) {
+export function Summary({ values, onSave, classes = [], subclasses = [], races = [], subraces = [], backgrounds = [] }) {
   const character = values || {};
-  const emit = (partial) => { if (typeof onChange === 'function') onChange(partial); };
-
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const navigate = useNavigate();
 
-  const handleSave = () => {
-    onSave();
-    navigate(`/ISK/${sessionStorage.getItem("session_ID")}/character`);
-  }
+  const handleSave = async () => {
+    if (isSaving) return;
+
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      const response = (typeof onSave === 'function')
+        ? await onSave()
+        : { success: false, message: 'Save handler unavailable' };
+
+      if (!response?.success) {
+        setSaveError(response?.message || 'Failed to save character');
+        return;
+      }
+
+      navigate(`/ISK/${sessionStorage.getItem("session_ID")}/character`);
+    } catch (error) {
+      setSaveError(error?.message || 'Failed to save character');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const selectedClass = useMemo(() => classes.find((c) => c._id === character.class), [classes, character.class]);
   const selectedSubclass = useMemo(() => subclasses.find((sc) => sc._id === character.subclass), [subclasses, character.subclass]);
@@ -47,18 +64,14 @@ export function Summary({ values, onChange, onSave, classes = [], subclasses = [
 
   // Proficiencies and languages
   const proficiencies = character?.skills?.proficiencies || {};
-  const languages = selectedSubrace?.languages?.length ? selectedSubrace.languages : selectedRace?.languages || [];
+  const selectedLanguages = Object.keys(character?.skills?.languages || {});
+  const languages = selectedLanguages.length > 0
+    ? selectedLanguages
+    : (selectedSubrace?.languages?.length ? selectedSubrace.languages : selectedRace?.languages || []);
 
   // Simple inventory summary
   const gp = character?.inv?.gp ?? 0;
   const itemCount = character?.inv?.items ? Object.keys(character.inv.items).length : 0;
-
-  const SectionHeader = ({ title, description }) => (
-    <div className='mb-3'>
-      <h3 className='text-website-default-100 text-lg font-semibold'>{title}</h3>
-      {description && <div className='text-website-default-300 text-sm'>{description}</div>}
-    </div>
-  );
 
   const StatRow = ({ code }) => {
     const base = parseInt(baseStats[code], 10) || 0;
@@ -224,11 +237,15 @@ export function Summary({ values, onChange, onSave, classes = [], subclasses = [
 
         {/* Save */}
         <div className='flex justify-end'>
+          {saveError && (
+            <div className='mr-4 text-sm text-red-400 self-center'>{saveError}</div>
+          )}
           <button
-            className='px-4 py-2 bg-website-specials-500 text-white rounded hover:bg-website-specials-600'
+            className='px-4 py-2 bg-website-specials-500 text-white rounded hover:bg-website-specials-600 disabled:opacity-60 disabled:cursor-not-allowed'
             onClick={handleSave}
+            disabled={isSaving}
           >
-            Save Character
+            {isSaving ? 'Saving...' : 'Save Character'}
           </button>
         </div>
       </div>

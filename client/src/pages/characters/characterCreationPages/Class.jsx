@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Card } from '../../../pageComponents/card';
 import { CircleUser } from 'lucide-react';
 import classFeatures from '../../../data/classfeatures';
@@ -14,7 +14,7 @@ import {
 
 export function Class({ values, onChange, classes = [], subclasses = [] }) {
     // Get game data from context (items, maps, selectors)
-    const { maps, selectors } = useGameData();
+    const { maps } = useGameData();
 
     const selected = values?.class || '';
     const selectedSubclass = values?.subclass || '';
@@ -45,6 +45,7 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
     const handleClassChange = (classId) => {
         const fullClassData = classes.find(c => c._id === classId);
         if (!fullClassData) return;
+        const previousClassData = classes.find(c => c._id === values?.class);
 
         const baseMods = fullClassData.baseProficiencies || {};
         const resMods = fullClassData.resourcePoolModifier || { HP: 1, STA: 1, MP: 1 };
@@ -59,28 +60,39 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
 
         // Reset subclass when class changes
         const applyUpdate = (inventoryMap) => {
-            // Convert proficiency arrays to Map format (key: proficiency name, value: boolean or level)
-            const proficienciesMap = {};
-            
-            // Add armor proficiencies
-            (baseMods.armor || []).forEach(armor => {
-                proficienciesMap[armor] = 'proficient';
+            const previousClassBase = values.classBaseProficiencies || [];
+            const previousClassSkillOptions = previousClassData?.choices?.proficiencies?.skills?.options || [];
+            const nextClassBase = [
+                ...(baseMods.armor || []),
+                ...(baseMods.weapons || []),
+                ...(baseMods.tools || []),
+                ...(baseMods.abilityScore || [])
+            ];
+
+            // Start from existing proficiencies so background/manual selections are preserved.
+            const proficienciesMap = { ...(values.skills?.proficiencies || {}) };
+
+            // Remove old class base proficiencies and old class-pick skills.
+            [...previousClassBase, ...previousClassSkillOptions].forEach((key) => {
+                delete proficienciesMap[key];
             });
-            
-            // Add weapon proficiencies
-            (baseMods.weapons || []).forEach(weapon => {
-                proficienciesMap[weapon] = 'proficient';
+
+            // Add new class base proficiencies.
+            nextClassBase.forEach((key) => {
+                proficienciesMap[key] = 'proficient';
             });
-            
-            // Add tool proficiencies
-            (baseMods.tools || []).forEach(tool => {
-                proficienciesMap[tool] = 'proficient';
+
+            // Remove all previous class-added items (base + equipment choices + any-item picks)
+            const currentItems = { ...(values.inv?.items || {}) };
+            const itemIdsToRemove = [
+                ...(values.classBaseItemIds || []),
+                ...Object.values(values.classEquipmentChoices || {}).flatMap(choice => choice?.addedIds || []),
+                ...Object.values(values.classAnyItemSelections || {}).map(selection => selection?.uniqueId).filter(Boolean),
+            ];
+            itemIdsToRemove.forEach((id) => {
+                if (currentItems[id]) delete currentItems[id];
             });
-            
-            // Add ability score proficiencies (saving throws)
-            (baseMods.abilityScore || []).forEach(ability => {
-                proficienciesMap[ability] = 'proficient';
-            });
+            const updatedItems = { ...currentItems, ...inventoryMap };
 
             const update = {
                 class: classId,
@@ -97,9 +109,11 @@ export function Class({ values, onChange, classes = [], subclasses = [] }) {
                 // Set base equipment
                 inv: { 
                     gp: values.inv?.gp || 0,
-                    items: inventoryMap,
+                    items: updatedItems,
                     equipment: values.inv?.equipment || {}
                 },
+                classBaseItemIds: Object.keys(inventoryMap),
+                classBaseProficiencies: nextClassBase,
                 // Reset equipment choices
                 classEquipmentChoices: {},
                 // Reset any item selections

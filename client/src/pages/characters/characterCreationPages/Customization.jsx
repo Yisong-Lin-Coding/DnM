@@ -1,15 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState, useContext} from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createDefaultCharacter } from '../../../data/characterDefaults';
 import {genderOptions}  from "../../../data/genderOptions";
 import { CircleUser, Shuffle } from 'lucide-react';
 import { Card } from "../../../pageComponents/card";
-import { SocketContext } from "../../../socket.io/context";
 
 // Controlled + Uncontrolled component:
 // - If `values` and `onChange` props are provided, this component is controlled by parent.
 // - Otherwise it manages its own local state for backward compatibility.
 export function Customization({ values, onChange }){
-  const socket = useContext(SocketContext)
   const ageInputRef = useRef(null);
   const prevBodyOverflow = useRef('');
   const [editingHeight,setIsEditingHeight] = useState(false);
@@ -34,22 +32,21 @@ export function Customization({ values, onChange }){
 
   // Update a specific personality input
   const handleChange = (index, value) => {
-    const newPersonalityTraits = [...personalityTraits];
-    newPersonalityTraits[index] = value;
-    setPersonalityTraits(newPersonalityTraits);
+    setPersonalityTraits((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      emitPartial({ stories: { ...(character.stories || {}), personality: next } });
+      return next;
+    });
   };
-
-  const playerID = localStorage.getItem("player_ID")
-
-  // Saving should be handled in parent flow; keep as no-op for now.
-  const characterCreation = ()=>{}
 
   const removeRelationship = (id) =>{
     setRelationships(prev=>{
       const updated = { ...prev };
       delete updated[id];
+      relationshipFormatting(updated);
       return updated;
-    })
+    });
   }
   
   const addPersonalityTraits = () => {
@@ -65,7 +62,11 @@ export function Customization({ values, onChange }){
   }
 
   const removePersonalityTraits = (index) => {
-    setPersonalityTraits(personalityTraits.filter((_, i) => i !== index));
+    setPersonalityTraits((prev) => {
+      const filtered = prev.filter((_, i) => i !== index);
+      emitPartial({ stories: { ...(character.stories || {}), personality: filtered } });
+      return filtered;
+    });
   };
 
   const changeRelationships = (id, field, value) => {
@@ -114,6 +115,13 @@ export function Customization({ values, onChange }){
     }, {});
     emitPartial({ stories: { ...(character.stories||{}), relationships: formatted } });
   };
+
+  useEffect(() => {
+    const nextPersonality = Array.isArray(character.stories?.personality) && character.stories.personality.length > 0
+      ? character.stories.personality
+      : [""];
+    setPersonalityTraits(nextPersonality);
+  }, [character.stories?.personality]);
 
   // setCharacter: supports dot-path updates and functional updates
   const setCharacter = (pathOrUpdater, value) => {
@@ -715,10 +723,8 @@ export function Customization({ values, onChange }){
                           type="text"
                           value={value}
                           onChange={(e) => {
-                            handleChange(index, e.target.value)
-                            emitPartial({ stories: { ...(character.stories||{}), personality: personalityTraits } })
+                            handleChange(index, e.target.value);
                           }}
-                          onBlur={()=>emitPartial({ stories: { ...(character.stories||{}), personality: personalityTraits } })}
                           placeholder={`Trait #${index + 1}`}
                           className="flex-1 px-3 py-2 border border-website-specials-500 rounded bg-website-default-900 focus:outline-none focus:ring-2 focus:ring-website-highlights-400"
                         />

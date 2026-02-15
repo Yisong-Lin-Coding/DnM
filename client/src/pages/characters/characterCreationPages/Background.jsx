@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Card } from '../../../pageComponents/card';
 import { BookOpen } from 'lucide-react';
 import { useGameData } from '../../../data/gameDataContext';
@@ -15,7 +15,7 @@ import {
 
 export function Background({ values, onChange, backgrounds = [], items = [], classes = [] }) {
     // Get game data from context (items, maps, selectors)
-    const { maps, selectors } = useGameData();
+    const { maps } = useGameData();
 
     const selected = values?.background || '';
     const emit = (partial) => { if (typeof onChange === 'function') onChange(partial); };
@@ -70,20 +70,42 @@ export function Background({ values, onChange, backgrounds = [], items = [], cla
         });
 
         const applyUpdate = (inventoryMap) => {
-            // Convert proficiency arrays to Map format
+            const currentItems = { ...(values.inv?.items || {}) };
+            const itemIdsToRemove = [
+                ...(values.backgroundBaseItemIds || []),
+                ...Object.values(values.backgroundEquipmentChoices || {}).flatMap(choice => choice?.addedIds || []),
+                ...Object.values(values.backgroundAnyItemSelections || {}).map(selection => selection?.uniqueId).filter(Boolean),
+            ];
+            itemIdsToRemove.forEach((id) => {
+                if (currentItems[id]) delete currentItems[id];
+            });
+            const updatedItems = { ...currentItems, ...inventoryMap };
+
+            // Convert proficiency selections to map and replace previous background contributions.
             const proficienciesMap = { ...values.skills?.proficiencies || {} };
-            
-            // Add base proficiencies
-            (fullBackgroundData.baseProficiencies || []).forEach(prof => {
+            const previousBackgroundBase = values.backgroundBaseProficiencies || [];
+            const previousChoiceSelections = Object.values(values.proficiencyChoices || {});
+
+            [...previousBackgroundBase, ...previousChoiceSelections].forEach((prof) => {
+                delete proficienciesMap[prof];
+            });
+
+            const nextBackgroundBase = fullBackgroundData.baseProficiencies || [];
+            nextBackgroundBase.forEach((prof) => {
                 proficienciesMap[prof] = 'proficient';
             });
 
+            const previousBackgroundGp = Number(values.backgroundBaseGp || 0);
+            const currentGp = Number(values.inv?.gp || 0);
+            const nextBackgroundGp = Number(fullBackgroundData.gp || 0);
+            const normalizedGp = Math.max(0, currentGp - previousBackgroundGp + nextBackgroundGp);
+
             const update = {
                 background: backgroundId,
-                // Add gold
+                // Replace prior background gold/items/proficiencies contribution.
                 inv: { 
-                    gp: (values.inv?.gp || 0) + (fullBackgroundData.gp || 0),
-                    items: { ...values.inv?.items, ...inventoryMap },
+                    gp: normalizedGp,
+                    items: updatedItems,
                     equipment: values.inv?.equipment || {}
                 },
                 // Update proficiencies
@@ -91,6 +113,9 @@ export function Background({ values, onChange, backgrounds = [], items = [], cla
                     ...values.skills,
                     proficiencies: proficienciesMap
                 },
+                backgroundBaseGp: nextBackgroundGp,
+                backgroundBaseItemIds: Object.keys(inventoryMap),
+                backgroundBaseProficiencies: nextBackgroundBase,
                 // Reset choices
                 proficiencyChoices: {},
                 backgroundEquipmentChoices: {},
