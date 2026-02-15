@@ -22,12 +22,18 @@ export default function CharacterMenu() {
             return;
         }
         socket.emit("character_delete", { characterID }, (response) => {
-            if (!response || !response.success) {
-                alert(response?.message || 'Failed to delete character');
-                return;
+            if (response && response.success) {
+                // This triggers the rerender instantly
+                setCharacters((prevCharacters) => 
+                    prevCharacters.filter(char => char.id !== characterID)
+                );
+                
+                // Don't forget to hide the menu!
+                closeContextMenu();
+            } else {
+                alert(response?.message || 'Failed to delete');
             }
-
-        })
+        });
     }
 
     // --- CONTEXT MENU STATE ---
