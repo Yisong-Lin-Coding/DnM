@@ -1,7 +1,7 @@
 import Body from "../../pageComponents/bodySkeleton";
 import Header from "../../pageComponents/header";
 import IndexCardFolder from "../../pageComponents/indexCard";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { SocketContext } from "../../socket.io/context";
 import { Plus, Edit2, Trash2, Eye } from "lucide-react"; // Added icons
 import CharacterCard from "../../pageComponents/characterCard";
@@ -54,6 +54,8 @@ export default function CharacterMenu() {
     const playerID = localStorage.getItem("player_ID");
     const [builtCharacters, setBuiltCharacters] = useState({}); // { [id]: builtCharacter }
     const logPrefix = "[CharacterMenu]";
+    const loadInFlightRef = useRef(false);
+    const lastLoadKeyRef = useRef("");
 
     const handleDeleteCharacter = (characterID) => {
         
@@ -133,6 +135,18 @@ useEffect(() => {
         return;
     }
 
+    const loadKey = `${socket.id || "no-socket"}:${playerID}`;
+    if (loadInFlightRef.current) {
+        console.log(`${logPrefix} skip load (already in progress)`, { loadKey });
+        return;
+    }
+    if (lastLoadKeyRef.current === loadKey) {
+        console.log(`${logPrefix} skip load (same key already loaded)`, { loadKey });
+        return;
+    }
+    loadInFlightRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+
     // 1. Define an async function inside the effect
     const loadAndBuildCharacters = async () => {
         const menuLoadStartedAt = performance.now();
@@ -181,12 +195,14 @@ useEffect(() => {
         } catch (err) {
             console.error(`${logPrefix} load failed`, { message: err.message });
             setError(err.message);
+            lastLoadKeyRef.current = "";
         } finally {
             console.log(`${logPrefix} load complete`, {
                 playerID,
                 totalDurationMs: Math.round(performance.now() - menuLoadStartedAt),
             });
             setLoading(false); // Stop loading regardless of success/failure
+            loadInFlightRef.current = false;
         }
     };
 

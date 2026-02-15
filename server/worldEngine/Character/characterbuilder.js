@@ -1,6 +1,23 @@
 const CHARACTER = require('./character');
 const fs = require('fs').promises;
 const path = require('path');
+const Item = require('../../data/mongooseDataStructure/item');
+const Class = require('../../data/mongooseDataStructure/class');
+const Subclass = require('../../data/mongooseDataStructure/subclass');
+const Race = require('../../data/mongooseDataStructure/race');
+const SubRace = require('../../data/mongooseDataStructure/subrace');
+const Character = require('../../data/mongooseDataStructure/character');
+const Background = require('../../data/mongooseDataStructure/background');
+
+const MODELS = {
+    items: Item,
+    classes: Class,
+    subclasses: Subclass,
+    races: Race,
+    subraces: SubRace,
+    characters: Character,
+    backgrounds: Background
+};
 
 /**
  * CharacterBuilder - MongoDB + Server File Hybrid System
@@ -35,30 +52,46 @@ class CharacterBuilder {
      */
     async _queryDatabase(collection, operation, filter = {}) {
         const startedAt = Date.now();
-        return new Promise((resolve, reject) => {
-            this.socket.emit('database_query', {
+        const Model = MODELS[collection];
+        if (!Model) {
+            throw new Error(`Invalid collection: ${collection}`);
+        }
+
+        try {
+            let result;
+
+            switch (operation) {
+                case 'findById': {
+                    const idValue = filter._id || filter.id || filter.characterID;
+                    if (!idValue) throw new Error('No ID provided for findById');
+                    result = await Model.findById(idValue);
+                    break;
+                }
+                case 'findOne':
+                    result = await Model.findOne(filter);
+                    break;
+                case 'findAll':
+                    result = await Model.find(filter);
+                    break;
+                default:
+                    throw new Error(`Unsupported operation in CharacterBuilder: ${operation}`);
+            }
+
+            console.log(`${this.logPrefix} db query success`, {
                 collection,
                 operation,
-                filter
-            }, (response) => {
-                if (response.success) {
-                    console.log(`${this.logPrefix} db query success`, {
-                        collection,
-                        operation,
-                        durationMs: Date.now() - startedAt
-                    });
-                    resolve(response.data);
-                } else {
-                    console.warn(`${this.logPrefix} db query failed`, {
-                        collection,
-                        operation,
-                        durationMs: Date.now() - startedAt,
-                        message: response.message
-                    });
-                    reject(new Error(response.message || 'Database query failed'));
-                }
+                durationMs: Date.now() - startedAt
             });
-        });
+            return result;
+        } catch (error) {
+            console.warn(`${this.logPrefix} db query failed`, {
+                collection,
+                operation,
+                durationMs: Date.now() - startedAt,
+                message: error.message
+            });
+            throw error;
+        }
     }
 
     /**
