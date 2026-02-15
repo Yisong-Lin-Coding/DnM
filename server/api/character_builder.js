@@ -1,4 +1,4 @@
-const CharacterBuilder = require('../../classes/CharacterBuilder');
+const CharacterBuilder = require('../worldEngine/Character/characterbuilder');
 
 
 module.exports = (socket) => {
