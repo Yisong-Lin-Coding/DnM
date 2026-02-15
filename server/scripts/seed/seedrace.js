@@ -3,11 +3,11 @@ const mongoose = require('mongoose');
 const path = require('path');
 
 // Ensure these paths point to your new camelCase files
-const mainRacesData = require('../data/gameFiles/race/main_races.json');
-const subracesData = require('../data/gameFiles/race/subraces.json');
+const mainRacesData = require('../../data/gameFiles/race/main_races.json');
+const subracesData = require('../../data/gameFiles/race/subraces.json');
 
-const Race = require('../data/mongooseDataStructure/race');
-const SubRace = require('../data/mongooseDataStructure/subrace');
+const Race = require('../../data/mongooseDataStructure/race');
+const SubRace = require('../../data/mongooseDataStructure/subrace');
 
 const MONGO_URI = process.env.MONGO_URI;
 

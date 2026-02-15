@@ -1,7 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const itemsData = require('../data/gameFiles/item/items2.json');
-const Item = require('../data/mongooseDataStructure/item');
+const itemsData = require('../../data/gameFiles/item/items2.json');
+const Item = require('../../data/mongooseDataStructure/item');
 
 const MONGO_URI = process.env.MONGO_URI;
 

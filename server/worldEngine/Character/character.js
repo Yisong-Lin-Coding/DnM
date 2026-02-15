@@ -111,6 +111,28 @@ class CHARACTER {
             character: this
         };
 
+        if (this.race && this.race.abilityScoreModifiers) {
+            const modValue = this.race.abilityScoreModifiers[statName];
+            
+            if (modValue) {
+                context.value += modValue;
+            }
+        }
+
+        if (this.subrace && this.subrace.abilityScoreModifiers) {
+            const modValue = this.subrace.abilityScoreModifiers[statName];
+            if (modValue) {
+                context.value += modValue;
+            }
+        }
+
+        if (this.classType && this.classType.baseStatModifier) {
+            const modValue = this.classType.baseStatModifier[statName];
+            if (modValue) {
+                context.value += modValue;
+            }
+        }
+
         // Run through the pipeline
         this.applyModifierPipeline(`onStatCalc_${statName}`, context);
 
@@ -150,53 +172,57 @@ class CHARACTER {
     /**
      * GETTER: Armor Class (calculated through pipeline)
      */
-    get AC() {
-        if (!this._isDirty && this._cache.AC !== undefined) {
-            return this._cache.AC;
+    get AR() {
+        if (!this._isDirty && this._cache.AR !== undefined) {
+            return this._cache.AR;
         }
 
         const context = {
-            baseAC: 10,
-            dexMod: this.stats.DEX.modifier,
+            baseAR:{},
             character: this,
             armor: this.equippedItems.find(item => item.type === 'armor'),
             shield: this.equippedItems.find(item => item.type === 'shield')
         };
 
         // Apply armor base AC if equipped
-        if (context.armor && context.armor.baseAC) {
-            context.baseAC = context.armor.baseAC;
+        if (context.armor && context.armor.AR) {
             
-            // Some armor limits DEX bonus
-            if (context.armor.maxDexBonus !== undefined) {
-                context.dexMod = Math.min(context.dexMod, context.armor.maxDexBonus);
+            for(const part of context.armor.AR) {
+                context.baseAR[part] = context.armor.AR[part];
             }
+            
+            
         }
 
-        // Shield adds to AC
-        if (context.shield && context.shield.acBonus) {
-            context.baseAC += context.shield.acBonus;
-        }
 
-        context.totalAC = context.baseAC + context.dexMod;
+            if(context.shield && context.shield.AR) {
+                for(const part of context.shield.AR) {
+                    context.baseAR[part] = (context.baseAR[part] || 0) + context.shield.AR[part];
+                }
+            }
 
         // Run through modifier pipeline
-        this.applyModifierPipeline('onACCalc', context);
+        this.applyModifierPipeline('onARCalc', context);
 
-        this._cache.AC = context.totalAC;
-        return context.totalAC;
+        this._cache.AR = context.AR;
+        return context.AR;
     }
 
-    /**
-     * GETTER: Initiative (calculated through pipeline)
-     */
     get initiative() {
         const context = {
-            base: this.stats.DEX.modifier,
-            character: this
+            base: ((this.stats.DEX)-10)/2,
+            character: this,
+            roll:[{
+                dice: '1d20',
+                context: 'initiative roll'
+            }]
         };
 
         this.applyModifierPipeline('onInitiativeCalc', context);
+
+        for (const roll of context.roll) {
+            context.base += this._rollDice(roll.dice);
+        }
 
         return context.base;
     }
@@ -209,8 +235,14 @@ class CHARACTER {
             baseMax: this._baseHP.max,
             character: this,
             level: this.level,
-            conMod: this.stats.CON.modifier
-        };
+            con: this.stats.CON,
+            baseHPBonus: 0,
+            classHPBonus: this.class.resourcePoolModifier.HP
+        }
+
+        this.applyModifierPipeline('onPreHPCalc', context);
+
+        context.baseMax = context.con*(1+context.baseHPBonus+((context.level/2) * context.classHPBonus)); // Example HP scaling
 
         this.applyModifierPipeline('onHPCalc', context);
 
@@ -229,8 +261,15 @@ class CHARACTER {
             baseMax: this._baseMP.max,
             character: this,
             level: this.level,
-            intMod: this.stats.INT.modifier
+            wis: this.stats.WIS.modifier,
+            baseMPBonus: 0,
+            classMPBonus: this.class.resourcePoolModifier.MP
+
         };
+
+        this.applyModifierPipeline('onPreMPCalc', context);
+
+        context.baseMax = context.wis*(1+context.baseMPBonus+((context.level/2) * context.classMPBonus)); // Example MP scaling
 
         this.applyModifierPipeline('onMPCalc', context);
 
@@ -249,8 +288,14 @@ class CHARACTER {
             baseMax: this._baseSTA.max,
             character: this,
             level: this.level,
-            conMod: this.stats.CON.modifier
+            con: this.stats.CON,
+            baseSTABonus: 0,
+            classSTABonus: this.class.resourcePoolModifier.STA
         };
+
+        this.applyModifierPipeline('onPreSTACalc', context);
+
+            context.baseMax = 2 * context.con * (1+context.baseSTABonus+((context.level/2) * context.classSTABonus)); // Example STA scaling
 
         this.applyModifierPipeline('onSTACalc', context);
 
@@ -264,18 +309,36 @@ class CHARACTER {
     /**
      * Dice rolling utility
      */
-    _rollDice(dice) {
-        const [countStr, sidesStr] = dice.toLowerCase().split('d');
-        const count = Number(countStr);
-        const sides = Number(sidesStr);
-        let total = 0;
+_rollDice(context) {
+    // 1. Parse the dice string
+    const [countStr, sidesStr] = context.dice.toLowerCase().split('d');
+    const count = Number(countStr) || 1;
+    const sides = Number(sidesStr) || 20;
+    let total = 0;
 
-        for (let i = 0; i < count; i++) {
-            total += Math.floor(Math.random() * sides) + 1;
+    for (let i = 0; i < count; i++) {
+        let currentRolls = [];
+        
+        // 2. Determine how many dice to throw for this specific "count"
+        // If advantage is 1, we roll 2 dice. If 0, we roll 1.
+        const numToRoll = Math.abs(context.advantage || 0) + 1;
+
+        for (let j = 0; j < numToRoll; j++) {
+            currentRolls.push(Math.floor(Math.random() * sides) + 1);
         }
 
-        return total;
+        // 3. Pick the result based on advantage/disadvantage/normal
+        if (context.advantage > 0) {
+            total += Math.max(...currentRolls);
+        } else if (context.advantage < 0) {
+            total += Math.min(...currentRolls);
+        } else {
+            total += currentRolls[0]; // Normal roll
+        }
     }
+
+    return total;
+}
 
     /**
      * Main action handler
@@ -297,6 +360,30 @@ class CHARACTER {
     /**
      * Attack action with full pipeline support
      */
+
+
+    check(params){
+        
+        const context = {
+            character: this,
+            checkType: params.checkType, // e.g., 'stealth', 'perception', etc.
+            baseValue: 0,
+            roll: [{
+                dice: '1d20',
+                context: 'check roll'
+            }],
+            advantage: 0,
+            DC: params.DC || 10,
+            success: false
+        };
+
+        
+
+
+
+    }
+
+
     attack(params) {
         const context = {
             attacker: this,
@@ -304,10 +391,14 @@ class CHARACTER {
             weapon: params.weapon || { name: 'Unarmed Strike', damage: '1d1', type: 'bludgeoning' },
             
             // Attack Roll
-            attackRoll: this._rollDice('1d20'),
+            attackRoll: [{
+                dice: '1d20',
+                context: 'attack roll',
+            }],
+            baseAC:0,
+            AC:0,
             attackBonus: 0,
-            advantage: false,
-            disadvantage: false,
+            advantage: 0,
             
             // Damage
             damageParts: [
@@ -317,9 +408,12 @@ class CHARACTER {
                     source: 'weapon'
                 }
             ],
-            flatBonus: 0,
+            flatBonus: [{
+
+            }],
+            damageAdvantage:0,
             
-            isCrit: false,
+            isCrit: 0,
             hits: false
         };
 
@@ -327,28 +421,48 @@ class CHARACTER {
         gameEvents.emitGameEvent('preAttack', { attacker: this.name, target: params.target.name });
         this.applyModifierPipeline('onAttackRoll', context);
 
-        // Determine hit
-        const totalAttackRoll = context.attackRoll + context.attackBonus;
-        context.hits = totalAttackRoll >= params.target.AC;
-        context.isCrit = context.attackRoll === 20;
+
+            for (const roll of context.attackRoll) {
+                // We call the helper and store the result in a new "roll" property
+                const result = this._rollDice({dice:roll.dice, advantage: context.advantage});
+                
+                // This adds the 'roll' key to the object inside the array
+                roll.roll = result.total; 
+                
+                // Optional: Store the raw dice if you want to check for Crits later
+                roll.natural = result.allDiceThrown; 
+            }
+
+            if (context.attackRoll.find(r=>r.context === 'attack roll')?.roll === 20) {
+                context.isCrit += 1;
+            }
+
+        this.applyModifierPipeline('onACCalc', context);
+
+        for (const roll of context.attackRoll) {
+            context.baseAC += roll.roll
+        }
+
+        context.AC = context.baseAC + context.attackBonus;
+
+        context.hits = params.target.reaction({
+            attackContext:context
+        });
 
         if (context.hits) {
             // Phase 2: Damage Calculation
             this.applyModifierPipeline('onDamageCalc', context);
 
-            // Roll damage
-            let totalDamage = context.flatBonus;
-            context.damageParts.forEach(part => {
-                const roll = this._rollDice(part.dice);
-                totalDamage += context.isCrit ? roll * 2 : roll;
-            });
+            for (const part of context.damageParts) {
+                part.total = this._rollDice({dice:part.dice, advantage: context.damageAdvantage});
+                for(let i = 0; i<context.isCrit; i++) {
+                    part.total += this._rollDice({dice:part.dice, advantage: 99});
+                }
+            }
 
-            context.totalDamage = totalDamage;
-
-            // Apply damage to target
             params.target.takeDamage({
-                damage: totalDamage,
                 damageParts: context.damageParts,
+                flatBonus: context.flatBonus,
                 attacker: this,
                 isCrit: context.isCrit
             });
@@ -376,22 +490,54 @@ class CHARACTER {
         const context = {
             target: this,
             attacker: damageInfo.attacker,
-            incomingDamage: damageInfo.damage,
             damageParts: damageInfo.damageParts || [],
+            flatBonus: damageInfo.flatBonus || [],
             finalDamage: damageInfo.damage,
             isCrit: damageInfo.isCrit || false,
             
             // Resistance tracking
             resistances: {},
             immunities: {},
-            vulnerabilities: {}
+            ar: this.AR
         };
 
         // Run defensive pipeline
-        this.applyModifierPipeline('onReceiveDamage', context);
+        this.applyModifierPipeline('onTakeDamage', context);
+
+        for (const part of context.damageParts) {
+            if (context.immunities[part.type]) {
+                part.total = 0;
+            }
+            else if (context.resistances[part.type]) {
+                part.total = Math.floor(part.total * (0.95^context.resistances[part.type])); // Example: each resistance level reduces damage by 20%
+            }
+
+            if(context.ar[part.type]) {
+                part.total = Math.max(0, part.total - context.ar[part.type]);
+            }
+            context.finalDamage += part.total;
+        }
+
+        for (const bonus of context.flatBonus) {
+
+            if(context.immunities[bonus.type]) {
+                bonus.value = 0;
+            }
+            else if (context.resistances[bonus.type]) {
+                bonus.value = Math.floor(bonus.value * (0.95^context.resistances[bonus.type]));
+            }
+            if(context.ar[bonus.type]) {
+                bonus.value = Math.max(0, bonus.value - context.ar[bonus.type]);
+            }
+            
+            context.finalDamage += (bonus.value * (context?.isCrit || 1) * context.damageParts.length);
+        }
+
+
+
 
         // Apply final damage
-        const actualDamage = Math.max(0, Math.floor(context.finalDamage));
+        const actualDamage = Math.max(1, Math.floor(context.finalDamage));
         
         // First apply to temp HP
         if (this._baseHP.temp > 0) {
@@ -401,6 +547,12 @@ class CHARACTER {
             this._baseHP.current = Math.max(0, this._baseHP.current - remaining);
         } else {
             this._baseHP.current = Math.max(0, this._baseHP.current - actualDamage);
+        }
+
+        if (this._baseHP.current === 0) {
+            gameEvents.emitGameEvent('characterDown', {
+                target: this.name
+            });
         }
 
         gameEvents.emitGameEvent('damageTaken', {
@@ -416,7 +568,7 @@ class CHARACTER {
      * Add a status effect
      */
     addStatusEffect(effect) {
-        this.statusEffects.push(effect);
+        this.effect.push(effect);
         this.invalidateCache();
         gameEvents.emitGameEvent('statusEffectAdded', {
             target: this.name,
@@ -428,7 +580,7 @@ class CHARACTER {
      * Remove a status effect
      */
     removeStatusEffect(effectName) {
-        this.statusEffects = this.statusEffects.filter(e => e.name !== effectName);
+        this.effect = this.effect.filter(e => e.name !== effectName);
         this.invalidateCache();
         gameEvents.emitGameEvent('statusEffectRemoved', {
             target: this.name,
@@ -440,7 +592,7 @@ class CHARACTER {
      * Equip an item
      */
     equipItem(item) {
-        this.equippedItems.push(item);
+        this.inv.equipItem.push(item);
         this.invalidateCache();
     }
 
@@ -448,7 +600,7 @@ class CHARACTER {
      * Unequip an item
      */
     unequipItem(itemName) {
-        this.equippedItems = this.equippedItems.filter(i => i.name !== itemName);
+        this.inv.equipItem = this.inv.equipItem.filter(i => i.name !== itemName);
         this.invalidateCache();
     }
 }

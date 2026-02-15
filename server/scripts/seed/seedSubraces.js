@@ -6,8 +6,8 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 
-const subracesData = require('../data/gameFiles/race/subraces.json');
-const SubRace = require('../data/mongooseDataStructure/subrace');
+const subracesData = require('../../data/gameFiles/race/subraces.json');
+const SubRace = require('../../data/mongooseDataStructure/subrace');
 
 const MONGO_URI = process.env.MONGO_URI;
 

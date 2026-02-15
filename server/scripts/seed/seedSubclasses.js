@@ -1,9 +1,9 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const path = require('path');
-const Subclass = require('../data/mongooseDataStructure/subclass');
+const Subclass = require('../../data/mongooseDataStructure/subclass');
 
-const subclassesData = require('../data/gameFiles/class/subclasses.json');
+const subclassesData = require('../../data/gameFiles/class/subclasses.json');
 
 const MONGO_URI = process.env.MONGO_URI;
 

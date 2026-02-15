@@ -1,70 +1,19 @@
 import { User, Heart, Zap, Droplet } from "lucide-react";
 import IndexCardFolder from "./indexCard";
-import { SocketContext } from "../socket.io/context";
-import { useContext, useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
 
 export default function CharacterCard({ character, to, onClick }) {
-  const hp = character.HP || { current: 0, max: 0, temp: 0 };
-  const sta = character.STA || { current: 0, max: 0 };
-  const mp = character.MP || { current: 0, max: 0 };
-  const stats = character.stats || {};
-  const customization = character.customization || {};
+  const className =
+    character?.classType?.name ||
+    character?.classType ||
+    character?.class?.name ||
+    character?.className ||
+    "No Class";
 
-  const [classTable,setClassTable] = useState([])
-  const [backgroundTable, setBackgroundTable] = useState([])
-  const [raceTable, setRaceTable] = useState([])
-  const [subraceTable] = useState([])
-
-  
-
-  const socket = useContext(SocketContext);
-
-
-
-  useEffect(() => {
-      socket.emit(
-        'database_query',
-        {
-          collection: 'classes',
-          operation: 'findAll',
-        },
-        (response) => {
-          if (response.success) {
-            setClassTable(response.data);
-            console.log(response.data);
-          }
-        }
-      );
-      socket.emit(
-        'database_query',
-        {
-          collection: 'races',
-          operation: 'findAll',
-        },
-        (response) => {
-          if (response.success) {
-            setRaceTable(response.data);
-            console.log(response.data);
-          }
-        }
-      );
-      socket.emit(
-        'database_query',
-        {
-          collection: 'backgrounds',
-          operation: 'findAll',
-        },
-        (response) => {
-          if (response.success) {
-            setBackgroundTable(response.data);
-            console.log(response.data);
-          }
-        }
-      );
-    }, [socket]);
-
-  
+  const raceName =
+    character?.race?.name ||
+    character?.race ||
+    character?.raceName ||
+    "No Race";
 
 
   return (
@@ -87,22 +36,22 @@ export default function CharacterCard({ character, to, onClick }) {
             {/* Level Badge - Top Right */}
             <div className="flex justify-end mb-2">
               <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-white/30 shadow-lg">
-                <div className="text-sm font-bold text-white">Lv {character.level || 1}</div>
+                <div className="text-sm font-bold text-white">Lv {character?.level || 1}</div>
               </div>
             </div>
             
             {/* Name - Centered */}
             <div className="text-center mb-3">
               <h2 className="text-xl font-bold text-white drop-shadow-lg px-4">
-                {character.name || "Unnamed Character"}
+                {character?.name || "Unnamed Character"}
               </h2>
             </div>
             
             {/* Race/Class - Bottom, smaller text to avoid PFP overlap */}
             <div className="flex items-center justify-center gap-2 text-purple-100 text-xs px-4">
-              <span className="font-medium truncate max-w-[45%]">{classTable.find(u => u._id === character.class)?.name || "No Class"}</span>
-              <span className="text-purple-300 flex-shrink-0">•</span>
-              <span className="truncate max-w-[45%]">{raceTable.find(u => u._id === character.race)?.name || "No Race"}</span>
+              <span className="font-medium truncate max-w-[45%]">{className}</span>
+              <span className="text-purple-300 flex-shrink-0">|</span>
+              <span className="truncate max-w-[45%]">{raceName}</span>
             </div>
           </div>
         </div>
@@ -126,23 +75,23 @@ export default function CharacterCard({ character, to, onClick }) {
           <StatBar 
             icon={<Heart className="w-3.5 h-3.5" />}
             label="HP"
-            current={hp.current}
-            max={hp.max}
-            temp={hp.temp}
+            current={character?.hp?.current || 0}
+            max={character?.hp?.max || 1}
+            temp={character?.hp?.temp || 0}
             color="red"
           />
           <StatBar 
             icon={<Zap className="w-3.5 h-3.5" />}
             label="STA"
-            current={sta.current}
-            max={sta.max}
+            current={character?.sta?.current || 0}
+            max={character?.sta?.max || 1}
             color="yellow"
           />
           <StatBar 
             icon={<Droplet className="w-3.5 h-3.5" />}
             label="MP"
-            current={mp.current}
-            max={mp.max}
+            current={character?.mp?.current || 0}
+            max={character?.mp?.max || 1}
             color="blue"
           />
         </div>
@@ -158,11 +107,13 @@ export default function CharacterCard({ character, to, onClick }) {
         </div>
 
         {/* Attribute Grid with hover effects */}
-        {Object.keys(stats).length > 0 && (
+        {Object.keys(character?.stats || {}).length > 0 && (
           <div className="grid grid-cols-3 gap-2 w-full mb-4">
-            {Object.entries(stats).map(([stat, value]) => {
+            {Object.entries(character.stats).map(([stat, value]) => {
               // Handle both simple numbers and complex objects
-              const statValue = typeof value === 'object' ? (value.total || 0) : (value || 0);
+              const statValue = typeof value === 'object'
+                ? (value.total ?? value.score ?? 0)
+                : (value || 0);
               
               return (
                 <div 
@@ -183,36 +134,7 @@ export default function CharacterCard({ character, to, onClick }) {
           </div>
         )}
 
-        {/* Enhanced Appearance section */}
-        {(customization.skinColor || customization.eyeColor || customization.hairColor) && (
-          <div className="bg-slate-800/40 backdrop-blur-sm rounded-lg p-3 border border-slate-700/30 w-full mb-4">
-            <h3 className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider flex items-center gap-2">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-slate-700"></div>
-              <span>Appearance</span>
-              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-slate-700"></div>
-            </h3>
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              {customization.skinColor && (
-                <div className="text-center">
-                  <div className="text-slate-500 mb-1 text-[10px] uppercase tracking-wider">Skin</div>
-                  <div className="text-slate-200 font-medium truncate">{customization.skinColor}</div>
-                </div>
-              )}
-              {customization.eyeColor && (
-                <div className="text-center">
-                  <div className="text-slate-500 mb-1 text-[10px] uppercase tracking-wider">Eyes</div>
-                  <div className="text-slate-200 font-medium truncate">{customization.eyeColor}</div>
-                </div>
-              )}
-              {customization.hairColor && (
-                <div className="text-center">
-                  <div className="text-slate-500 mb-1 text-[10px] uppercase tracking-wider">Hair</div>
-                  <div className="text-slate-200 font-medium truncate">{customization.hairColor}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+
 
         {/* Bottom padding for scroll */}
         <div className="h-4"></div>

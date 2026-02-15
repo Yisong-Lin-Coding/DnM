@@ -1,21 +1,4 @@
-// Damage resistance/vulnerability multipliers
-const DAMAGE_MULTIPLIERS = {
-  'flaw': 4,           // Takes 4x damage
-  'weakness': 2,       // Takes 2x damage
-  'vulnerable': 1.5,   // Takes 1.5x damage
-  'normal': 1.0,       // Takes 1x damage
-  'resistant': 0.75,   // Takes 0.75x damage
-  'highly_resistant': 0.50,  // Takes 0.5x damage
-  'immune': 0.25,      // Takes 0.25x damage
-  'true_immunity': 0   // Takes 0 damage (cannot be stacked)
-};
 
-// Helper function to calculate final damage with resistance/vulnerability
-const calculateDamageWithResistance = (baseDamage, target, damageType) => {
-  const resistanceLevel = target.getResistanceLevel ? target.getResistanceLevel(damageType) : 'normal';
-  const multiplier = DAMAGE_MULTIPLIERS[resistanceLevel] !== undefined ? DAMAGE_MULTIPLIERS[resistanceLevel] : 1.0;
-  return Math.floor(baseDamage * multiplier);
-};
 
 const effects = {
   exhaustion: {

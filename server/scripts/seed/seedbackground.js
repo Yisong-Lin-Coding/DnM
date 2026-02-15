@@ -6,8 +6,8 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 
-const backgroundsData = require('../data/gameFiles/background/background.json');
-const Background = require('../data/mongooseDataStructure/background');
+const backgroundsData = require('../../data/gameFiles/background/background.json');
+const Background = require('../../data/mongooseDataStructure/background');
 
 const MONGO_URI = process.env.MONGO_URI;
 

@@ -6,13 +6,53 @@ import { SocketContext } from "../../socket.io/context";
 import { Plus, Edit2, Trash2, Eye } from "lucide-react"; // Added icons
 import CharacterCard from "../../pageComponents/characterCard";
 
+function normalizeStats(stats, fallbackStats = {}) {
+    if (stats && typeof stats === "object" && Object.keys(stats).length > 0) {
+        return stats;
+    }
+
+    if (fallbackStats && typeof fallbackStats === "object") {
+        const normalized = {};
+        Object.entries(fallbackStats).forEach(([key, value]) => {
+            const num = Number(value) || 0;
+            normalized[key.toUpperCase()] = { score: num, modifier: Math.floor((num - 10) / 2) };
+        });
+        return normalized;
+    }
+
+    return {};
+}
+
+function normalizeCharacterForCard(rawCharacter, fallbackCharacter = {}) {
+    const c = rawCharacter || {};
+    const f = fallbackCharacter || {};
+
+    const hp = c.hp || c.HP || c._baseHP || { max: 0, current: 0, temp: 0 };
+    const mp = c.mp || c.MP || c._baseMP || { max: 0, current: 0, temp: 0 };
+    const sta = c.sta || c.STA || c._baseSTA || { max: 0, current: 0, temp: 0 };
+    const stats = normalizeStats(c.stats, c._baseStats || f.stats);
+
+    return {
+        ...f,
+        ...c,
+        id: String(c.id || c._id || f.id || f._id || ""),
+        name: c.name || f.name || "Unnamed Character",
+        level: c.level || f.level || 1,
+        hp,
+        mp,
+        sta,
+        stats,
+    };
+}
+
+
 export default function CharacterMenu() {
     const socket = useContext(SocketContext);
     const [characters, setCharacters] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const playerID = localStorage.getItem("player_ID");
-
+    const [builtCharacters, setBuiltCharacters] = useState({}); // { [id]: builtCharacter }
 
     const handleDeleteCharacter = (characterID) => {
         
@@ -25,7 +65,7 @@ export default function CharacterMenu() {
             if (response && response.success) {
                 // This triggers the rerender instantly
                 setCharacters((prevCharacters) => 
-                    prevCharacters.filter(char => char.id !== characterID)
+                    prevCharacters.filter(char => String(char.id) !== String(characterID))
                 );
                 
                 // Don't forget to hide the menu!
@@ -35,6 +75,27 @@ export default function CharacterMenu() {
             }
         });
     }
+
+    const buildCharacter = async (characterID) => {
+    // 1. Basic validation
+    if (!socket || !playerID) return null;
+
+    // 2. Wrap the socket emit in a Promise
+    return new Promise((resolve, reject) => {
+        socket.emit("character_builder", { characterID }, (response) => {
+            if (response && response.success) {
+                // Success: Resolve the promise with the data
+                resolve(response.character);
+            } else {
+                // Failure: Log and Reject
+                const errorMsg = response?.message || 'Failed to build character';
+                console.error(errorMsg);
+                resolve(null); // Or use reject(errorMsg) if you want to use try/catch
+            }
+        });
+    });
+};
+    
 
     // --- CONTEXT MENU STATE ---
     const [contextMenu, setContextMenu] = useState({
@@ -57,31 +118,62 @@ export default function CharacterMenu() {
 
     // Close menu when clicking elsewhere
     const closeContextMenu = () => {
-        setContextMenu({ ...contextMenu, show: false });
+        setContextMenu((prev) => ({ ...prev, show: false, character: null }));
     };
 
-    useEffect(() => {
-        window.addEventListener("click", closeContextMenu);
-        return () => window.removeEventListener("click", closeContextMenu);
-    }, []);
+useEffect(() => {
+    if (!socket || !playerID) {
+        setLoading(false);
+        return;
+    }
 
-    // --- FETCH LOGIC (Existing) ---
-    useEffect(() => {
-        if (!socket || !playerID) {
-            setLoading(false);
-            return;
-        }
+    // 1. Define an async function inside the effect
+    const loadAndBuildCharacters = async () => {
+        setLoading(true); // Start loading
 
-        socket.emit("playerData_getCharacter", { playerID }, (response) => {
-            if (!response || !response.success) {
-                setError(response?.message || 'Failed to fetch characters');
-                setLoading(false);
-                return;
+        try {
+            // A. Get the list of character IDs
+            const listResponse = await new Promise((resolve) => {
+                socket.emit("playerData_getCharacter", { playerID }, resolve);
+            });
+
+            if (!listResponse || !listResponse.success) {
+                throw new Error(listResponse?.message || 'Failed to fetch characters');
             }
-            setCharacters(response.characters || []);
-            setLoading(false);
-        });
-    }, [socket, playerID]);
+
+            const charList = listResponse.characters || [];
+            setCharacters(charList);
+
+            // B. Build the mapping object: { [id]: characterData }
+            const builtMap = {};
+            
+            // Use Promise.all to fetch all characters in parallel for speed
+            await Promise.all(
+                charList.map(async (char) => {
+                    const builtChar = await buildCharacter(char.id); // Using your new async function
+                    builtMap[char.id] = normalizeCharacterForCard(builtChar, char);
+                })
+            );
+
+            // C. Update state once all are built
+            setBuiltCharacters(builtMap);
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false); // Stop loading regardless of success/failure
+        }
+    };
+
+    // 2. Call the function
+    loadAndBuildCharacters();
+
+}, [socket, playerID]);
+
+
+
+
+
 
     return (
         <>
@@ -96,7 +188,7 @@ export default function CharacterMenu() {
                             Character Actions
                         </div>
                         <div className="px-4 pb-2 text-xs font-semibold text-website-default-300 truncate">
-                            {contextMenu.character.name}
+                            {contextMenu.character?.name}
                         </div>
                         
                         {/* Divider */}
@@ -143,18 +235,24 @@ export default function CharacterMenu() {
                         {loading && <div>Loading characters...</div>}
                         {error && <div className="text-red-400">Error: {error}</div>}
                         
-                        {!loading && !error && characters.map(character => (
+                        {!loading && !error && characters.map(character => {
+                            const normalizedCharacter = normalizeCharacterForCard(
+                                builtCharacters[character.id],
+                                character
+                            );
+
+                            return (
                             <div 
                                 key={character.id} 
-                                onContextMenu={(e) => handleContextMenu(e, character)}
+                                onContextMenu={(e) => handleContextMenu(e, normalizedCharacter)}
                                 className="relative"
                             >
                                 <CharacterCard 
-                                    character={character}
-                                    to={`/ISK/${sessionStorage.getItem('session_ID') || 'default'}/character/view/${character.id}`}
+                                    character={normalizedCharacter}
+                                    to={`/ISK/${sessionStorage.getItem('session_ID') || 'default'}/character/view/${normalizedCharacter.id}`}
                                 />
                             </div>
-                        ))}
+                        )})}
 
                         <IndexCardFolder.File to={`/ISK/${sessionStorage.getItem('session_ID') || 'default'}/character/creation`}>
                             <IndexCardFolder.File.Bottom>
