@@ -63,21 +63,8 @@ class CharacterBuilder {
         if (!this.data.race) return this;
 
         try {
-            const race = await this._queryDatabase('races', 'findOne', { name: this.data.race });
-            this.fetchedData.race = race;
-
-            // Apply racial stat bonuses
-            if (race.statBonuses) {
-                for (const [stat, bonus] of Object.entries(race.statBonuses)) {
-                    this.data.stats[stat] = (this.data.stats[stat] || 10) + bonus;
-                }
-            }
-
-            // Store race features (which contain modifiers)
-            if (race.features) {
-                this.data.raceFeatures = this.data.raceFeatures || [];
-                this.data.raceFeatures.push(...race.features);
-            }
+            const race = await this._queryDatabase('races', 'findById', { _id: this.data.race });
+            this.data.race = race;
 
         } catch (error) {
             console.error('Error fetching race:', error);
@@ -93,21 +80,8 @@ class CharacterBuilder {
         if (!this.data.subrace) return this;
 
         try {
-            const subrace = await this._queryDatabase('subraces', 'findOne', { name: this.data.subrace });
-            this.fetchedData.subrace = subrace;
-
-            // Apply subrace stat bonuses
-            if (subrace.statBonuses) {
-                for (const [stat, bonus] of Object.entries(subrace.statBonuses)) {
-                    this.data.stats[stat] = (this.data.stats[stat] || 10) + bonus;
-                }
-            }
-
-            // Store subrace features
-            if (subrace.features) {
-                this.data.raceFeatures = this.data.raceFeatures || [];
-                this.data.raceFeatures.push(...subrace.features);
-            }
+            const subrace = await this._queryDatabase('subraces', 'findById', { _id: this.data.subrace });
+            this.data.subrace = subrace;
 
         } catch (error) {
             console.error('Error fetching subrace:', error);
@@ -123,37 +97,8 @@ class CharacterBuilder {
         if (!this.data.classType) return this;
 
         try {
-            const classData = await this._queryDatabase('classes', 'findOne', { name: this.data.classType });
-            this.fetchedData.class = classData;
-
-            // Calculate initial HP/MP/STA based on class
-            const level = this.data.level || 1;
-            const conMod = Math.floor((this.data.stats.CON - 10) / 2);
-            const intMod = Math.floor((this.data.stats.INT - 10) / 2);
-
-            this.data.HP = {
-                max: (classData.hitDie + conMod) * level,
-                current: (classData.hitDie + conMod) * level,
-                temp: 0
-            };
-
-            this.data.MP = {
-                max: Math.max(0, (classData.mpPerLevel || 0) + intMod) * level,
-                current: Math.max(0, (classData.mpPerLevel || 0) + intMod) * level,
-                temp: 0
-            };
-
-            this.data.STA = {
-                max: Math.max(0, (classData.staminaPerLevel || 0) + conMod) * level,
-                current: Math.max(0, (classData.staminaPerLevel || 0) + conMod) * level,
-                temp: 0
-            };
-
-            // Store class features
-            if (classData.features) {
-                this.data.classFeatures = this.data.classFeatures || [];
-                this.data.classFeatures.push(...classData.features);
-            }
+            const classData = await this._queryDatabase('classes', 'findById', { _id: this.data.class });
+            this.data.classType = classData;
 
         } catch (error) {
             console.error('Error fetching class:', error);
@@ -169,14 +114,8 @@ class CharacterBuilder {
         if (!this.data.subclassType) return this;
 
         try {
-            const subclass = await this._queryDatabase('subclasses', 'findOne', { name: this.data.subclassType });
-            this.fetchedData.subclass = subclass;
-
-            // Store subclass features
-            if (subclass.features) {
-                this.data.classFeatures = this.data.classFeatures || [];
-                this.data.classFeatures.push(...subclass.features);
-            }
+            const subclass = await this._queryDatabase('subclasses', 'findById', { _id: this.data.subclassType });
+            this.data.subclass = subclass;
 
         } catch (error) {
             console.error('Error fetching subclass:', error);
@@ -192,14 +131,8 @@ class CharacterBuilder {
         if (!this.data.background) return this;
 
         try {
-            const background = await this._queryDatabase('backgrounds', 'findOne', { name: this.data.background });
-            this.fetchedData.background = background;
-
-            // Backgrounds might provide skill proficiencies or equipment
-            if (background.features) {
-                this.data.abilities = this.data.abilities || [];
-                this.data.abilities.push(...background.features);
-            }
+            const background = await this._queryDatabase('backgrounds', 'findById', { _id: this.data.background });
+            this.data.background = background;
 
         } catch (error) {
             console.error('Error fetching background:', error);
@@ -227,7 +160,7 @@ class CharacterBuilder {
 
         } catch (error) {
             console.error('Error fetching equipped items:', error);
-            this.data.equippedItems = [];
+            this.data.equippedItems = {};
         }
 
         return this;

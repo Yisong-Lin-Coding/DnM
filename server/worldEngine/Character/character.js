@@ -2,10 +2,10 @@ const gameEvents = require('../../handlers/gameEventEmitter');
 
 class CHARACTER {
     constructor(data) {
-        // Raw base data (never modified directly)
+
         this._baseStats = { ...data.stats };
         
-        // Identity & Core Data
+  
         this.name = data.name;
         this.id = data.id;
         this.level = data.level || 1;
@@ -15,16 +15,16 @@ class CHARACTER {
         this.subrace = data.subrace || null;
         this.background = data.background || null;
         
-        // Resources (use base values, getters will calculate max)
+
         this._baseHP = data.HP || { max: 0, current: 0, temp: 0 };
         this._baseMP = data.MP || { max: 0, current: 0, temp: 0 };
         this._baseSTA = data.STA || { max: 0, current: 0, temp: 0 };
         
-        // Gameplay State
+
         this.movement = data.movement || 30;
         this.position = data.position || { x: 0, y: 0, z: 0 };
         
-        // Collections (these hold references to full objects with modifiers)
+
         this.abilities = data.abilities || [];
         this.equipment = data.equipment || [];
         this.inventory = data.inventory || [];
@@ -41,9 +41,6 @@ class CHARACTER {
         this._isDirty = true;
     }
 
-    /**
-     * Mark cache as dirty when something changes
-     */
     invalidateCache() {
         this._isDirty = true;
         this._cache = {};
@@ -57,12 +54,20 @@ class CHARACTER {
     getModifiersForHook(hookName) {
         const allSources = [
             { modifiers: this._baseModifiers },
-            ...this.equippedItems,
-            ...this.statusEffects,
-            ...this.abilities,
-            ...this.classFeatures,
-            ...this.raceFeatures,
-        ];
+            ...this.inv.equipment ,
+            ...this.effects,
+            ...this.skills.passive,
+            ...this.classType.classFeatures,
+            ...this.race.traits,
+
+        /** remember to add subclasses and also fix race.trait formating. Rn it's just a flat string, 
+        * it needs to be an object with a modifiers array to work with this system
+        *   Same with skills and passives
+        *     as well as effects
+        * all of these need to be formated in characterbuilder when we fetch the data, so that they can be properly processed here
+        * everything needs to be formated as an object with a modifiers array, even if it's just a single modifier, to work with this system
+        */
+    ];
 
         return allSources
             .flatMap(source => source.modifiers || [])
@@ -102,7 +107,7 @@ class CHARACTER {
     _calculateStat(statName) {
         const context = {
             stat: statName,
-            value: this._baseStats[statName] || 10,
+            value: (this._baseStats[statName])|| 10,
             character: this
         };
 

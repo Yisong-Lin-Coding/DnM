@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Card } from '../../../pageComponents/card';
 import { CircleUser } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const LABELS = {
   str: 'Strength',
@@ -14,6 +15,14 @@ const LABELS = {
 export function Summary({ values, onChange, onSave, classes = [], subclasses = [], races = [], subraces = [], backgrounds = [] }) {
   const character = values || {};
   const emit = (partial) => { if (typeof onChange === 'function') onChange(partial); };
+
+
+  const navigate = useNavigate();
+
+  const handleSave = () => {
+    onSave();
+    navigate(`/ISK/${sessionStorage.getItem("session_ID")}/character`);
+  }
 
   const selectedClass = useMemo(() => classes.find((c) => c._id === character.class), [classes, character.class]);
   const selectedSubclass = useMemo(() => subclasses.find((sc) => sc._id === character.subclass), [subclasses, character.subclass]);
@@ -217,7 +226,7 @@ export function Summary({ values, onChange, onSave, classes = [], subclasses = [
         <div className='flex justify-end'>
           <button
             className='px-4 py-2 bg-website-specials-500 text-white rounded hover:bg-website-specials-600'
-            onClick={onSave}
+            onClick={handleSave}
           >
             Save Character
           </button>

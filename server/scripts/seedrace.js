@@ -1,12 +1,8 @@
-/**
- * Seed script: Load main races and subraces into MongoDB
- * Run: node server/scripts/seedRaces.js
- */
-
 require('dotenv').config();
 const mongoose = require('mongoose');
 const path = require('path');
 
+// Ensure these paths point to your new camelCase files
 const mainRacesData = require('../data/gameFiles/race/main_races.json');
 const subracesData = require('../data/gameFiles/race/subraces.json');
 
@@ -18,65 +14,58 @@ const MONGO_URI = process.env.MONGO_URI;
 async function seedRaces() {
   try {
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 30000 });
+    await mongoose.connect(MONGO_URI);
     console.log('✓ Connected to MongoDB');
 
-    // Clear existing races and subraces
-    const deleteMain = await Race.deleteMany({});
-    const deleteSub = await SubRace.deleteMany({});
-    console.log(`✓ Deleted ${deleteMain.deletedCount} main races and ${deleteSub.deletedCount} subraces`);
+    // Clear existing
+    await Race.deleteMany({});
+    await SubRace.deleteMany({});
+    console.log('✓ Cleared existing collections');
 
     // Seed main races
-    console.log('Seeding main races...');
     const mainRacesToInsert = mainRacesData.map(race => ({
       name: race.name,
-      raceID: race.race_id,
+      raceID: race.raceId, // Mapped from camelCase raceId
       description: race.description,
       speed: race.speed,
-      abilityScoreModifiers: race.ability_score_modifiers || {},
+      abilityScoreModifiers: race.abilityScoreModifiers || {},
       size: race.size || 'M',
       languages: race.languages || [],
       traits: race.traits || [],
       choices: race.choices || {},
-      subraces: race.subraces.map(sr => ({
-        name: sr.name,
-        subraceID: sr.race_id
+      subraces: race.subraces.map(srId => ({
+        subraceID: srId // Mapping the ID strings to the subrace schema
       }))
     }));
 
-    const insertedMainRaces = await Race.insertMany(mainRacesToInsert);
-    console.log(`✓ Inserted ${insertedMainRaces.length} main races`);
+    await Race.insertMany(mainRacesToInsert);
+    console.log(`✓ Inserted ${mainRacesToInsert.length} main races`);
 
     // Seed subraces
-    console.log('Seeding subraces...');
     const subracesToInsert = subracesData.map(sr => ({
       name: sr.name,
-      subraceID: sr.race_id,
+      subraceID: sr.raceId, // Mapped from camelCase raceId
       mainrace: [
         {
-          name: sr.race, // main race name
-          raceID: sr.race // main race ID
+          raceID: sr.race // The parent race identifier
         }
       ],
       description: sr.description,
       speed: sr.speed,
-      abilityScoreModifiers: sr.ability_score_modifiers || {},
+      abilityScoreModifiers: sr.abilityScoreModifiers || {},
       size: sr.size || 'M',
       languages: sr.languages || [],
       traits: sr.traits || [],
       choices: sr.choices || {}
     }));
 
-    const insertedSubraces = await SubRace.insertMany(subracesToInsert);
-    console.log(`✓ Inserted ${insertedSubraces.length} subraces`);
+    await SubRace.insertMany(subracesToInsert);
+    console.log(`✓ Inserted ${subracesToInsert.length} subraces`);
 
-    await mongoose.connection.close();
-    console.log('✓ Connection closed');
+    console.log('✓ Seeding Complete');
     process.exit(0);
-
   } catch (err) {
     console.error('Seed error:', err);
-    await mongoose.connection.close();
     process.exit(1);
   }
 }

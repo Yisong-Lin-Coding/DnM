@@ -26,6 +26,11 @@ function Login() {
                         console.log(response.message)
                     })
 
+                    while(sessionStorage.getItem("session_ID") === null){
+                        setTimeout(() => {
+                            }, 100)
+                    }
+                    
                     navigate(`/ISK/${sessionStorage.getItem(`session_ID`)}/home`);
                 } 
                 else {
@@ -41,8 +46,14 @@ function Login() {
 useEffect(() => {
     function autoLogin() {
         const playerID = (localStorage.getItem("player_ID") || "");
-        const sessionID = (sessionStorage.getItem("session_ID") || "")
+        
         const lastLocation = (sessionStorage.getItem("lastLocation") || "")
+
+        while(sessionStorage.getItem("session_ID") === null){
+            setTimeout(() => {
+                }, 100)
+        }
+        const sessionID = (sessionStorage.getItem("session_ID"))
         
         socket.emit("login_validityCheck", { playerID, sessionID }, (response) => {
             if (response.success) {

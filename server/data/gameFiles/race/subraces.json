@@ -1,10 +1,10 @@
 [
   {
     "name": "Genasi (Air)",
-    "race_id": "genasi_air",
+    "raceId": "genasiAir",
     "description": "You can hold your breath indefinitely while you're not incapacitated....",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "con": 2,
       "dex": 1
     },
@@ -14,18 +14,18 @@
       "primordial"
     ],
     "traits": [
-      "unending_breath",
-      "mingle_with_the_wind"
+      "unendingBreath",
+      "mingleWithTheWind"
     ],
     "choices": {},
     "race": "genasi"
   },
   {
     "name": "Elf (Drow)",
-    "race_id": "elf_drow",
+    "raceId": "elfDrow",
     "description": "Accustomed to the depths of the Underdark, you have superior vision in dark and dim conditions. You can see in dim light within 120 feet of you as if it were bright light, and in darkness as if it wer...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2,
       "cha": 1
     },
@@ -35,23 +35,23 @@
       "elvish"
     ],
     "traits": [
-      "superior_darkvision",
-      "keen_senses",
-      "fey_ancestry",
+      "superiorDarkvision",
+      "keenSenses",
+      "feyAncestry",
       "trance",
-      "sunlight_sensitivity",
-      "drow_magic",
-      "drow_weapon_training"
+      "sunlightSensitivity",
+      "drowMagic",
+      "drowWeaponTraining"
     ],
     "choices": {},
     "race": "elf"
   },
   {
     "name": "Gnome (Deep)",
-    "race_id": "gnome_deep",
+    "raceId": "gnomeDeep",
     "description": "Accustomed to life underground, you have superior vision in dark and dim conditions. You can see in dim light within 120 feet of you as if it were bright light, and in darkness as if it were dim light...",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "int": 2,
       "dex": 1
     },
@@ -62,19 +62,19 @@
       "undercommon"
     ],
     "traits": [
-      "superior_darkvision",
-      "gnome_cunning",
-      "stone_camouflage"
+      "superiorDarkvision",
+      "gnomeCunning",
+      "stoneCamouflage"
     ],
     "choices": {},
     "race": "gnome"
   },
   {
     "name": "Genasi (Earth)",
-    "race_id": "genasi_earth",
+    "raceId": "genasiEarth",
     "description": "You can move across difficult terrain made of earth or stone without expending extra movement....",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "con": 2,
       "str": 1
     },
@@ -84,18 +84,18 @@
       "primordial"
     ],
     "traits": [
-      "earth_walk",
-      "merge_with_stone"
+      "earthWalk",
+      "mergeWithStone"
     ],
     "choices": {},
     "race": "genasi"
   },
   {
     "name": "Elf (Eladrin)",
-    "race_id": "elf_eladrin",
+    "raceId": "elfEladrin",
     "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2,
       "int": 1
     },
@@ -106,21 +106,21 @@
     ],
     "traits": [
       "darkvision",
-      "keen_senses",
-      "fey_ancestry",
+      "keenSenses",
+      "feyAncestry",
       "trance",
-      "elf_weapon_training",
-      "fey_step"
+      "elfWeaponTraining",
+      "feyStep"
     ],
     "choices": {},
     "race": "elf"
   },
   {
     "name": "Genasi (Fire)",
-    "race_id": "genasi_fire",
+    "raceId": "genasiFire",
     "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. Your ties to the Elemental Plane of Fire make your darkvision unusual: everything yo...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "con": 2,
       "int": 1
     },
@@ -131,18 +131,18 @@
     ],
     "traits": [
       "darkvision",
-      "fire_resistance",
-      "reach_to_the_blaze"
+      "fireResistance",
+      "reachToTheBlaze"
     ],
     "choices": {},
     "race": "genasi"
   },
   {
     "name": "Gnome (Forest)",
-    "race_id": "gnome_forest",
+    "raceId": "gnomeForest",
     "description": "Accustomed to life underground, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light....",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "int": 2,
       "dex": 1
     },
@@ -154,19 +154,19 @@
     ],
     "traits": [
       "darkvision",
-      "gnome_cunning",
-      "natural_illusionist",
-      "speak_with_small_beasts"
+      "gnomeCunning",
+      "naturalIllusionist",
+      "speakWithSmallBeasts"
     ],
     "choices": {},
     "race": "gnome"
   },
   {
     "name": "Half-Elf",
-    "race_id": "halfelf",
+    "raceId": "halfelf",
     "description": "Two different ability scores of your choice increase by 1....",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2
     },
     "size": "M",
@@ -176,20 +176,20 @@
     ],
     "traits": [
       "darkvision",
-      "fey_ancestry",
-      "skill_versatility"
+      "feyAncestry",
+      "skillVersatility"
     ],
     "choices": {
-      "ability_scores": "Cha 2 Choose 2 1"
+      "abilityScores": "Cha 2 Choose 2 1"
     },
     "race": "elf"
   },
   {
     "name": "Half-Orc",
-    "race_id": "halforc",
+    "raceId": "halforc",
     "description": "Thanks to your orc blood, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You c...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "str": 2,
       "con": 1
     },
@@ -202,18 +202,18 @@
     "traits": [
       "darkvision",
       "menacing",
-      "relentless_endurance",
-      "savage_attacks"
+      "relentlessEndurance",
+      "savageAttacks"
     ],
     "choices": {},
     "race": "orc"
   },
   {
     "name": "Dwarf (Hill)",
-    "race_id": "dwarf_hill",
+    "raceId": "dwarfHill",
     "description": "Player's Handbook",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "con": 2,
       "wis": 1
     },
@@ -225,21 +225,21 @@
     "traits": [
       "speed",
       "darkvision",
-      "dwarven_resilience",
-      "dwarven_combat_training",
-      "tool_proficiency",
+      "dwarvenResilience",
+      "dwarvenCombatTraining",
+      "toolProficiency",
       "stonecunning",
-      "dwarven_toughness"
+      "dwarvenToughness"
     ],
     "choices": {},
     "race": "dwarf"
   },
   {
     "name": "Human (Variant)",
-    "race_id": "human_variant",
+    "raceId": "humanVariant",
     "description": "Two different ability scores of your choice increase by 1....",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "choose": 2
     },
     "size": "M",
@@ -254,16 +254,16 @@
       "feat"
     ],
     "choices": {
-      "ability_scores": "Choose 2 1"
+      "abilityScores": "Choose 2 1"
     },
     "race": "human"
   },
   {
     "name": "Halfling (Lightfoot)",
-    "race_id": "halfling_lightfoot",
+    "raceId": "halflingLightfoot",
     "description": "When you roll a 1 on an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll....",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2,
       "cha": 1
     },
@@ -275,18 +275,18 @@
     "traits": [
       "lucky",
       "brave",
-      "halfling_nimbleness",
-      "naturally_stealthy"
+      "halflingNimbleness",
+      "naturallyStealthy"
     ],
     "choices": {},
     "race": "halfling"
   },
   {
     "name": "Dwarf (Mountain)",
-    "race_id": "dwarf_mountain",
+    "raceId": "dwarfMountain",
     "description": "Player's Handbook",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "con": 2,
       "str": 2
     },
@@ -298,21 +298,21 @@
     "traits": [
       "speed",
       "darkvision",
-      "dwarven_resilience",
-      "dwarven_combat_training",
-      "tool_proficiency",
+      "dwarvenResilience",
+      "dwarvenCombatTraining",
+      "toolProficiency",
       "stonecunning",
-      "dwarven_armor_training"
+      "dwarvenArmorTraining"
     ],
     "choices": {},
     "race": "dwarf"
   },
   {
     "name": "Shifter (Razorclaw)",
-    "race_id": "shifter_razorclaw",
+    "raceId": "shifterRazorclaw",
     "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2
     },
     "size": "M",
@@ -323,17 +323,17 @@
     "traits": [
       "darkvision",
       "shifting",
-      "shifting_feature"
+      "shiftingFeature"
     ],
     "choices": {},
     "race": "shifter"
   },
   {
     "name": "Gnome (Rock)",
-    "race_id": "gnome_rock",
+    "raceId": "gnomeRock",
     "description": "Accustomed to life underground, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light....",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "int": 2,
       "con": 1
     },
@@ -345,8 +345,8 @@
     ],
     "traits": [
       "darkvision",
-      "gnome_cunning",
-      "artificers_lore",
+      "gnomeCunning",
+      "artificersLore",
       "tinker"
     ],
     "choices": {},
@@ -354,10 +354,10 @@
   },
   {
     "name": "Halfling (Stout)",
-    "race_id": "halfling_stout",
+    "raceId": "halflingStout",
     "description": "When you roll a 1 on an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll....",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2,
       "con": 1
     },
@@ -369,18 +369,18 @@
     "traits": [
       "lucky",
       "brave",
-      "halfling_nimbleness",
-      "stout_resilience"
+      "halflingNimbleness",
+      "stoutResilience"
     ],
     "choices": {},
     "race": "halfling"
   },
   {
     "name": "Tiefling (Infernal)",
-    "race_id": "tiefling_infernal",
+    "raceId": "tieflingInfernal",
     "description": "Thanks to your infernal heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim ligh...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2,
       "int": 1
     },
@@ -391,11 +391,11 @@
     ],
     "traits": [
       "darkvision",
-      "hellish_resistance",
-      "infernal_legacy",
-      "feral_variant",
-      "variant_features_choose_1",
-      "appearance_variant"
+      "hellishResistance",
+      "infernalLegacy",
+      "feralVariant",
+      "variantFeaturesChoose_1",
+      "appearanceVariant"
     ],
     "choices": {
       "traits": [
@@ -417,10 +417,10 @@
   },
   {
     "name": "Genasi (Water)",
-    "race_id": "genasi_water",
+    "raceId": "genasiWater",
     "description": "Elemental Evil Player's Companion",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "con": 2,
       "wis": 1
     },
@@ -430,20 +430,20 @@
       "primordial"
     ],
     "traits": [
-      "acid_resistance",
+      "acidResistance",
       "amphibious",
       "swim",
-      "call_to_the_wave"
+      "callToTheWave"
     ],
     "choices": {},
     "race": "genasi"
   },
   {
     "name": "Shifter (Wildhunt)",
-    "race_id": "shifter_wildhunt",
+    "raceId": "shifterWildhunt",
     "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 1,
       "wis": 1
     },
@@ -455,17 +455,17 @@
     "traits": [
       "darkvision",
       "shifting",
-      "shifting_feature"
+      "shiftingFeature"
     ],
     "choices": {},
     "race": "shifter"
   },
   {
     "name": "Elf (Wood)",
-    "race_id": "elf_wood",
+    "raceId": "elfWood",
     "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
     "speed": 35,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2,
       "wis": 1
     },
@@ -476,22 +476,22 @@
     ],
     "traits": [
       "darkvision",
-      "keen_senses",
-      "fey_ancestry",
+      "keenSenses",
+      "feyAncestry",
       "trance",
-      "elf_weapon_training",
-      "fleet_of_foot",
-      "mask_of_the_wild"
+      "elfWeaponTraining",
+      "fleetOfFoot",
+      "maskOfTheWild"
     ],
     "choices": {},
     "race": "elf"
   },
   {
     "name": "Dwarf (Duergar)",
-    "race_id": "dwarf_duergar",
+    "raceId": "dwarfDuergar",
     "description": "Sword Coast Adventurer's Guide",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "con": 2,
       "str": 1
     },
@@ -503,23 +503,23 @@
     ],
     "traits": [
       "speed",
-      "superior_darkvision",
-      "duergar_resilience",
-      "dwarven_combat_training",
-      "tool_proficiency",
+      "superiorDarkvision",
+      "duergarResilience",
+      "dwarvenCombatTraining",
+      "toolProficiency",
       "stonecunning",
-      "duergar_magic",
-      "sunlight_sensitivity"
+      "duergarMagic",
+      "sunlightSensitivity"
     ],
     "choices": {},
     "race": "dwarf"
   },
   {
     "name": "Half-Elf (Wood Elf Descent)",
-    "race_id": "halfelf_wood_elf_descent",
+    "raceId": "halfelfWoodElfDescent",
     "description": "Two different ability scores of your choice increase by 1....",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2
     },
     "size": "M",
@@ -529,8 +529,8 @@
     ],
     "traits": [
       "darkvision",
-      "fey_ancestry",
-      "variant_feature_choose_1"
+      "feyAncestry",
+      "variantFeatureChoose_1"
     ],
     "choices": {
       "traits": [
@@ -544,10 +544,10 @@
   },
   {
     "name": "Half-Elf (Moon Elf or Sun Elf Descent)",
-    "race_id": "halfelf_moon_elf_or_sun_elf_descent",
+    "raceId": "halfelfMoonElfOrSunElfDescent",
     "description": "Two different ability scores of your choice increase by 1....",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2
     },
     "size": "M",
@@ -557,8 +557,8 @@
     ],
     "traits": [
       "darkvision",
-      "fey_ancestry",
-      "variant_feature_choose_1"
+      "feyAncestry",
+      "variantFeatureChoose_1"
     ],
     "choices": {
       "traits": [
@@ -572,10 +572,10 @@
   },
   {
     "name": "Half-Elf (Drow Descent)",
-    "race_id": "halfelf_drow_descent",
+    "raceId": "halfelfDrowDescent",
     "description": "Two different ability scores of your choice increase by 1....",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2
     },
     "size": "M",
@@ -585,8 +585,8 @@
     ],
     "traits": [
       "darkvision",
-      "fey_ancestry",
-      "variant_feature_choose_1"
+      "feyAncestry",
+      "variantFeatureChoose_1"
     ],
     "choices": {
       "traits": [
@@ -600,10 +600,10 @@
   },
   {
     "name": "Half-Elf (Aquatic Elf Descent)",
-    "race_id": "halfelf_aquatic_elf_descent",
+    "raceId": "halfelfAquaticElfDescent",
     "description": "Two different ability scores of your choice increase by 1....",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2
     },
     "size": "M",
@@ -613,8 +613,8 @@
     ],
     "traits": [
       "darkvision",
-      "fey_ancestry",
-      "variant_feature_choose_1"
+      "feyAncestry",
+      "variantFeatureChoose_1"
     ],
     "choices": {
       "traits": [
@@ -628,10 +628,10 @@
   },
   {
     "name": "Halfling (Ghostwise)",
-    "race_id": "halfling_ghostwise",
+    "raceId": "halflingGhostwise",
     "description": "When you roll a 1 on an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll....",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2,
       "wis": 1
     },
@@ -643,18 +643,18 @@
     "traits": [
       "lucky",
       "brave",
-      "halfling_nimbleness",
-      "silent_speech"
+      "halflingNimbleness",
+      "silentSpeech"
     ],
     "choices": {},
     "race": "halfling"
   },
   {
     "name": "Aasimar (Fallen)",
-    "race_id": "aasimar_fallen",
+    "raceId": "aasimarFallen",
     "description": "Blessed with a radiant soul, your vision can easily cut through darkness. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't ...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2,
       "str": 1
     },
@@ -665,20 +665,20 @@
     ],
     "traits": [
       "darkvision",
-      "celestial_resistance",
-      "healing_hands",
-      "light_bearer",
-      "necrotic_shroud"
+      "celestialResistance",
+      "healingHands",
+      "lightBearer",
+      "necroticShroud"
     ],
     "choices": {},
     "race": "aasimar"
   },
   {
     "name": "Aasimar (Protector)",
-    "race_id": "aasimar_protector",
+    "raceId": "aasimarProtector",
     "description": "Blessed with a radiant soul, your vision can easily cut through darkness. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't ...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2,
       "wis": 1
     },
@@ -689,20 +689,20 @@
     ],
     "traits": [
       "darkvision",
-      "celestial_resistance",
-      "healing_hands",
-      "light_bearer",
-      "radiant_soul"
+      "celestialResistance",
+      "healingHands",
+      "lightBearer",
+      "radiantSoul"
     ],
     "choices": {},
     "race": "aasimar"
   },
   {
     "name": "Aasimar (Scourge)",
-    "race_id": "aasimar_scourge",
+    "raceId": "aasimarScourge",
     "description": "Blessed with a radiant soul, your vision can easily cut through darkness. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't ...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2,
       "con": 1
     },
@@ -713,20 +713,20 @@
     ],
     "traits": [
       "darkvision",
-      "celestial_resistance",
-      "healing_hands",
-      "light_bearer",
-      "radiant_consumption"
+      "celestialResistance",
+      "healingHands",
+      "lightBearer",
+      "radiantConsumption"
     ],
     "choices": {},
     "race": "aasimar"
   },
   {
     "name": "Yuan-ti Pureblood",
-    "race_id": "yuanti_pureblood",
+    "raceId": "yuantiPureblood",
     "description": "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray....",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2,
       "int": 1
     },
@@ -738,19 +738,19 @@
     ],
     "traits": [
       "darkvision",
-      "innate_spellcasting",
-      "magic_resistance",
-      "poison_immunity"
+      "innateSpellcasting",
+      "magicResistance",
+      "poisonImmunity"
     ],
     "choices": {},
     "race": "yuanti"
   },
   {
     "name": "Shifter (Beasthide)",
-    "race_id": "shifter_beasthide",
+    "raceId": "shifterBeasthide",
     "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 1,
       "con": 1
     },
@@ -762,17 +762,17 @@
     "traits": [
       "darkvision",
       "shifting",
-      "shifting_feature"
+      "shiftingFeature"
     ],
     "choices": {},
     "race": "shifter"
   },
   {
     "name": "Shifter (Cliffwalk)",
-    "race_id": "shifter_cliffwalk",
+    "raceId": "shifterCliffwalk",
     "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2
     },
     "size": "M",
@@ -783,17 +783,17 @@
     "traits": [
       "darkvision",
       "shifting",
-      "shifting_feature"
+      "shiftingFeature"
     ],
     "choices": {},
     "race": "shifter"
   },
   {
     "name": "Shifter (Longstride)",
-    "race_id": "shifter_longstride",
+    "raceId": "shifterLongstride",
     "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2
     },
     "size": "M",
@@ -804,17 +804,17 @@
     "traits": [
       "darkvision",
       "shifting",
-      "shifting_feature"
+      "shiftingFeature"
     ],
     "choices": {},
     "race": "shifter"
   },
   {
     "name": "Shifter (Longtooth)",
-    "race_id": "shifter_longtooth",
+    "raceId": "shifterLongtooth",
     "description": "Your lycanthropic heritage grants you the ability to see in dark conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "str": 1,
       "dex": 1
     },
@@ -826,17 +826,17 @@
     "traits": [
       "darkvision",
       "shifting",
-      "shifting_feature"
+      "shiftingFeature"
     ],
     "choices": {},
     "race": "shifter"
   },
   {
     "name": "Tiefling (Abyssal)",
-    "race_id": "tiefling_abyssal",
+    "raceId": "tieflingAbyssal",
     "description": "Thanks to your infernal heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim ligh...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "cha": 2,
       "con": 1
     },
@@ -847,18 +847,18 @@
     ],
     "traits": [
       "darkvision",
-      "abyssal_arcana",
-      "abyssal_fortitude"
+      "abyssalArcana",
+      "abyssalFortitude"
     ],
     "choices": {},
     "race": "tiefling"
   },
   {
     "name": "Minotaur (Krynn)",
-    "race_id": "minotaur_krynn",
+    "raceId": "minotaurKrynn",
     "description": "From a young age, you focused on one of the three virtues of strength, cunning, or intellect. Your choice of your Strength, Intelligence, or Wisdom score increases by 1....",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "str": 1
     },
     "size": "M",
@@ -866,22 +866,22 @@
       "common"
     ],
     "traits": [
-      "conquerors_virtue",
+      "conquerorsVirtue",
       "horns",
-      "goring_rush",
-      "hammering_horns",
-      "labyrinthine_recall",
-      "sea_reaver"
+      "goringRush",
+      "hammeringHorns",
+      "labyrinthineRecall",
+      "seaReaver"
     ],
     "choices": {},
     "race": "minotaur"
   },
   {
     "name": "Merfolk (Cosi Creed)",
-    "race_id": "merfolk_cosi_creed",
+    "raceId": "merfolkCosiCreed",
     "description": "Plane Shift Zendikar",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "int": 1,
       "cha": 2
     },
@@ -893,7 +893,7 @@
     "traits": [
       "amphibious",
       "cantrip",
-      "creed_of_the_trickster",
+      "creedOfTheTrickster",
       "swimming"
     ],
     "choices": {
@@ -906,10 +906,10 @@
   },
   {
     "name": "Merfolk (Emeria Creed)",
-    "race_id": "merfolk_emeria_creed",
+    "raceId": "merfolkEmeriaCreed",
     "description": "Plane Shift Zendikar",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "wis": 2,
       "cha": 1
     },
@@ -922,7 +922,7 @@
       "amphibious",
       "cantrip",
       "swimming",
-      "wind_creed_manipulation"
+      "windCreedManipulation"
     ],
     "choices": {
       "proficiencies": [
@@ -934,10 +934,10 @@
   },
   {
     "name": "Goblin (Grogtag Tribe)",
-    "race_id": "goblin_grogtag_tribe",
+    "raceId": "goblinGrogtagTribe",
     "description": "Thanks to your heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You ca...",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "con": 2
     },
     "size": "S",
@@ -948,17 +948,17 @@
     "traits": [
       "darkvision",
       "grit",
-      "grogtag_tamer"
+      "grogtagTamer"
     ],
     "choices": {},
     "race": "goblin"
   },
   {
     "name": "Elf (Joraga Nation)",
-    "race_id": "elf_joraga_nation",
+    "raceId": "elfJoragaNation",
     "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
     "speed": 35,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 1,
       "wis": 2
     },
@@ -969,21 +969,21 @@
     ],
     "traits": [
       "darkvision",
-      "keen_senses",
-      "fey_ancestry",
-      "fleet_of_foot",
-      "mask_of_the_wild",
-      "elf_weapon_training"
+      "keenSenses",
+      "feyAncestry",
+      "fleetOfFoot",
+      "maskOfTheWild",
+      "elfWeaponTraining"
     ],
     "choices": {},
     "race": "elf"
   },
   {
     "name": "Goblin (Lavastep Tribe)",
-    "race_id": "goblin_lavastep_tribe",
+    "raceId": "goblinLavastepTribe",
     "description": "Thanks to your heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You ca...",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "con": 2
     },
     "size": "S",
@@ -994,17 +994,17 @@
     "traits": [
       "darkvision",
       "grit",
-      "lavastep_grit"
+      "lavastepGrit"
     ],
     "choices": {},
     "race": "goblin"
   },
   {
     "name": "Elf (Mul Daya Nation)",
-    "race_id": "elf_mul_daya_nation",
+    "raceId": "elfMulDayaNation",
     "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "str": 1,
       "wis": 2
     },
@@ -1015,22 +1015,22 @@
     ],
     "traits": [
       "darkvision",
-      "keen_senses",
-      "fey_ancestry",
-      "mul_daya_magic",
-      "superior_darkvision",
-      "sunlight_sensitivity",
-      "elf_weapon_training"
+      "keenSenses",
+      "feyAncestry",
+      "mulDayaMagic",
+      "superiorDarkvision",
+      "sunlightSensitivity",
+      "elfWeaponTraining"
     ],
     "choices": {},
     "race": "elf"
   },
   {
     "name": "Goblin (Tuktuk Tribe)",
-    "race_id": "goblin_tuktuk_tribe",
+    "raceId": "goblinTuktukTribe",
     "description": "Thanks to your heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You ca...",
     "speed": 25,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "con": 2
     },
     "size": "S",
@@ -1041,17 +1041,17 @@
     "traits": [
       "darkvision",
       "grit",
-      "tuktuk_cunning"
+      "tuktukCunning"
     ],
     "choices": {},
     "race": "goblin"
   },
   {
     "name": "Elf (Tajuru Nation)",
-    "race_id": "elf_tajuru_nation",
+    "raceId": "elfTajuruNation",
     "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "wis": 2,
       "cha": 1
     },
@@ -1062,10 +1062,10 @@
     ],
     "traits": [
       "darkvision",
-      "keen_senses",
-      "fey_ancestry",
+      "keenSenses",
+      "feyAncestry",
       "trance",
-      "skill_versatility"
+      "skillVersatility"
     ],
     "choices": {
       "proficiencies": [
@@ -1077,10 +1077,10 @@
   },
   {
     "name": "Merfolk (Ula Creed)",
-    "race_id": "merfolk_ula_creed",
+    "raceId": "merfolkUlaCreed",
     "description": "Plane Shift Zendikar",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "int": 2,
       "cha": 1
     },
@@ -1093,17 +1093,17 @@
       "amphibious",
       "cantrip",
       "swimming",
-      "water_creed_navigation"
+      "waterCreedNavigation"
     ],
     "choices": {},
     "race": "merfolk"
   },
   {
     "name": "Elf (Bishatar and Tirahar)",
-    "race_id": "elf_bishatar_and_tirahar",
+    "raceId": "elfBishatarAndTirahar",
     "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
     "speed": 35,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2,
       "wis": 1
     },
@@ -1114,22 +1114,22 @@
     ],
     "traits": [
       "darkvision",
-      "keen_senses",
-      "fey_ancestry",
+      "keenSenses",
+      "feyAncestry",
       "trance",
-      "fleet_of_foot",
-      "mask_of_the_wild",
-      "elf_weapon_training"
+      "fleetOfFoot",
+      "maskOfTheWild",
+      "elfWeaponTraining"
     ],
     "choices": {},
     "race": "elf"
   },
   {
     "name": "Elf (Vadahar)",
-    "race_id": "elf_vadahar",
+    "raceId": "elfVadahar",
     "description": "Accustomed to twilit forests and the night sky, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "dex": 2,
       "wis": 1
     },
@@ -1140,22 +1140,22 @@
     ],
     "traits": [
       "darkvision",
-      "keen_senses",
-      "fey_ancestry",
+      "keenSenses",
+      "feyAncestry",
       "trance",
-      "elf_weapon_training",
+      "elfWeaponTraining",
       "cantrip",
-      "extra_language"
+      "extraLanguage"
     ],
     "choices": {},
     "race": "elf"
   },
   {
     "name": "Aasimar (DMG)",
-    "race_id": "aasimar_dmg",
+    "raceId": "aasimarDmg",
     "description": "Thanks to your celestial heritage, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim lig...",
     "speed": 30,
-    "ability_score_modifiers": {
+    "abilityScoreModifiers": {
       "wis": 1,
       "cha": 2
     },
@@ -1166,8 +1166,8 @@
     ],
     "traits": [
       "darkvision",
-      "celestial_resistance",
-      "celestial_legacy"
+      "celestialResistance",
+      "celestialLegacy"
     ],
     "choices": {},
     "race": "aasimar"
