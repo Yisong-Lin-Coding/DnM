@@ -1,6 +1,18 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Globe, Lock, Play, RefreshCcw, Save, Settings, Upload, Users } from "lucide-react";
+import {
+    Eye,
+    Globe,
+    Lock,
+    LogOut,
+    Play,
+    RefreshCcw,
+    Save,
+    Settings,
+    Upload,
+    UserX,
+    Users,
+} from "lucide-react";
 import Body from "../../pageComponents/bodySkeleton";
 import Header from "../../pageComponents/header";
 import IndexCardFolder from "../../pageComponents/indexCard";
@@ -47,6 +59,12 @@ function buildCampaignRoster(campaign) {
     });
 }
 
+function fallbackPlayerLabel(playerID) {
+    const normalizedID = toID(playerID);
+    if (!normalizedID) return "Player";
+    return `Player ${normalizedID.slice(-4).toUpperCase()}`;
+}
+
 function LobbyMenu() {
     const socket = useContext(SocketContext);
     const navigate = useNavigate();
@@ -69,6 +87,28 @@ function LobbyMenu() {
     const [settingsCampaignID, setSettingsCampaignID] = useState("");
     const [descriptionModalCampaignID, setDescriptionModalCampaignID] = useState("");
     const [inviteUsernameByCampaign, setInviteUsernameByCampaign] = useState({});
+    const [characterStateByCampaign, setCharacterStateByCampaign] = useState({});
+    const [characterPickerState, setCharacterPickerState] = useState({
+        isOpen: false,
+        campaignID: "",
+        lobbyCode: "",
+        selectedCharacterID: "",
+        submitting: false,
+    });
+    const [characterPreviewState, setCharacterPreviewState] = useState({
+        isOpen: false,
+        campaignID: "",
+        assignment: null,
+        ownerName: "",
+        campaignName: "",
+    });
+    const [lobbyContextMenu, setLobbyContextMenu] = useState({
+        show: false,
+        x: 0,
+        y: 0,
+        campaignID: "",
+        campaignName: "",
+    });
 
     const loadCampaigns = useCallback(async () => {
         if (!socket || !playerID) {
@@ -140,10 +180,104 @@ function LobbyMenu() {
         );
     }, [campaigns]);
 
+    useEffect(() => {
+        if (!lobbyContextMenu.show) return undefined;
+
+        const closeContextMenu = () => {
+            setLobbyContextMenu((prev) => ({ ...prev, show: false }));
+        };
+
+        window.addEventListener("click", closeContextMenu);
+        return () => window.removeEventListener("click", closeContextMenu);
+    }, [lobbyContextMenu.show]);
+
     const isCampaignDM = useCallback(
         (campaign) => toID(campaign?.dmId) === toID(playerID),
         [playerID]
     );
+
+    const refreshCampaignCharacterState = useCallback(
+        async (campaignID) => {
+            if (!socket || !playerID || !campaignID) return false;
+
+            const response = await emitWithAck(socket, "campaign_getCharacterChoices", {
+                playerID,
+                campaignID,
+            });
+
+            if (!response?.success) {
+                return false;
+            }
+
+            setCharacterStateByCampaign((prev) => ({
+                ...prev,
+                [campaignID]: {
+                    assignments: Array.isArray(response.assignments)
+                        ? response.assignments
+                        : Array.isArray(response.campaign?.characterAssignments)
+                        ? response.campaign.characterAssignments
+                        : [],
+                    availableCharacters: Array.isArray(response.availableCharacters)
+                        ? response.availableCharacters
+                        : [],
+                    allCharactersByPlayer: Array.isArray(response.allCharactersByPlayer)
+                        ? response.allCharactersByPlayer
+                        : [],
+                    canManageAllCharacters: Boolean(response.canManageAllCharacters),
+                },
+            }));
+
+            return true;
+        },
+        [socket, playerID]
+    );
+
+    const getAssignmentsForCampaign = useCallback(
+        (campaignID, fallbackCampaign = null) => {
+            const stateEntry = characterStateByCampaign[campaignID];
+            if (stateEntry && Array.isArray(stateEntry.assignments)) {
+                return stateEntry.assignments;
+            }
+            if (fallbackCampaign && Array.isArray(fallbackCampaign.characterAssignments)) {
+                return fallbackCampaign.characterAssignments;
+            }
+            return [];
+        },
+        [characterStateByCampaign]
+    );
+
+    const getAvailableCharactersForCampaign = useCallback(
+        (campaignID) => {
+            const stateEntry = characterStateByCampaign[campaignID];
+            return Array.isArray(stateEntry?.availableCharacters)
+                ? stateEntry.availableCharacters
+                : [];
+        },
+        [characterStateByCampaign]
+    );
+
+    useEffect(() => {
+        if (!Array.isArray(campaigns) || campaigns.length === 0) {
+            setCharacterStateByCampaign({});
+            return;
+        }
+
+        const campaignIDs = new Set(campaigns.map((campaign) => campaign?._id).filter(Boolean));
+        setCharacterStateByCampaign((prev) => {
+            const next = {};
+            Object.entries(prev || {}).forEach(([campaignID, stateValue]) => {
+                if (campaignIDs.has(campaignID)) {
+                    next[campaignID] = stateValue;
+                }
+            });
+            return next;
+        });
+
+        campaigns.forEach((campaign) => {
+            if (!campaign?._id) return;
+            refreshCampaignCharacterState(campaign._id);
+        });
+    }, [campaigns, refreshCampaignCharacterState]);
 
     const upsertCampaignFromResponse = useCallback((updatedCampaign) => {
         if (!updatedCampaign?._id) return false;
@@ -212,6 +346,227 @@ function LobbyMenu() {
             goToGame(response.gameID || campaignID);
         },
         [socket, playerID, goToGame]
+    );
+
+    const openCharacterPickerForCampaign = useCallback(
+        (campaign) => {
+            const campaignID = campaign?._id;
+            if (!campaignID) return;
+
+            const availableCharacters = getAvailableCharactersForCampaign(campaignID);
+            if (!availableCharacters.length) {
+                setError("Create a character before entering this lobby.");
+                return;
+            }
+
+            const firstCharacterID = toID(availableCharacters[0]?._id || availableCharacters[0]?.id);
+            if (!firstCharacterID) {
+                setError("No valid character is available for this campaign.");
+                return;
+            }
+
+            setCharacterPickerState({
+                isOpen: true,
+                campaignID,
+                lobbyCode: campaign?.activeLobby?.lobbyCode || "",
+                selectedCharacterID: firstCharacterID,
+                submitting: false,
+            });
+        },
+        [getAvailableCharactersForCampaign]
+    );
+
+    const handleEnterLobbyRequest = useCallback(
+        (campaign) => {
+            const campaignID = campaign?._id;
+            if (!campaignID || !playerID) return;
+
+            if (!campaign.activeLobby?.isActive || !campaign.activeLobby?.lobbyCode) {
+                setError("This campaign does not have an active lobby yet.");
+                return;
+            }
+
+            const assignments = getAssignmentsForCampaign(campaignID, campaign);
+            const hasSelectedCharacter = assignments.some(
+                (assignment) =>
+                    toID(assignment?.playerId) === toID(playerID) && Boolean(toID(assignment?.characterId))
+            );
+
+            if (!isCampaignDM(campaign) && !hasSelectedCharacter) {
+                openCharacterPickerForCampaign(campaign);
+                return;
+            }
+
+            handleJoinLobby(campaignID, campaign.activeLobby?.lobbyCode || "");
+        },
+        [
+            playerID,
+            getAssignmentsForCampaign,
+            isCampaignDM,
+            openCharacterPickerForCampaign,
+            handleJoinLobby,
+        ]
+    );
+
+    const handleConfirmCharacterSelection = useCallback(async () => {
+        const { campaignID, lobbyCode, selectedCharacterID } = characterPickerState;
+        if (!campaignID || !selectedCharacterID || !playerID) return;
+
+        setCharacterPickerState((prev) => ({ ...prev, submitting: true }));
+        setError("");
+
+        const response = await emitWithAck(socket, "campaign_setCharacterAssignment", {
+            playerID,
+            campaignID,
+            characterID: selectedCharacterID,
+        });
+
+        if (!response?.success) {
+            setCharacterPickerState((prev) => ({ ...prev, submitting: false }));
+            setError(response?.message || "Failed to select character");
+            return;
+        }
+
+        setStatus("Character selected for this campaign.");
+        if (response.campaign) {
+            upsertCampaignFromResponse(response.campaign);
+        }
+
+        await refreshCampaignCharacterState(campaignID);
+        setCharacterPickerState({
+            isOpen: false,
+            campaignID: "",
+            lobbyCode: "",
+            selectedCharacterID: "",
+            submitting: false,
+        });
+
+        await handleJoinLobby(campaignID, lobbyCode || "");
+    }, [
+        characterPickerState,
+        playerID,
+        socket,
+        upsertCampaignFromResponse,
+        refreshCampaignCharacterState,
+        handleJoinLobby,
+    ]);
+
+    const handleOpenCharacterPreview = useCallback((campaign, assignment, ownerName = "") => {
+        const campaignID = campaign?._id;
+        if (!campaignID || !assignment) return;
+
+        setCharacterPreviewState({
+            isOpen: true,
+            campaignID,
+            assignment,
+            ownerName: ownerName || assignment?.playerName || fallbackPlayerLabel(assignment?.playerId),
+            campaignName: campaign?.name || "Campaign",
+        });
+    }, []);
+
+    const handleViewCharacterFromPreview = useCallback(() => {
+        const characterID = toID(characterPreviewState?.assignment?.characterId);
+        if (!characterID) return;
+
+        setCharacterPreviewState({
+            isOpen: false,
+            campaignID: "",
+            assignment: null,
+            ownerName: "",
+            campaignName: "",
+        });
+        navigate(`/ISK/${safeSessionID}/character/view/${characterID}`);
+    }, [characterPreviewState, navigate, safeSessionID]);
+
+    const handleForceRemoveCharacterAssignment = useCallback(
+        async (campaign, assignment) => {
+            const campaignID = campaign?._id;
+            const targetPlayerID = toID(assignment?.playerId);
+            const characterID = toID(assignment?.characterId);
+            if (!socket || !playerID || !campaignID || !targetPlayerID || !characterID) return;
+
+            const characterName = assignment?.characterName || "this character";
+            const ownerName = assignment?.playerName || fallbackPlayerLabel(targetPlayerID);
+            const confirmed = window.confirm(
+                `Force remove ${characterName} from ${ownerName}? They will be messaged to choose another character.`
+            );
+            if (!confirmed) return;
+
+            const actionKey = `force-remove:${campaignID}:${targetPlayerID}`;
+            setBusyAction(actionKey);
+            setError("");
+
+            const response = await emitWithAck(socket, "campaign_forceRemoveCharacterAssignment", {
+                playerID,
+                campaignID,
+                targetPlayerID,
+                characterID,
+            });
+
+            setBusyAction("");
+
+            if (!response?.success) {
+                setError(response?.message || "Failed to remove assigned character");
+                return;
+            }
+
+            if (response.campaign) {
+                upsertCampaignFromResponse(response.campaign);
+            }
+            await refreshCampaignCharacterState(campaignID);
+            setStatus(`${ownerName} must choose a new character.`);
+        },
+        [socket, playerID, upsertCampaignFromResponse, refreshCampaignCharacterState]
+    );
+
+    const handleLobbyCardContextMenu = useCallback(
+        (event, campaign, isDM) => {
+            if (!campaign?._id || isDM) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            setLobbyContextMenu({
+                show: true,
+                x: event.clientX,
+                y: event.clientY,
+                campaignID: campaign._id,
+                campaignName: campaign.name || "Campaign",
+            });
+        },
+        []
+    );
+
+    const handleLeaveCampaign = useCallback(
+        async (campaignID, campaignName = "Campaign") => {
+            if (!socket || !playerID || !campaignID) return;
+
+            const confirmed = window.confirm(`Leave "${campaignName}"?`);
+            if (!confirmed) return;
+
+            setBusyAction(`leave:${campaignID}`);
+            setError("");
+            const response = await emitWithAck(socket, "campaign_leave", {
+                playerID,
+                campaignID,
+            });
+            setBusyAction("");
+            setLobbyContextMenu((prev) => ({ ...prev, show: false }));
+
+            if (!response?.success) {
+                setError(response?.message || "Failed to leave campaign");
+                return;
+            }
+
+            setStatus(`You left ${campaignName}.`);
+            setCampaigns((prev) => prev.filter((campaign) => campaign?._id !== campaignID));
+            setCharacterStateByCampaign((prev) => {
+                const next = { ...prev };
+                delete next[campaignID];
+                return next;
+            });
+        },
+        [socket, playerID]
     );
 
     const handleQuickSave = useCallback(
@@ -321,12 +676,13 @@ function LobbyMenu() {
 
             setStatus("Lobby players updated.");
             if (upsertCampaignFromResponse(response.campaign)) {
+                await refreshCampaignCharacterState(campaignID);
                 return;
             }
 
             await loadCampaigns();
         },
-        [socket, playerID, loadCampaigns, upsertCampaignFromResponse]
+        [socket, playerID, loadCampaigns, upsertCampaignFromResponse, refreshCampaignCharacterState]
     );
 
     const handleManagePlayer = useCallback(
@@ -375,11 +731,12 @@ function LobbyMenu() {
                 setStatus(`${targetName} has been removed.`);
             }
             if (upsertCampaignFromResponse(response.campaign)) {
+                await refreshCampaignCharacterState(campaignID);
                 return;
             }
             await loadCampaigns();
         },
-        [socket, playerID, loadCampaigns, upsertCampaignFromResponse]
+        [socket, playerID, loadCampaigns, upsertCampaignFromResponse, refreshCampaignCharacterState]
     );
 
     const handleInvitePlayer = useCallback(
@@ -432,6 +789,16 @@ function LobbyMenu() {
         [campaigns, descriptionModalCampaignID]
     );
 
+    const characterPickerCampaign = useMemo(
+        () => campaigns.find((campaign) => campaign?._id === characterPickerState.campaignID) || null,
+        [campaigns, characterPickerState.campaignID]
+    );
+
+    const characterPickerCharacters = useMemo(
+        () => getAvailableCharactersForCampaign(characterPickerState.campaignID),
+        [characterPickerState.campaignID, getAvailableCharactersForCampaign]
+    );
+
     return (
         <Body className="bg-website-default-900 text-website-default-100">
             <Header className="col-span-3" title="Campaign Lobby" />
@@ -480,11 +847,21 @@ function LobbyMenu() {
                             const campaignID = campaign._id;
                             const isDM = isCampaignDM(campaign);
                             const roster = buildCampaignRoster(campaign);
+                            const rosterByID = new Map(
+                                roster.map((member) => [toID(member?._id), member?.username || "Player"])
+                            );
                             const nonDmPlayers = roster.filter(
                                 (member) => toID(member._id) !== toID(campaign.dmId)
                             );
                             const bannedPlayers = Array.isArray(campaign.bannedPlayers)
                                 ? campaign.bannedPlayers
+                                : [];
+                            const characterState = characterStateByCampaign[campaignID] || {};
+                            const lobbyAssignments = getAssignmentsForCampaign(campaignID, campaign).filter(
+                                (assignment) => toID(assignment?.characterId)
+                            );
+                            const allCharactersByPlayer = Array.isArray(characterState.allCharactersByPlayer)
+                                ? characterState.allCharactersByPlayer
                                 : [];
                             const saves = saveLists[campaignID] || [];
                             const isSaveLoading = Boolean(saveLoading[campaignID]);
@@ -499,20 +876,26 @@ function LobbyMenu() {
                             const isSettingsBusy = busyAction.startsWith(`settings:${campaignID}:`);
                             const isManageBusy = busyAction.startsWith(`manage:${campaignID}:`);
                             const isInviteBusy = busyAction === `invite:${campaignID}`;
+                            const isForceRemoveBusy = busyAction.startsWith(`force-remove:${campaignID}:`);
                             const playerCanEnterLobby =
                                 isDM || lobbyMembers.size === 0 || lobbyMembers.has(toID(playerID));
 
                             return (
-                                <IndexCardFolder.File
+                                <div
                                     key={campaignID}
-                                    onClick={
-                                        !isDM
-                                            ? () => setDescriptionModalCampaignID(campaignID)
-                                            : undefined
+                                    onContextMenu={(event) =>
+                                        handleLobbyCardContextMenu(event, campaign, isDM)
                                     }
-                                    className="!aspect-auto min-h-[520px] !grid-rows-[auto_auto_1fr] hover:!scale-100 hover:!translate-y-0"
                                 >
-                                    <IndexCardFolder.File.Top>
+                                    <IndexCardFolder.File
+                                        onClick={
+                                            !isDM
+                                                ? () => setDescriptionModalCampaignID(campaignID)
+                                                : undefined
+                                        }
+                                        className="!aspect-auto min-h-[520px] !grid-rows-[auto_auto_1fr] hover:!scale-100 hover:!translate-y-0"
+                                    >
+                                        <IndexCardFolder.File.Top>
                                         <div className="flex items-start justify-between gap-3">
                                             <IndexCardFolder.File.Title className="mb-0">
                                                 {campaign.name}
@@ -580,18 +963,67 @@ function LobbyMenu() {
                                             )}
                                         </div>
 
+                                        <div className="mt-4 rounded-md border border-slate-700/70 bg-slate-900/50 p-3">
+                                            <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
+                                                Selected Characters
+                                            </div>
+                                            {lobbyAssignments.length === 0 ? (
+                                                <div className="mt-2 text-xs text-slate-500">
+                                                    No one has selected a character yet.
+                                                </div>
+                                            ) : (
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {lobbyAssignments.map((assignment) => {
+                                                        const assignmentPlayerID = toID(assignment?.playerId);
+                                                        const ownerName =
+                                                            assignment?.playerName ||
+                                                            rosterByID.get(assignmentPlayerID) ||
+                                                            fallbackPlayerLabel(assignmentPlayerID);
+                                                        const characterID = toID(assignment?.characterId);
+                                                        const characterName =
+                                                            assignment?.characterName ||
+                                                            `Character ${characterID.slice(-4).toUpperCase()}`;
+                                                        const isMine = assignmentPlayerID === toID(playerID);
+
+                                                        return (
+                                                            <button
+                                                                key={`${assignmentPlayerID}:${characterID}`}
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    handleOpenCharacterPreview(
+                                                                        campaign,
+                                                                        assignment,
+                                                                        ownerName
+                                                                    );
+                                                                }}
+                                                                className={`rounded border px-2 py-1 text-left transition-colors ${
+                                                                    isMine
+                                                                        ? "border-website-highlights-500/50 bg-website-highlights-500/10 text-website-neutral-100"
+                                                                        : "border-slate-700 bg-slate-800/60 text-slate-200 hover:bg-slate-700/60"
+                                                                }`}
+                                                            >
+                                                                <div className="text-[11px] font-semibold truncate">
+                                                                    {characterName}
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-400 truncate">
+                                                                    {ownerName}
+                                                                    {isMine ? " (You)" : ""}
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div className="mt-4 flex flex-wrap gap-2">
                                             {campaign.activeLobby?.isActive ? (
                                                 <>
                                                     {playerCanEnterLobby ? (
                                                         <button
                                                             type="button"
-                                                            onClick={() =>
-                                                                handleJoinLobby(
-                                                                    campaignID,
-                                                                    campaign.activeLobby?.lobbyCode || ""
-                                                                )
-                                                            }
+                                                            onClick={() => handleEnterLobbyRequest(campaign)}
                                                             disabled={busyAction === `join:${campaignID}`}
                                                             className="inline-flex items-center gap-2 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50"
                                                         >
@@ -605,6 +1037,15 @@ function LobbyMenu() {
                                                             className="inline-flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-300 disabled:opacity-100"
                                                         >
                                                             Lobby locked by DM
+                                                        </button>
+                                                    )}
+                                                    {!isDM && playerCanEnterLobby && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openCharacterPickerForCampaign(campaign)}
+                                                            className="inline-flex items-center gap-2 rounded-md border border-website-highlights-500/50 bg-website-highlights-500/10 px-3 py-2 text-xs font-semibold text-website-neutral-100 hover:bg-website-highlights-500/20"
+                                                        >
+                                                            Choose Character
                                                         </button>
                                                     )}
                                                 </>
@@ -778,6 +1219,124 @@ function LobbyMenu() {
 
                                                 <div className="border-t border-slate-700/80 pt-3">
                                                     <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
+                                                        Character Roster
+                                                    </div>
+                                                    {allCharactersByPlayer.length === 0 && (
+                                                        <div className="mt-2 text-xs text-slate-400">
+                                                            No character data loaded yet.
+                                                        </div>
+                                                    )}
+                                                    {allCharactersByPlayer.map((playerGroup) => {
+                                                        const groupPlayerID = toID(playerGroup?.playerId);
+                                                        const playerName =
+                                                            playerGroup?.playerName ||
+                                                            rosterByID.get(groupPlayerID) ||
+                                                            fallbackPlayerLabel(groupPlayerID);
+                                                        const groupCharacters = Array.isArray(
+                                                            playerGroup?.characters
+                                                        )
+                                                            ? playerGroup.characters
+                                                            : [];
+                                                        const selectedCharacterID = toID(
+                                                            playerGroup?.assignedCharacterId
+                                                        );
+                                                        const canForceRemove =
+                                                            groupPlayerID &&
+                                                            groupPlayerID !== toID(campaign.dmId);
+                                                        const forceRemoveBusy =
+                                                            busyAction ===
+                                                            `force-remove:${campaignID}:${groupPlayerID}`;
+
+                                                        return (
+                                                            <div
+                                                                key={groupPlayerID}
+                                                                className="mt-2 rounded border border-slate-700/80 bg-slate-800/40 px-2 py-2"
+                                                            >
+                                                                <div className="text-xs font-semibold text-slate-200">
+                                                                    {playerName}
+                                                                    {groupPlayerID === toID(campaign.dmId)
+                                                                        ? " (DM)"
+                                                                        : ""}
+                                                                </div>
+                                                                {groupCharacters.length === 0 && (
+                                                                    <div className="mt-1 text-[11px] text-slate-500">
+                                                                        No characters.
+                                                                    </div>
+                                                                )}
+                                                                {groupCharacters.map((character) => {
+                                                                    const characterID = toID(
+                                                                        character?._id || character?.id
+                                                                    );
+                                                                    if (!characterID) return null;
+
+                                                                    const isSelected =
+                                                                        selectedCharacterID === characterID ||
+                                                                        Boolean(character?.isSelected);
+                                                                    const characterName =
+                                                                        character?.name ||
+                                                                        `Character ${characterID
+                                                                            .slice(-4)
+                                                                            .toUpperCase()}`;
+                                                                    const assignmentForPreview = {
+                                                                        playerId: groupPlayerID,
+                                                                        playerName,
+                                                                        characterId: characterID,
+                                                                        characterName,
+                                                                        characterLevel:
+                                                                            Number(character?.level) || 1,
+                                                                    };
+
+                                                                    return (
+                                                                        <div
+                                                                            key={characterID}
+                                                                            className="mt-2 flex items-center justify-between gap-2 rounded border border-slate-700/70 bg-slate-900/40 px-2 py-1"
+                                                                        >
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    handleOpenCharacterPreview(
+                                                                                        campaign,
+                                                                                        assignmentForPreview,
+                                                                                        playerName
+                                                                                    )
+                                                                                }
+                                                                                className="truncate text-left text-[11px] text-slate-200 hover:text-website-neutral-100"
+                                                                            >
+                                                                                {characterName} (Lv{" "}
+                                                                                {Number(character?.level) || 1})
+                                                                                {isSelected
+                                                                                    ? " - Selected"
+                                                                                    : ""}
+                                                                            </button>
+                                                                            {isSelected && canForceRemove && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        handleForceRemoveCharacterAssignment(
+                                                                                            campaign,
+                                                                                            assignmentForPreview
+                                                                                        )
+                                                                                    }
+                                                                                    disabled={
+                                                                                        forceRemoveBusy ||
+                                                                                        isForceRemoveBusy
+                                                                                    }
+                                                                                    className="inline-flex items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-60"
+                                                                                >
+                                                                                    <UserX className="size-3" />
+                                                                                    Force Remove
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                <div className="border-t border-slate-700/80 pt-3">
+                                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
                                                         Banned Players
                                                     </div>
                                                     {bannedPlayers.length === 0 && (
@@ -913,7 +1472,8 @@ function LobbyMenu() {
                                             </>
                                         )}
                                     </IndexCardFolder.File.Bottom>
-                                </IndexCardFolder.File>
+                                    </IndexCardFolder.File>
+                                </div>
                             );
                         })}
 
@@ -932,6 +1492,210 @@ function LobbyMenu() {
 
                 {loading && (
                     <div className="px-6 text-left text-sm text-slate-400 pb-6">Loading campaigns...</div>
+                )}
+
+                {lobbyContextMenu.show && (
+                    <div
+                        className="fixed z-[110] w-56 rounded-lg border border-slate-700 bg-slate-900/95 px-2 py-2 shadow-2xl"
+                        style={{ top: lobbyContextMenu.y, left: lobbyContextMenu.x }}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="px-2 pb-2 text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
+                            Campaign Actions
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                handleLeaveCampaign(
+                                    lobbyContextMenu.campaignID,
+                                    lobbyContextMenu.campaignName
+                                )
+                            }
+                            disabled={busyAction === `leave:${lobbyContextMenu.campaignID}`}
+                            className="flex w-full items-center gap-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-2 text-left text-xs font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-60"
+                        >
+                            <LogOut className="size-3.5" />
+                            Leave Campaign
+                        </button>
+                    </div>
+                )}
+
+                {characterPickerState.isOpen && (
+                    <div
+                        className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm p-4 flex items-center justify-center"
+                        onClick={() =>
+                            setCharacterPickerState({
+                                isOpen: false,
+                                campaignID: "",
+                                lobbyCode: "",
+                                selectedCharacterID: "",
+                                submitting: false,
+                            })
+                        }
+                    >
+                        <div
+                            className="w-full max-w-xl rounded-xl border border-slate-700 bg-slate-900 text-slate-100 p-5 shadow-2xl"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 className="text-lg font-bold">Choose Lobby Character</h2>
+                                    <div className="mt-1 text-xs text-slate-400">
+                                        {characterPickerCampaign?.name || "Campaign"}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setCharacterPickerState({
+                                            isOpen: false,
+                                            campaignID: "",
+                                            lobbyCode: "",
+                                            selectedCharacterID: "",
+                                            submitting: false,
+                                        })
+                                    }
+                                    className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-700"
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                            <div className="mt-4 space-y-2">
+                                {characterPickerCharacters.length === 0 && (
+                                    <div className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+                                        No characters available. Create one before joining this lobby.
+                                    </div>
+                                )}
+                                {characterPickerCharacters.map((character) => {
+                                    const characterID = toID(character?._id || character?.id);
+                                    const checked =
+                                        characterID === toID(characterPickerState.selectedCharacterID);
+                                    return (
+                                        <label
+                                            key={characterID}
+                                            className={`flex cursor-pointer items-center justify-between gap-3 rounded border px-3 py-2 text-xs ${
+                                                checked
+                                                    ? "border-website-highlights-500/60 bg-website-highlights-500/10 text-website-neutral-100"
+                                                    : "border-slate-700 bg-slate-800/50 text-slate-200"
+                                            }`}
+                                        >
+                                            <span className="truncate">
+                                                {character?.name || "Unnamed Character"} (Lv{" "}
+                                                {Number(character?.level) || 1})
+                                            </span>
+                                            <input
+                                                type="radio"
+                                                name={`campaign-character-${characterPickerState.campaignID}`}
+                                                checked={checked}
+                                                onChange={() =>
+                                                    setCharacterPickerState((prev) => ({
+                                                        ...prev,
+                                                        selectedCharacterID: characterID,
+                                                    }))
+                                                }
+                                                className="size-4"
+                                            />
+                                        </label>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="mt-4 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setCharacterPickerState({
+                                            isOpen: false,
+                                            campaignID: "",
+                                            lobbyCode: "",
+                                            selectedCharacterID: "",
+                                            submitting: false,
+                                        })
+                                    }
+                                    className="rounded border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmCharacterSelection}
+                                    disabled={
+                                        !characterPickerState.selectedCharacterID ||
+                                        characterPickerState.submitting
+                                    }
+                                    className="rounded border border-website-highlights-500/60 bg-website-highlights-500/10 px-3 py-2 text-xs font-semibold text-website-neutral-100 hover:bg-website-highlights-500/20 disabled:opacity-60"
+                                >
+                                    {characterPickerState.submitting ? "Saving..." : "Save and Enter"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {characterPreviewState.isOpen && (
+                    <div
+                        className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm p-4 flex items-center justify-center"
+                        onClick={() =>
+                            setCharacterPreviewState({
+                                isOpen: false,
+                                campaignID: "",
+                                assignment: null,
+                                ownerName: "",
+                                campaignName: "",
+                            })
+                        }
+                    >
+                        <div
+                            className="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 text-slate-100 p-5 shadow-2xl"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 className="text-lg font-bold">
+                                        {characterPreviewState.assignment?.characterName ||
+                                            "Selected Character"}
+                                    </h2>
+                                    <div className="mt-1 text-xs text-slate-400">
+                                        Owner: {characterPreviewState.ownerName || "Unknown player"}
+                                    </div>
+                                    <div className="mt-1 text-xs text-slate-500">
+                                        Campaign: {characterPreviewState.campaignName || "Campaign"}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setCharacterPreviewState({
+                                            isOpen: false,
+                                            campaignID: "",
+                                            assignment: null,
+                                            ownerName: "",
+                                            campaignName: "",
+                                        })
+                                    }
+                                    className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-700"
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                            <div className="mt-4 rounded border border-slate-700 bg-slate-800/60 px-3 py-3 text-sm text-slate-200">
+                                Level: {Number(characterPreviewState.assignment?.characterLevel) || 1}
+                            </div>
+
+                            <div className="mt-4 flex justify-end">
+                                <button
+                                    type="button"
+                                    onClick={handleViewCharacterFromPreview}
+                                    className="inline-flex items-center gap-2 rounded border border-website-highlights-500/60 bg-website-highlights-500/10 px-3 py-2 text-xs font-semibold text-website-neutral-100 hover:bg-website-highlights-500/20"
+                                >
+                                    <Eye className="size-3.5" />
+                                    View Full Character
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
 
                 {descriptionModalCampaign && (

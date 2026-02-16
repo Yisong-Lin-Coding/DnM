@@ -3,6 +3,7 @@ const Campaign = require("../data/mongooseDataStructure/campaign");
 const GameSave = require("../data/mongooseDataStructure/gameSave");
 const Player = require("../data/mongooseDataStructure/player");
 const Messages = require("../data/mongooseDataStructure/messages");
+const Character = require("../data/mongooseDataStructure/character");
 
 const MIN_ALLOWED_PLAYERS = 2;
 const MAX_ALLOWED_PLAYERS = 12;
@@ -56,6 +57,33 @@ const isCampaignBanned = (campaign, playerID) => {
     return (campaign.bannedPlayers || []).some((bannedID) => String(bannedID) === normalizedPlayerID);
 };
 
+const buildCampaignMemberIDSet = (campaign) => {
+    const memberIDs = new Set();
+    const dmID = toObjectIdString(campaign?.dmId);
+    if (dmID) memberIDs.add(dmID);
+
+    if (Array.isArray(campaign?.players)) {
+        campaign.players.forEach((member) => {
+            const memberID = toObjectIdString(member);
+            if (memberID) memberIDs.add(memberID);
+        });
+    }
+
+    return memberIDs;
+};
+
+const formatCharacterSummary = (characterDoc) => {
+    const character = characterDoc?.toObject ? characterDoc.toObject() : characterDoc;
+    if (!character) return null;
+
+    return {
+        _id: toObjectIdString(character),
+        name: character.name || "Unnamed Character",
+        level: Number(character.level) || 1,
+        playerId: toObjectIdString(character.playerId),
+    };
+};
+
 const formatCampaign = (campaignDoc) => {
     const campaign = campaignDoc?.toObject ? campaignDoc.toObject() : campaignDoc;
     if (!campaign) return null;
@@ -63,6 +91,37 @@ const formatCampaign = (campaignDoc) => {
     const players = Array.isArray(campaign.players) ? campaign.players : [];
     const bannedPlayers = Array.isArray(campaign.bannedPlayers) ? campaign.bannedPlayers : [];
     const activeLobby = campaign.activeLobby || {};
+    const memberIDs = buildCampaignMemberIDSet(campaign);
+
+    const characterAssignments = new Map();
+    if (Array.isArray(campaign.characterAssignments)) {
+        campaign.characterAssignments.forEach((assignment) => {
+            const playerID = toObjectIdString(assignment?.playerId);
+            const characterID = toObjectIdString(assignment?.characterId);
+            if (!playerID || !characterID) return;
+            if (memberIDs.size > 0 && !memberIDs.has(playerID)) return;
+            if (characterAssignments.has(playerID)) return;
+
+            const characterRef =
+                assignment?.characterId && typeof assignment.characterId === "object"
+                    ? assignment.characterId
+                    : null;
+            const playerRef =
+                assignment?.playerId && typeof assignment.playerId === "object"
+                    ? assignment.playerId
+                    : null;
+
+            characterAssignments.set(playerID, {
+                playerId: playerID,
+                playerName: playerRef?.username || "",
+                characterId: characterID,
+                characterName: characterRef?.name || "",
+                characterLevel: Number(characterRef?.level) || null,
+                selectedBy: toObjectIdString(assignment?.selectedBy),
+                selectedAt: assignment?.selectedAt || null,
+            });
+        });
+    }
 
     return {
         _id: String(campaign._id),
@@ -96,6 +155,7 @@ const formatCampaign = (campaignDoc) => {
                 ? activeLobby.members.map((member) => toObjectIdString(member))
                 : [],
         },
+        characterAssignments: Array.from(characterAssignments.values()),
         createdAt: campaign.createdAt || null,
     };
 };
@@ -146,6 +206,8 @@ const readCampaignForResponse = async (campaignID) =>
         .populate({ path: "dmId", select: "_id username" })
         .populate({ path: "players", select: "_id username" })
         .populate({ path: "bannedPlayers", select: "_id username" })
+        .populate({ path: "characterAssignments.playerId", select: "_id username" })
+        .populate({ path: "characterAssignments.characterId", select: "_id name level playerId" })
         .lean();
 
 module.exports = (socket) => {
@@ -164,7 +226,9 @@ module.exports = (socket) => {
             const campaign = await Campaign.findById(campaignID)
                 .populate({ path: "dmId", select: "_id username" })
                 .populate({ path: "players", select: "_id username" })
-                .populate({ path: "bannedPlayers", select: "_id username" });
+                .populate({ path: "bannedPlayers", select: "_id username" })
+                .populate({ path: "characterAssignments.playerId", select: "_id username" })
+                .populate({ path: "characterAssignments.characterId", select: "_id name level playerId" });
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
             }
@@ -225,7 +289,9 @@ module.exports = (socket) => {
                 .sort({ createdAt: -1 })
                 .populate({ path: "dmId", select: "_id username" })
                 .populate({ path: "players", select: "_id username" })
-                .populate({ path: "bannedPlayers", select: "_id username" });
+                .populate({ path: "bannedPlayers", select: "_id username" })
+                .populate({ path: "characterAssignments.playerId", select: "_id username" })
+                .populate({ path: "characterAssignments.characterId", select: "_id name level playerId" });
 
             respond({
                 success: true,
@@ -284,6 +350,7 @@ module.exports = (socket) => {
                     startedAt: null,
                     members: [],
                 },
+                characterAssignments: [],
             });
 
             await Player.findByIdAndUpdate(player._id, {
@@ -473,6 +540,38 @@ module.exports = (socket) => {
                 });
             }
 
+            if (!isCampaignDM(campaign, playerID)) {
+                const playerAssignment = Array.isArray(campaign.characterAssignments)
+                    ? campaign.characterAssignments.find(
+                          (assignment) => String(assignment?.playerId) === String(playerID)
+                      ) || null
+                    : null;
+                let hasAssignedCharacter = false;
+
+                if (playerAssignment?.characterId && mongoose.isValidObjectId(playerAssignment.characterId)) {
+                    const validCharacter = await Character.exists({
+                        _id: playerAssignment.characterId,
+                        playerId: playerID,
+                    });
+                    hasAssignedCharacter = Boolean(validCharacter);
+
+                    if (!hasAssignedCharacter) {
+                        campaign.characterAssignments = (campaign.characterAssignments || []).filter(
+                            (assignment) => String(assignment?.playerId) !== String(playerID)
+                        );
+                        await campaign.save();
+                    }
+                }
+
+                if (!hasAssignedCharacter) {
+                    return respond({
+                        success: false,
+                        requiresCharacterSelection: true,
+                        message: "Choose a character for this campaign before entering the lobby",
+                    });
+                }
+            }
+
             respond({
                 success: true,
                 gameID: String(campaign._id),
@@ -482,6 +581,380 @@ module.exports = (socket) => {
         } catch (error) {
             console.error("[campaign_joinLobby] failed", error);
             respond({ success: false, message: error.message || "Failed to join lobby" });
+        }
+    });
+
+    socket.on("campaign_getCharacterChoices", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID)
+                .populate({ path: "dmId", select: "_id username" })
+                .populate({ path: "players", select: "_id username" })
+                .populate({ path: "characterAssignments.playerId", select: "_id username" })
+                .populate({ path: "characterAssignments.characterId", select: "_id name level playerId" });
+
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can view lobby character choices",
+                });
+            }
+
+            const availableCharacters = await Character.find({ playerId: playerID })
+                .select("_id name level playerId")
+                .sort({ updatedAt: -1, createdAt: -1 });
+            const formattedCampaign = formatCampaign(campaign);
+
+            const isDM = isCampaignDM(campaign, playerID);
+            const selectedAssignment = Array.isArray(formattedCampaign?.characterAssignments)
+                ? formattedCampaign.characterAssignments.find(
+                      (assignment) => assignment.playerId === String(playerID)
+                  ) || null
+                : null;
+
+            let allCharactersByPlayer = [];
+            if (isDM) {
+                const memberIDs = Array.from(buildCampaignMemberIDSet(campaign)).filter((memberID) =>
+                    mongoose.isValidObjectId(memberID)
+                );
+                const assignmentByPlayer = new Map(
+                    (formattedCampaign?.characterAssignments || []).map((assignment) => [
+                        assignment.playerId,
+                        assignment.characterId,
+                    ])
+                );
+                const dmID = toObjectIdString(campaign.dmId);
+
+                const playersWithCharacters = await Player.find({
+                    _id: { $in: memberIDs },
+                })
+                    .select("_id username characters")
+                    .populate({ path: "characters", select: "_id name level playerId" });
+
+                allCharactersByPlayer = playersWithCharacters
+                    .map((member) => {
+                        const memberID = String(member._id);
+                        const assignedCharacterId = assignmentByPlayer.get(memberID) || "";
+                        const characters = Array.isArray(member.characters)
+                            ? member.characters
+                                  .map((characterDoc) => {
+                                      const summary = formatCharacterSummary(characterDoc);
+                                      if (!summary) return null;
+                                      return {
+                                          ...summary,
+                                          isSelected: summary._id === assignedCharacterId,
+                                      };
+                                  })
+                                  .filter(Boolean)
+                            : [];
+
+                        return {
+                            playerId: memberID,
+                            playerName: member.username || "",
+                            assignedCharacterId,
+                            characters,
+                        };
+                    })
+                    .sort((a, b) => {
+                        if (a.playerId === dmID) return -1;
+                        if (b.playerId === dmID) return 1;
+                        return (a.playerName || "").localeCompare(b.playerName || "");
+                    });
+            }
+
+            respond({
+                success: true,
+                campaign: formattedCampaign,
+                assignments: formattedCampaign?.characterAssignments || [],
+                selectedAssignment,
+                availableCharacters: availableCharacters
+                    .map((character) => formatCharacterSummary(character))
+                    .filter(Boolean),
+                allCharactersByPlayer,
+                canManageAllCharacters: isDM,
+            });
+        } catch (error) {
+            console.error("[campaign_getCharacterChoices] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to load campaign character choices",
+            });
+        }
+    });
+
+    socket.on("campaign_setCharacterAssignment", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID, characterID } = data || {};
+
+        try {
+            if (
+                !mongoose.isValidObjectId(playerID) ||
+                !mongoose.isValidObjectId(campaignID) ||
+                !mongoose.isValidObjectId(characterID)
+            ) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID, campaignID, and characterID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players activeLobby characterAssignments"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can set lobby characters",
+                });
+            }
+
+            if (!campaign.activeLobby?.isActive || !campaign.activeLobby?.lobbyCode) {
+                return respond({
+                    success: false,
+                    message: "Start the lobby before selecting a character",
+                });
+            }
+
+            const allowedLobbyMembers = Array.isArray(campaign.activeLobby.members)
+                ? campaign.activeLobby.members.map((member) => String(member))
+                : [];
+            if (
+                allowedLobbyMembers.length > 0 &&
+                !allowedLobbyMembers.includes(String(playerID))
+            ) {
+                return respond({
+                    success: false,
+                    message: "The DM has not granted this player access to the active lobby",
+                });
+            }
+
+            const character = await Character.findById(characterID).select("_id name level playerId");
+            if (!character) {
+                return respond({ success: false, message: "Character not found" });
+            }
+
+            if (String(character.playerId) !== String(playerID)) {
+                return respond({
+                    success: false,
+                    message: "You can only assign your own character to this lobby",
+                });
+            }
+
+            const nextAssignments = Array.isArray(campaign.characterAssignments)
+                ? campaign.characterAssignments.filter(
+                      (assignment) => String(assignment?.playerId) !== String(playerID)
+                  )
+                : [];
+            nextAssignments.push({
+                playerId,
+                characterId,
+                selectedBy: playerID,
+                selectedAt: new Date(),
+            });
+            campaign.characterAssignments = nextAssignments;
+
+            await campaign.save();
+
+            const campaignForClient = await readCampaignForResponse(campaign._id);
+            const formattedCampaign = formatCampaign(campaignForClient);
+            const assignment = Array.isArray(formattedCampaign?.characterAssignments)
+                ? formattedCampaign.characterAssignments.find(
+                      (entry) => String(entry.playerId) === String(playerID)
+                  ) || null
+                : null;
+
+            respond({
+                success: true,
+                campaign: formattedCampaign,
+                assignment,
+                character: formatCharacterSummary(character),
+            });
+        } catch (error) {
+            console.error("[campaign_setCharacterAssignment] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to select lobby character",
+            });
+        }
+    });
+
+    socket.on("campaign_forceRemoveCharacterAssignment", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID, targetPlayerID } = data || {};
+        const characterID = String(data?.characterID || "").trim();
+
+        try {
+            if (
+                !mongoose.isValidObjectId(playerID) ||
+                !mongoose.isValidObjectId(campaignID) ||
+                !mongoose.isValidObjectId(targetPlayerID)
+            ) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID, campaignID, and targetPlayerID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id name dmId players characterAssignments"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the DM can remove assigned characters",
+                });
+            }
+
+            const assignment = Array.isArray(campaign.characterAssignments)
+                ? campaign.characterAssignments.find(
+                      (entry) => String(entry?.playerId) === String(targetPlayerID)
+                  )
+                : null;
+            if (!assignment) {
+                return respond({
+                    success: false,
+                    message: "That player does not currently have a selected character",
+                });
+            }
+
+            const assignedCharacterID = toObjectIdString(assignment.characterId);
+            if (characterID && characterID !== assignedCharacterID) {
+                return respond({
+                    success: false,
+                    message: "Selected character does not match the player's current assignment",
+                });
+            }
+
+            campaign.characterAssignments = (campaign.characterAssignments || []).filter(
+                (entry) => String(entry?.playerId) !== String(targetPlayerID)
+            );
+            await campaign.save();
+
+            const [dmPlayer, targetPlayer, removedCharacter] = await Promise.all([
+                Player.findById(playerID).select("_id username"),
+                Player.findById(targetPlayerID).select("_id username"),
+                Character.findById(assignedCharacterID).select("_id name level"),
+            ]);
+
+            if (targetPlayer) {
+                await Messages.create({
+                    from: dmPlayer?._id || null,
+                    to: [targetPlayer._id],
+                    kind: "campaign_character_removed",
+                    subject: `Character Removed: ${campaign.name || "Campaign"}`,
+                    message: `${dmPlayer?.username || "DM"} removed your selected character${
+                        removedCharacter?.name ? ` (${removedCharacter.name})` : ""
+                    } from "${campaign.name || "this campaign"}". Choose another character before entering the lobby.`,
+                    payload: {
+                        campaignID: String(campaign._id),
+                        campaignName: campaign.name || "Campaign",
+                        removedCharacterID: assignedCharacterID,
+                        removedCharacterName: removedCharacter?.name || "",
+                        removedByID: String(playerID),
+                    },
+                    status: "sent",
+                    readBy: [],
+                });
+            }
+
+            const campaignForClient = await readCampaignForResponse(campaign._id);
+            respond({
+                success: true,
+                campaign: formatCampaign(campaignForClient),
+                removedPlayerID: String(targetPlayerID),
+                removedCharacterID: assignedCharacterID,
+            });
+        } catch (error) {
+            console.error("[campaign_forceRemoveCharacterAssignment] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to remove assigned character",
+            });
+        }
+    });
+
+    socket.on("campaign_leave", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players activeLobby characterAssignments"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: true,
+                    alreadyLeft: true,
+                    campaignID: String(campaignID),
+                });
+            }
+
+            if (isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "The DM cannot leave their own campaign",
+                });
+            }
+
+            campaign.players = (campaign.players || []).filter(
+                (member) => String(member) !== String(playerID)
+            );
+            if (Array.isArray(campaign.activeLobby?.members)) {
+                campaign.activeLobby.members = campaign.activeLobby.members.filter(
+                    (member) => String(member) !== String(playerID)
+                );
+            }
+            campaign.characterAssignments = (campaign.characterAssignments || []).filter(
+                (assignment) => String(assignment?.playerId) !== String(playerID)
+            );
+
+            await campaign.save();
+
+            await Player.findByIdAndUpdate(playerID, {
+                $pull: { campaigns: campaign._id },
+            });
+
+            const campaignForClient = await readCampaignForResponse(campaign._id);
+            respond({
+                success: true,
+                campaign: formatCampaign(campaignForClient),
+                leftCampaignID: String(campaign._id),
+            });
+        } catch (error) {
+            console.error("[campaign_leave] failed", error);
+            respond({ success: false, message: error.message || "Failed to leave campaign" });
         }
     });
 
@@ -572,7 +1045,7 @@ module.exports = (socket) => {
             }
 
             const campaign = await Campaign.findById(campaignID).select(
-                "_id dmId players bannedPlayers activeLobby"
+                "_id dmId players bannedPlayers activeLobby characterAssignments"
             );
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
@@ -624,6 +1097,9 @@ module.exports = (socket) => {
                     (member) => String(member) !== String(targetPlayerID)
                 );
             }
+            campaign.characterAssignments = (campaign.characterAssignments || []).filter(
+                (assignment) => String(assignment?.playerId) !== String(targetPlayerID)
+            );
 
             if (action === "ban") {
                 campaign.bannedPlayers.addToSet(targetPlayerID);

@@ -11,6 +11,16 @@ const lobbySchema = new mongoose.Schema(
     { _id: false }
 );
 
+const lobbyCharacterAssignmentSchema = new mongoose.Schema(
+    {
+        playerId: { type: mongoose.Schema.Types.ObjectId, ref: "Player", required: true },
+        characterId: { type: mongoose.Schema.Types.ObjectId, ref: "Character", required: true },
+        selectedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
+        selectedAt: { type: Date, default: Date.now },
+    },
+    { _id: false }
+);
+
 const campaignSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true },
     description: { type: String, default: "", trim: true },
@@ -22,6 +32,7 @@ const campaignSchema = new mongoose.Schema({
     isPrivate: { type: Boolean, default: false },
     setting: { type: String, default: "", trim: true },
     activeLobby: { type: lobbySchema, default: () => ({}) },
+    characterAssignments: { type: [lobbyCharacterAssignmentSchema], default: [] },
     createdAt: { type: Date, default: Date.now },
     settings: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
     maps: [{ type: String, default: [] }],
