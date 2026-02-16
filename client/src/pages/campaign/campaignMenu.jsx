@@ -939,6 +939,58 @@ function LobbyMenu() {
         [campaigns, descriptionModalCampaignID]
     );
 
+    const settingsModalData = useMemo(() => {
+        const campaign = campaigns.find((entry) => entry?._id === settingsCampaignID);
+        if (!campaign || !isCampaignDM(campaign)) return null;
+
+        const campaignID = campaign._id;
+        const roster = buildCampaignRoster(campaign);
+        const rosterByID = new Map(
+            roster.map((member) => [toID(member?._id), member?.username || "Player"])
+        );
+        const nonDmPlayers = roster.filter((member) => toID(member._id) !== toID(campaign.dmId));
+        const bannedPlayers = Array.isArray(campaign.bannedPlayers) ? campaign.bannedPlayers : [];
+        const selectedAssignmentsForDM = getAssignmentsForCampaign(campaignID, campaign)
+            .filter((assignment) => toID(assignment?.characterId))
+            .map((assignment) => {
+                const selectedPlayerID = toID(assignment?.playerId);
+                const selectedCharacterID = toID(assignment?.characterId);
+                return {
+                    ...assignment,
+                    playerId: selectedPlayerID,
+                    playerName:
+                        assignment?.playerName ||
+                        rosterByID.get(selectedPlayerID) ||
+                        fallbackPlayerLabel(selectedPlayerID),
+                    characterId: selectedCharacterID,
+                    characterName:
+                        assignment?.characterName ||
+                        `Character ${selectedCharacterID.slice(-4).toUpperCase()}`,
+                    characterLevel: Number(assignment?.characterLevel) || 1,
+                };
+            })
+            .sort((a, b) => String(a?.playerName || "").localeCompare(String(b?.playerName || "")));
+        const lobbyMembers = new Set(
+            (Array.isArray(campaign.activeLobby?.members) ? campaign.activeLobby.members : []).map(
+                (memberID) => toID(memberID)
+            )
+        );
+
+        return {
+            campaign,
+            campaignID,
+            roster,
+            nonDmPlayers,
+            bannedPlayers,
+            selectedAssignmentsForDM,
+            lobbyMembers,
+            isSettingsBusy: busyAction.startsWith(`settings:${campaignID}:`),
+            isManageBusy: busyAction.startsWith(`manage:${campaignID}:`),
+            isInviteBusy: busyAction === `invite:${campaignID}`,
+            isForceRemoveBusy: busyAction.startsWith(`force-remove:${campaignID}:`),
+        };
+    }, [campaigns, settingsCampaignID, isCampaignDM, getAssignmentsForCampaign, busyAction]);
+
     const characterPickerCampaign = useMemo(
         () => campaigns.find((campaign) => campaign?._id === characterPickerState.campaignID) || null,
         [campaigns, characterPickerState.campaignID]
@@ -991,7 +1043,7 @@ function LobbyMenu() {
                     )}
                 </div>
 
-                <IndexCardFolder>
+                <IndexCardFolder className="items-start lg:!grid-cols-2 2xl:!grid-cols-3">
                     {!loading &&
                         campaigns.map((campaign) => {
                             const campaignID = campaign._id;
@@ -1000,50 +1052,18 @@ function LobbyMenu() {
                             const rosterByID = new Map(
                                 roster.map((member) => [toID(member?._id), member?.username || "Player"])
                             );
-                            const nonDmPlayers = roster.filter(
-                                (member) => toID(member._id) !== toID(campaign.dmId)
-                            );
-                            const bannedPlayers = Array.isArray(campaign.bannedPlayers)
-                                ? campaign.bannedPlayers
-                                : [];
                             const lobbyAssignments = getAssignmentsForCampaign(campaignID, campaign).filter(
                                 (assignment) => toID(assignment?.characterId)
                             );
-                            const selectedAssignmentsForDM = lobbyAssignments
-                                .map((assignment) => {
-                                    const selectedPlayerID = toID(assignment?.playerId);
-                                    const selectedCharacterID = toID(assignment?.characterId);
-                                    return {
-                                        ...assignment,
-                                        playerId: selectedPlayerID,
-                                        playerName:
-                                            assignment?.playerName ||
-                                            rosterByID.get(selectedPlayerID) ||
-                                            fallbackPlayerLabel(selectedPlayerID),
-                                        characterId: selectedCharacterID,
-                                        characterName:
-                                            assignment?.characterName ||
-                                            `Character ${selectedCharacterID.slice(-4).toUpperCase()}`,
-                                        characterLevel: Number(assignment?.characterLevel) || 1,
-                                    };
-                                })
-                                .sort((a, b) =>
-                                    String(a?.playerName || "").localeCompare(String(b?.playerName || ""))
-                                );
                             const saves = saveLists[campaignID] || [];
                             const isSaveLoading = Boolean(saveLoading[campaignID]);
                             const activeSaveID = activeSaveMap[campaignID] || campaign.activeGameSave || "";
-                            const isSettingsOpen = settingsCampaignID === campaignID;
                             const lobbyMembers = new Set(
                                 (Array.isArray(campaign.activeLobby?.members)
                                     ? campaign.activeLobby.members
                                     : []
                                 ).map((memberID) => toID(memberID))
                             );
-                            const isSettingsBusy = busyAction.startsWith(`settings:${campaignID}:`);
-                            const isManageBusy = busyAction.startsWith(`manage:${campaignID}:`);
-                            const isInviteBusy = busyAction === `invite:${campaignID}`;
-                            const isForceRemoveBusy = busyAction.startsWith(`force-remove:${campaignID}:`);
                             const playerCanEnterLobby =
                                 isDM || lobbyMembers.size === 0 || lobbyMembers.has(toID(playerID));
 
@@ -1060,7 +1080,7 @@ function LobbyMenu() {
                                                 ? () => setDescriptionModalCampaignID(campaignID)
                                                 : undefined
                                         }
-                                        className="!aspect-auto min-h-[520px] !grid-rows-[auto_auto_1fr] hover:!scale-100 hover:!translate-y-0"
+                                        className="!aspect-auto min-h-[620px] h-[72vh] max-h-[860px] !grid-rows-[auto_1fr_auto] hover:!scale-100 hover:!translate-y-0"
                                     >
                                         <IndexCardFolder.File.Top>
                                         <div className="flex items-start justify-between gap-3">
@@ -1086,7 +1106,7 @@ function LobbyMenu() {
                                         </IndexCardFolder.File.Description>
                                     </IndexCardFolder.File.Top>
 
-                                    <IndexCardFolder.File.Middle className="text-left">
+                                    <IndexCardFolder.File.Middle className="text-left min-h-0 overflow-y-auto pr-1">
                                         <div className="space-y-2 text-xs text-slate-300">
                                             <div className="flex items-center gap-2">
                                                 <Users className="size-3.5 text-website-highlights-400" />
@@ -1277,270 +1297,9 @@ function LobbyMenu() {
                                             )}
                                         </div>
 
-                                        {isDM && isSettingsOpen && (
-                                            <div className="mt-4 space-y-4 rounded-md border border-slate-700 bg-slate-900/60 p-3">
-                                                <div>
-                                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
-                                                        Lobby Access
-                                                    </div>
-                                                    {!campaign.activeLobby?.isActive && (
-                                                        <div className="mt-1 text-xs text-amber-300">
-                                                            Start the lobby first, then choose who can enter.
-                                                        </div>
-                                                    )}
-                                                    {campaign.activeLobby?.isActive &&
-                                                        roster.map((member) => {
-                                                            const memberID = toID(member._id);
-                                                            const memberIsDM = memberID === toID(campaign.dmId);
-                                                            const checked = memberIsDM || lobbyMembers.has(memberID);
-                                                            const label =
-                                                                member.username ||
-                                                                `Player ${memberID.slice(-4).toUpperCase()}`;
-
-                                                            return (
-                                                                <label
-                                                                    key={memberID}
-                                                                    className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-200"
-                                                                >
-                                                                    <span className="truncate">
-                                                                        {label}
-                                                                        {memberIsDM ? " (DM)" : ""}
-                                                                    </span>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={checked}
-                                                                        disabled={memberIsDM || isSettingsBusy}
-                                                                        onChange={(event) =>
-                                                                            handleLobbyMemberToggle(
-                                                                                campaign,
-                                                                                memberID,
-                                                                                event.target.checked
-                                                                            )
-                                                                        }
-                                                                        className="size-4 rounded border-slate-600 bg-slate-800"
-                                                                    />
-                                                                </label>
-                                                            );
-                                                        })}
-                                                </div>
-
-                                                <div className="border-t border-slate-700/80 pt-3">
-                                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
-                                                        Campaign Players
-                                                    </div>
-                                                    {nonDmPlayers.length === 0 && (
-                                                        <div className="mt-2 text-xs text-slate-400">
-                                                            No players to manage yet.
-                                                        </div>
-                                                    )}
-                                                    {nonDmPlayers.map((member) => {
-                                                        const memberID = toID(member._id);
-                                                        const label =
-                                                            member.username ||
-                                                            `Player ${memberID.slice(-4).toUpperCase()}`;
-
-                                                        return (
-                                                            <div
-                                                                key={memberID}
-                                                                className="mt-2 flex items-center justify-between gap-2 rounded border border-slate-700/80 bg-slate-800/40 px-2 py-2"
-                                                            >
-                                                                <span className="truncate text-xs text-slate-200">
-                                                                    {label}
-                                                                </span>
-                                                                <div className="flex items-center gap-2">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            handleManagePlayer(
-                                                                                campaign,
-                                                                                memberID,
-                                                                                "kick",
-                                                                                label
-                                                                            )
-                                                                        }
-                                                                        disabled={isManageBusy}
-                                                                        className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/20 disabled:opacity-60"
-                                                                    >
-                                                                        Kick
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            handleManagePlayer(
-                                                                                campaign,
-                                                                                memberID,
-                                                                                "ban",
-                                                                                label
-                                                                            )
-                                                                        }
-                                                                        disabled={isManageBusy}
-                                                                        className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-60"
-                                                                    >
-                                                                        Ban
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                <div className="border-t border-slate-700/80 pt-3">
-                                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
-                                                        Selected Characters
-                                                    </div>
-                                                    {selectedAssignmentsForDM.length === 0 && (
-                                                        <div className="mt-2 text-xs text-slate-400">
-                                                            No players have selected a character yet.
-                                                        </div>
-                                                    )}
-                                                    {selectedAssignmentsForDM.map((assignment) => {
-                                                        const groupPlayerID = toID(assignment?.playerId);
-                                                        const playerName = assignment?.playerName;
-                                                        const selectedCharacterID = toID(assignment?.characterId);
-                                                        const characterName =
-                                                            assignment?.characterName ||
-                                                            `Character ${selectedCharacterID.slice(-4).toUpperCase()}`;
-                                                        const canForceRemove =
-                                                            Boolean(groupPlayerID) &&
-                                                            groupPlayerID !== toID(campaign.dmId);
-                                                        const forceRemoveBusy =
-                                                            busyAction ===
-                                                            `force-remove:${campaignID}:${groupPlayerID}`;
-                                                        const assignmentForPreview = {
-                                                            playerId: groupPlayerID,
-                                                            playerName,
-                                                            characterId: selectedCharacterID,
-                                                            characterName,
-                                                            characterLevel: Number(assignment?.characterLevel) || 1,
-                                                        };
-
-                                                        return (
-                                                            <div
-                                                                key={groupPlayerID}
-                                                                className="mt-2 rounded border border-slate-700/80 bg-slate-800/40 px-2 py-2"
-                                                            >
-                                                                <div className="text-xs font-semibold text-slate-200">
-                                                                    {playerName}
-                                                                    {groupPlayerID === toID(campaign.dmId)
-                                                                        ? " (DM)"
-                                                                        : ""}
-                                                                </div>
-                                                                <div className="mt-2 flex items-center justify-between gap-2 rounded border border-slate-700/70 bg-slate-900/40 px-2 py-1">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            handleOpenCharacterPreview(
-                                                                                campaign,
-                                                                                assignmentForPreview,
-                                                                                playerName
-                                                                            )
-                                                                        }
-                                                                        className="truncate text-left text-[11px] text-slate-200 hover:text-website-neutral-100"
-                                                                    >
-                                                                        {characterName} (Lv{" "}
-                                                                        {Number(assignment?.characterLevel) || 1}) -
-                                                                        Selected
-                                                                    </button>
-                                                                    {canForceRemove && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() =>
-                                                                                handleForceRemoveCharacterAssignment(
-                                                                                    campaign,
-                                                                                    assignmentForPreview
-                                                                                )
-                                                                            }
-                                                                            disabled={
-                                                                                forceRemoveBusy ||
-                                                                                isForceRemoveBusy
-                                                                            }
-                                                                            className="inline-flex items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-60"
-                                                                        >
-                                                                            <UserX className="size-3" />
-                                                                            Force Remove
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                <div className="border-t border-slate-700/80 pt-3">
-                                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
-                                                        Banned Players
-                                                    </div>
-                                                    {bannedPlayers.length === 0 && (
-                                                        <div className="mt-2 text-xs text-slate-400">
-                                                            No banned players.
-                                                        </div>
-                                                    )}
-                                                    {bannedPlayers.map((member) => {
-                                                        const memberID = toID(member?._id || member);
-                                                        const label =
-                                                            member?.username ||
-                                                            `Player ${memberID.slice(-4).toUpperCase()}`;
-
-                                                        return (
-                                                            <div
-                                                                key={memberID}
-                                                                className="mt-2 flex items-center justify-between gap-2 rounded border border-slate-700/80 bg-slate-800/40 px-2 py-2"
-                                                            >
-                                                                <span className="truncate text-xs text-slate-200">
-                                                                    {label}
-                                                                </span>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        handleManagePlayer(
-                                                                            campaign,
-                                                                            memberID,
-                                                                            "unban",
-                                                                            label
-                                                                        )
-                                                                    }
-                                                                    disabled={isManageBusy}
-                                                                    className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-60"
-                                                                >
-                                                                    Unban
-                                                                </button>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                <div className="border-t border-slate-700/80 pt-3">
-                                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
-                                                        Send Invite
-                                                    </div>
-                                                    <div className="mt-2 flex items-center gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={inviteUsernameByCampaign[campaignID] || ""}
-                                                            onChange={(event) =>
-                                                                setInviteUsernameByCampaign((prev) => ({
-                                                                    ...prev,
-                                                                    [campaignID]: event.target.value,
-                                                                }))
-                                                            }
-                                                            placeholder="Exact username"
-                                                            className="w-full rounded border border-slate-700 bg-slate-800/60 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-website-highlights-500"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleInvitePlayer(campaign)}
-                                                            disabled={isInviteBusy}
-                                                            className="rounded border border-website-highlights-500/50 bg-website-highlights-500/10 px-2 py-1 text-[11px] font-semibold text-website-neutral-100 hover:bg-website-highlights-500/20 disabled:opacity-60"
-                                                        >
-                                                            Invite
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
                                     </IndexCardFolder.File.Middle>
 
-                                    <IndexCardFolder.File.Bottom className="items-stretch gap-2">
+                                    <IndexCardFolder.File.Bottom className="items-stretch gap-2 !overflow-visible">
                                         {isDM ? (
                                             <>
                                                 <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
@@ -1610,7 +1369,7 @@ function LobbyMenu() {
 
                     <IndexCardFolder.File
                         to={`/ISK/${safeSessionID}/lobby/create`}
-                        className="!aspect-auto min-h-[520px] !grid-rows-[auto_auto_1fr] hover:!scale-100 hover:!translate-y-0"
+                        className="!aspect-auto min-h-[620px] h-[72vh] max-h-[860px] !grid-rows-[auto_1fr_auto] hover:!scale-100 hover:!translate-y-0"
                     >
                         <IndexCardFolder.File.Bottom className="justify-center">
                             <div className="text-3xl text-website-specials-400">+</div>
@@ -1648,6 +1407,303 @@ function LobbyMenu() {
                             <LogOut className="size-3.5" />
                             Leave Campaign
                         </button>
+                    </div>
+                )}
+
+                {settingsModalData && (
+                    <div
+                        className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm p-4 flex items-center justify-center"
+                        onClick={() => setSettingsCampaignID("")}
+                    >
+                        <div
+                            className="w-full max-w-3xl rounded-xl border border-slate-700 bg-slate-900 text-slate-100 p-5 shadow-2xl max-h-[88vh] flex flex-col"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 className="text-lg font-bold">Lobby Settings</h2>
+                                    <div className="mt-1 text-xs text-slate-400">
+                                        {settingsModalData.campaign?.name || "Campaign"}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSettingsCampaignID("")}
+                                    className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-700"
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                            <div className="mt-4 space-y-4 overflow-y-auto pr-2">
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
+                                        Lobby Access
+                                    </div>
+                                    {!settingsModalData.campaign.activeLobby?.isActive && (
+                                        <div className="mt-1 text-xs text-amber-300">
+                                            Start the lobby first, then choose who can enter.
+                                        </div>
+                                    )}
+                                    {settingsModalData.campaign.activeLobby?.isActive &&
+                                        settingsModalData.roster.map((member) => {
+                                            const memberID = toID(member._id);
+                                            const memberIsDM =
+                                                memberID === toID(settingsModalData.campaign.dmId);
+                                            const checked =
+                                                memberIsDM ||
+                                                settingsModalData.lobbyMembers.has(memberID);
+                                            const label =
+                                                member.username ||
+                                                `Player ${memberID.slice(-4).toUpperCase()}`;
+
+                                            return (
+                                                <label
+                                                    key={memberID}
+                                                    className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-200"
+                                                >
+                                                    <span className="truncate">
+                                                        {label}
+                                                        {memberIsDM ? " (DM)" : ""}
+                                                    </span>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        disabled={
+                                                            memberIsDM || settingsModalData.isSettingsBusy
+                                                        }
+                                                        onChange={(event) =>
+                                                            handleLobbyMemberToggle(
+                                                                settingsModalData.campaign,
+                                                                memberID,
+                                                                event.target.checked
+                                                            )
+                                                        }
+                                                        className="size-4 rounded border-slate-600 bg-slate-800"
+                                                    />
+                                                </label>
+                                            );
+                                        })}
+                                </div>
+
+                                <div className="border-t border-slate-700/80 pt-3">
+                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
+                                        Campaign Players
+                                    </div>
+                                    {settingsModalData.nonDmPlayers.length === 0 && (
+                                        <div className="mt-2 text-xs text-slate-400">
+                                            No players to manage yet.
+                                        </div>
+                                    )}
+                                    {settingsModalData.nonDmPlayers.map((member) => {
+                                        const memberID = toID(member._id);
+                                        const label =
+                                            member.username ||
+                                            `Player ${memberID.slice(-4).toUpperCase()}`;
+
+                                        return (
+                                            <div
+                                                key={memberID}
+                                                className="mt-2 flex items-center justify-between gap-2 rounded border border-slate-700/80 bg-slate-800/40 px-2 py-2"
+                                            >
+                                                <span className="truncate text-xs text-slate-200">
+                                                    {label}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleManagePlayer(
+                                                                settingsModalData.campaign,
+                                                                memberID,
+                                                                "kick",
+                                                                label
+                                                            )
+                                                        }
+                                                        disabled={settingsModalData.isManageBusy}
+                                                        className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/20 disabled:opacity-60"
+                                                    >
+                                                        Kick
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleManagePlayer(
+                                                                settingsModalData.campaign,
+                                                                memberID,
+                                                                "ban",
+                                                                label
+                                                            )
+                                                        }
+                                                        disabled={settingsModalData.isManageBusy}
+                                                        className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-60"
+                                                    >
+                                                        Ban
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="border-t border-slate-700/80 pt-3">
+                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
+                                        Selected Characters
+                                    </div>
+                                    {settingsModalData.selectedAssignmentsForDM.length === 0 && (
+                                        <div className="mt-2 text-xs text-slate-400">
+                                            No players have selected a character yet.
+                                        </div>
+                                    )}
+                                    {settingsModalData.selectedAssignmentsForDM.map((assignment) => {
+                                        const groupPlayerID = toID(assignment?.playerId);
+                                        const playerName = assignment?.playerName;
+                                        const selectedCharacterID = toID(assignment?.characterId);
+                                        const characterName =
+                                            assignment?.characterName ||
+                                            `Character ${selectedCharacterID.slice(-4).toUpperCase()}`;
+                                        const canForceRemove =
+                                            Boolean(groupPlayerID) &&
+                                            groupPlayerID !== toID(settingsModalData.campaign.dmId);
+                                        const forceRemoveBusy =
+                                            busyAction ===
+                                            `force-remove:${settingsModalData.campaignID}:${groupPlayerID}`;
+                                        const assignmentForPreview = {
+                                            playerId: groupPlayerID,
+                                            playerName,
+                                            characterId: selectedCharacterID,
+                                            characterName,
+                                            characterLevel: Number(assignment?.characterLevel) || 1,
+                                        };
+
+                                        return (
+                                            <div
+                                                key={`${groupPlayerID || "player"}:${selectedCharacterID}`}
+                                                className="mt-2 rounded border border-slate-700/80 bg-slate-800/40 px-2 py-2"
+                                            >
+                                                <div className="text-xs font-semibold text-slate-200">
+                                                    {playerName}
+                                                    {groupPlayerID === toID(settingsModalData.campaign.dmId)
+                                                        ? " (DM)"
+                                                        : ""}
+                                                </div>
+                                                <div className="mt-2 flex items-center justify-between gap-2 rounded border border-slate-700/70 bg-slate-900/40 px-2 py-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleOpenCharacterPreview(
+                                                                settingsModalData.campaign,
+                                                                assignmentForPreview,
+                                                                playerName
+                                                            )
+                                                        }
+                                                        className="truncate text-left text-[11px] text-slate-200 hover:text-website-neutral-100"
+                                                    >
+                                                        {characterName} (Lv{" "}
+                                                        {Number(assignment?.characterLevel) || 1}) -
+                                                        Selected
+                                                    </button>
+                                                    {canForceRemove && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleForceRemoveCharacterAssignment(
+                                                                    settingsModalData.campaign,
+                                                                    assignmentForPreview
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                forceRemoveBusy ||
+                                                                settingsModalData.isForceRemoveBusy
+                                                            }
+                                                            className="inline-flex items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-60"
+                                                        >
+                                                            <UserX className="size-3" />
+                                                            Force Remove
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="border-t border-slate-700/80 pt-3">
+                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
+                                        Banned Players
+                                    </div>
+                                    {settingsModalData.bannedPlayers.length === 0 && (
+                                        <div className="mt-2 text-xs text-slate-400">
+                                            No banned players.
+                                        </div>
+                                    )}
+                                    {settingsModalData.bannedPlayers.map((member) => {
+                                        const memberID = toID(member?._id || member);
+                                        const label =
+                                            member?.username ||
+                                            `Player ${memberID.slice(-4).toUpperCase()}`;
+
+                                        return (
+                                            <div
+                                                key={memberID}
+                                                className="mt-2 flex items-center justify-between gap-2 rounded border border-slate-700/80 bg-slate-800/40 px-2 py-2"
+                                            >
+                                                <span className="truncate text-xs text-slate-200">
+                                                    {label}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleManagePlayer(
+                                                            settingsModalData.campaign,
+                                                            memberID,
+                                                            "unban",
+                                                            label
+                                                        )
+                                                    }
+                                                    disabled={settingsModalData.isManageBusy}
+                                                    className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-60"
+                                                >
+                                                    Unban
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="border-t border-slate-700/80 pt-3">
+                                    <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
+                                        Send Invite
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={
+                                                inviteUsernameByCampaign[settingsModalData.campaignID] || ""
+                                            }
+                                            onChange={(event) =>
+                                                setInviteUsernameByCampaign((prev) => ({
+                                                    ...prev,
+                                                    [settingsModalData.campaignID]: event.target.value,
+                                                }))
+                                            }
+                                            placeholder="Exact username"
+                                            className="w-full rounded border border-slate-700 bg-slate-800/60 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-website-highlights-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleInvitePlayer(settingsModalData.campaign)
+                                            }
+                                            disabled={settingsModalData.isInviteBusy}
+                                            className="rounded border border-website-highlights-500/50 bg-website-highlights-500/10 px-2 py-1 text-[11px] font-semibold text-website-neutral-100 hover:bg-website-highlights-500/20 disabled:opacity-60"
+                                        >
+                                            Invite
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 

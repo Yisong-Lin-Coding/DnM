@@ -42,8 +42,10 @@ const isCampaignMember = (campaign, playerID) => {
     const normalizedPlayerID = String(playerID || "");
     if (!normalizedPlayerID || !campaign) return false;
 
-    if (String(campaign.dmId) === normalizedPlayerID) return true;
-    return (campaign.players || []).some((memberID) => String(memberID) === normalizedPlayerID);
+    if (toObjectIdString(campaign.dmId) === normalizedPlayerID) return true;
+    return (campaign.players || []).some(
+        (memberID) => toObjectIdString(memberID) === normalizedPlayerID
+    );
 };
 
 const isCampaignDM = (campaign, playerID) => {
@@ -55,7 +57,9 @@ const isCampaignDM = (campaign, playerID) => {
 const isCampaignBanned = (campaign, playerID) => {
     const normalizedPlayerID = String(playerID || "");
     if (!normalizedPlayerID || !campaign) return false;
-    return (campaign.bannedPlayers || []).some((bannedID) => String(bannedID) === normalizedPlayerID);
+    return (campaign.bannedPlayers || []).some(
+        (bannedID) => toObjectIdString(bannedID) === normalizedPlayerID
+    );
 };
 
 const buildCampaignMemberIDSet = (campaign) => {
@@ -282,7 +286,7 @@ module.exports = (socket) => {
                 }
             }
 
-            const isDM = String(campaign.dmId?._id || campaign.dmId) === String(playerID);
+            const isDM = isCampaignDM(campaign, playerID);
 
             respond({
                 success: true,

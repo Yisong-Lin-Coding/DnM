@@ -16,6 +16,9 @@ const ZOOM_FACTOR = 1.1;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 const PAN_SPEED = 13;
+const CLICK_DRAG_THRESHOLD_PX = 6;
+const MIN_RECT_WORLD_SIZE = 8;
+const MIN_SHAPE_WORLD_SIZE = 4;
 
 const LAYER_CONFIG = [
     { name: "background", component: backgroundLayer, zIndex: 0 },
@@ -67,6 +70,46 @@ function findTopMapObjectAt(worldX, worldY, mapObjects = []) {
     return sorted.find((obj) => isPointInsideMapObject(worldX, worldY, obj)) || null;
 }
 
+function resolveDMPermission(response, playerID) {
+    const explicitPermission = response?.permissions?.isDM;
+    if (typeof explicitPermission === "boolean") return explicitPermission;
+    if (typeof explicitPermission === "string") {
+        const normalized = explicitPermission.trim().toLowerCase();
+        if (normalized === "true") return true;
+        if (normalized === "false") return false;
+    }
+
+    const dmID = String(response?.campaign?.dmId || "").trim();
+    const normalizedPlayerID = String(playerID || "").trim();
+    return Boolean(dmID && normalizedPlayerID && dmID === normalizedPlayerID);
+}
+
+function buildPlacementFromDrag(placementConfig, startWorld, endWorld) {
+    const type = String(placementConfig?.type || "circle").toLowerCase();
+    const centerX = (startWorld.x + endWorld.x) / 2;
+    const centerY = (startWorld.y + endWorld.y) / 2;
+    const deltaX = Math.abs(endWorld.x - startWorld.x);
+    const deltaY = Math.abs(endWorld.y - startWorld.y);
+
+    if (type === "rect") {
+        return {
+            x: Math.round(centerX),
+            y: Math.round(centerY),
+            overrides: {
+                width: Math.max(MIN_RECT_WORLD_SIZE, Math.round(deltaX)),
+                height: Math.max(MIN_RECT_WORLD_SIZE, Math.round(deltaY)),
+            },
+        };
+    }
+
+    const size = Math.max(MIN_SHAPE_WORLD_SIZE, Math.round(Math.max(deltaX, deltaY) / 2));
+    return {
+        x: Math.round(centerX),
+        y: Math.round(centerY),
+        overrides: { size },
+    };
+}
+
 function GameComponent() {
     const socket = useContext(SocketContext);
     const navigate = useNavigate();
@@ -102,6 +145,7 @@ function GameComponent() {
     const [dragTarget, setDragTarget] = useState(null);
     const [gameContextError, setGameContextError] = useState("");
     const [loadingGameContext, setLoadingGameContext] = useState(true);
+    const [placementDrag, setPlacementDrag] = useState(null);
 
     const spacePressed = useRef(false);
     const isPanning = useRef(false);
@@ -157,7 +201,7 @@ function GameComponent() {
                 return;
             }
 
-            const canEdit = Boolean(response?.permissions?.isDM);
+            const canEdit = resolveDMPermission(response, playerID);
             setIsDM(canEdit);
             setGameContextError("");
             setLoadingGameContext(false);
@@ -391,12 +435,19 @@ function GameComponent() {
             if (event.key !== "Escape") return;
             setContextMenu(null);
             setDragTarget(null);
+            setPlacementDrag(null);
             clearMapObjectPlacement();
         };
 
         window.addEventListener("keydown", onEscape);
         return () => window.removeEventListener("keydown", onEscape);
     }, [clearMapObjectPlacement]);
+
+    useEffect(() => {
+        if (!mapObjectPlacement) {
+            setPlacementDrag(null);
+        }
+    }, [mapObjectPlacement]);
 
     const handleMouseDown = (event) => {
         const world = getWorldFromMouseEvent(event);
@@ -426,10 +477,12 @@ function GameComponent() {
         setContextMenu(null);
 
         if (isDM && mapObjectPlacement) {
-            const placed = placePendingMapObjectAt(world.x, world.y);
-            if (placed) {
-                return;
-            }
+            setPlacementDrag({
+                startWorld: { x: world.x, y: world.y },
+                currentWorld: { x: world.x, y: world.y },
+                startClient: { x: event.clientX, y: event.clientY },
+            });
+            return;
         }
 
         if (isDM) {
@@ -464,6 +517,21 @@ function GameComponent() {
     const handleMouseMove = (event) => {
         setLastMouse({ x: event.clientX, y: event.clientY });
 
+        if (placementDrag && isDM && mapObjectPlacement) {
+            const world = getWorldFromMouseEvent(event);
+            if (!world) return;
+
+            setPlacementDrag((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          currentWorld: { x: world.x, y: world.y },
+                      }
+                    : prev
+            );
+            return;
+        }
+
         if (dragTarget && isDM) {
             const world = getWorldFromMouseEvent(event);
             if (!world) return;
@@ -492,7 +560,37 @@ function GameComponent() {
         }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (event) => {
+        if (placementDrag && isDM && mapObjectPlacement) {
+            const fallbackWorld = placementDrag.currentWorld || placementDrag.startWorld;
+            const releaseWorld = getWorldFromMouseEvent(event) || fallbackWorld;
+            const endClientX =
+                typeof event?.clientX === "number" ? event.clientX : placementDrag.startClient.x;
+            const endClientY =
+                typeof event?.clientY === "number" ? event.clientY : placementDrag.startClient.y;
+            const dragDistancePx = Math.hypot(
+                endClientX - placementDrag.startClient.x,
+                endClientY - placementDrag.startClient.y
+            );
+
+            if (dragDistancePx <= CLICK_DRAG_THRESHOLD_PX) {
+                placePendingMapObjectAt(placementDrag.startWorld.x, placementDrag.startWorld.y);
+            } else {
+                const draggedPlacement = buildPlacementFromDrag(
+                    mapObjectPlacement,
+                    placementDrag.startWorld,
+                    releaseWorld
+                );
+                placePendingMapObjectAt(
+                    draggedPlacement.x,
+                    draggedPlacement.y,
+                    draggedPlacement.overrides
+                );
+            }
+
+            setPlacementDrag(null);
+        }
+
         isPanning.current = false;
         setDragTarget(null);
     };
@@ -542,6 +640,50 @@ function GameComponent() {
         );
     };
 
+    const placementPreview = (() => {
+        if (!isDM || !mapObjectPlacement || !placementDrag) return null;
+        const currentWorld = placementDrag.currentWorld || placementDrag.startWorld;
+        const placement = buildPlacementFromDrag(
+            mapObjectPlacement,
+            placementDrag.startWorld,
+            currentWorld
+        );
+        const center = worldToScreen(placement.x, placement.y);
+        const zoom = Number(camera.current.zoom) || 1;
+        const type = String(mapObjectPlacement.type || "circle").toLowerCase();
+        const color = String(mapObjectPlacement.color || "#3B82F6");
+
+        if (type === "rect") {
+            const width = (Number(placement.overrides.width) || MIN_RECT_WORLD_SIZE) * zoom;
+            const height = (Number(placement.overrides.height) || MIN_RECT_WORLD_SIZE) * zoom;
+            return {
+                type,
+                color,
+                x: center.x,
+                y: center.y,
+                width,
+                height,
+            };
+        }
+
+        const size = (Number(placement.overrides.size) || MIN_SHAPE_WORLD_SIZE) * zoom;
+        if (type === "triangle") {
+            return {
+                type,
+                color,
+                points: `${center.x},${center.y - size} ${center.x - size},${center.y + size} ${center.x + size},${center.y + size}`,
+            };
+        }
+
+        return {
+            type: "circle",
+            color,
+            x: center.x,
+            y: center.y,
+            radius: size,
+        };
+    })();
+
     return (
         <div>
             <div
@@ -579,7 +721,7 @@ function GameComponent() {
                     </span>
                     {mapObjectPlacement && (
                         <span className="text-xs px-3 py-2 rounded border bg-blue-900/70 border-blue-500 text-blue-200">
-                            Placement: {mapObjectPlacement.type} (click map)
+                            Placement: {mapObjectPlacement.type} (click or drag on map)
                         </span>
                     )}
                     {loadingGameContext && (
@@ -605,6 +747,46 @@ function GameComponent() {
                         }}
                     />
                 ))}
+
+                {placementPreview && (
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-[25]">
+                        {placementPreview.type === "rect" && (
+                            <rect
+                                x={placementPreview.x - placementPreview.width / 2}
+                                y={placementPreview.y - placementPreview.height / 2}
+                                width={placementPreview.width}
+                                height={placementPreview.height}
+                                fill={placementPreview.color}
+                                fillOpacity="0.28"
+                                stroke={placementPreview.color}
+                                strokeWidth="2"
+                                strokeDasharray="7 5"
+                            />
+                        )}
+                        {placementPreview.type === "circle" && (
+                            <circle
+                                cx={placementPreview.x}
+                                cy={placementPreview.y}
+                                r={placementPreview.radius}
+                                fill={placementPreview.color}
+                                fillOpacity="0.28"
+                                stroke={placementPreview.color}
+                                strokeWidth="2"
+                                strokeDasharray="7 5"
+                            />
+                        )}
+                        {placementPreview.type === "triangle" && (
+                            <polygon
+                                points={placementPreview.points}
+                                fill={placementPreview.color}
+                                fillOpacity="0.28"
+                                stroke={placementPreview.color}
+                                strokeWidth="2"
+                                strokeDasharray="7 5"
+                            />
+                        )}
+                    </svg>
+                )}
 
                 {contextMenu && (
                     <div

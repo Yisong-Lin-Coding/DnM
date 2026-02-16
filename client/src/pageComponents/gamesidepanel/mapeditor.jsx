@@ -52,7 +52,7 @@ function MapEditor() {
     const armPlacement = () => {
         setError("");
         armMapObjectPlacement(creationDraft);
-        setStatus("Placement armed. Click on the map to place the object.");
+        setStatus("Placement armed. Click for default size, or drag on the map to size the shape.");
     };
 
     const quickPlaceAtCursor = () => {
@@ -163,6 +163,9 @@ function MapEditor() {
                     <p>Map ID: {currentMapId}</p>
                     <p>
                         Cursor: ({Math.round(worldMouseCoords?.x || 0)}, {Math.round(worldMouseCoords?.y || 0)})
+                    </p>
+                    <p className="text-xs text-gray-400">
+                        DM placement: click for quick drop, or click-drag to define shape size.
                     </p>
                     {mapObjectPlacement && (
                         <p className="text-emerald-300">Placement Active: {placementLabel}</p>

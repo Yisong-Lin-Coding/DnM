@@ -243,11 +243,16 @@ export const GameProvider = ({ children }) => {
     }, []);
 
     const placePendingMapObjectAt = useCallback(
-        (x, y) => {
+        (x, y, overrides = {}) => {
             if (!mapObjectPlacement) return null;
+            const safeOverrides =
+                overrides && typeof overrides === "object" && !Array.isArray(overrides)
+                    ? overrides
+                    : {};
 
             const placed = createMapObject({
                 ...mapObjectPlacement,
+                ...safeOverrides,
                 x: Math.round(toNumber(x, 0)),
                 y: Math.round(toNumber(y, 0)),
             });
