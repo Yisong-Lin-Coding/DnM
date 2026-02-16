@@ -641,35 +641,93 @@ module.exports = (socket) => {
                     mongoose.isValidObjectId(memberID)
                 );
                 const assignmentByPlayer = new Map(
-                    (formattedCampaign?.characterAssignments || []).map((assignment) => [
-                        assignment.playerId,
-                        assignment.characterId,
-                    ])
+                    (formattedCampaign?.characterAssignments || [])
+                        .filter((assignment) => Boolean(assignment?.playerId))
+                        .map((assignment) => [assignment.playerId, assignment])
                 );
                 const dmID = toObjectIdString(campaign.dmId);
 
-                const playersWithCharacters = await Player.find({
-                    _id: { $in: memberIDs },
-                })
-                    .select("_id username characters")
-                    .populate({ path: "characters", select: "_id name level playerId" });
+                const [playersWithCharacters, charactersByPlayerId] = await Promise.all([
+                    Player.find({
+                        _id: { $in: memberIDs },
+                    })
+                        .select("_id username characters")
+                        .populate({ path: "characters", select: "_id name level playerId" }),
+                    Character.find({
+                        playerId: { $in: memberIDs },
+                    })
+                        .select("_id name level playerId")
+                        .sort({ updatedAt: -1, createdAt: -1 }),
+                ]);
+
+                const charactersByPlayer = new Map();
+                (Array.isArray(charactersByPlayerId) ? charactersByPlayerId : []).forEach((characterDoc) => {
+                    const summary = formatCharacterSummary(characterDoc);
+                    if (!summary?._id) return;
+
+                    const ownerID = toObjectIdString(characterDoc?.playerId || summary.playerId);
+                    if (!ownerID) return;
+
+                    const existing = charactersByPlayer.get(ownerID) || [];
+                    existing.push({
+                        ...summary,
+                        playerId: ownerID,
+                    });
+                    charactersByPlayer.set(ownerID, existing);
+                });
 
                 allCharactersByPlayer = playersWithCharacters
                     .map((member) => {
                         const memberID = String(member._id);
-                        const assignedCharacterId = assignmentByPlayer.get(memberID) || "";
-                        const characters = Array.isArray(member.characters)
+                        const assignment = assignmentByPlayer.get(memberID) || null;
+                        const assignedCharacterId = assignment?.characterId || "";
+
+                        const linkedCharacters = Array.isArray(member.characters)
                             ? member.characters
                                   .map((characterDoc) => {
                                       const summary = formatCharacterSummary(characterDoc);
                                       if (!summary) return null;
                                       return {
                                           ...summary,
-                                          isSelected: summary._id === assignedCharacterId,
+                                          playerId: summary.playerId || memberID,
                                       };
                                   })
                                   .filter(Boolean)
                             : [];
+                        const ownedCharacters = charactersByPlayer.get(memberID) || [];
+
+                        const dedupedCharactersByID = new Map();
+                        [...linkedCharacters, ...ownedCharacters].forEach((character) => {
+                            const characterID = toObjectIdString(character?._id || character?.id);
+                            if (!characterID) return;
+                            if (dedupedCharactersByID.has(characterID)) return;
+                            dedupedCharactersByID.set(characterID, {
+                                ...character,
+                                _id: characterID,
+                                playerId: toObjectIdString(character.playerId) || memberID,
+                            });
+                        });
+
+                        if (assignedCharacterId && !dedupedCharactersByID.has(assignedCharacterId)) {
+                            dedupedCharactersByID.set(assignedCharacterId, {
+                                _id: assignedCharacterId,
+                                name: assignment?.characterName || "Assigned Character",
+                                level: Number(assignment?.characterLevel) || 1,
+                                playerId: memberID,
+                            });
+                        }
+
+                        const characters = Array.from(dedupedCharactersByID.values())
+                            .map((character) => ({
+                                ...character,
+                                isSelected: toObjectIdString(character?._id || character?.id) === assignedCharacterId,
+                            }))
+                            .sort((a, b) => {
+                                const aSelected = Boolean(a?.isSelected);
+                                const bSelected = Boolean(b?.isSelected);
+                                if (aSelected !== bSelected) return aSelected ? -1 : 1;
+                                return String(a?.name || "").localeCompare(String(b?.name || ""));
+                            });
 
                         return {
                             playerId: memberID,
