@@ -59,6 +59,146 @@ const getBaseStatValue = (stats, lowerKey, upperKey) => {
     return Number.isNaN(fallback) ? 0 : fallback;
 };
 
+const ABILITY_ALIASES = {
+    str: 'str',
+    strength: 'str',
+    dex: 'dex',
+    dexterity: 'dex',
+    con: 'con',
+    constitution: 'con',
+    int: 'int',
+    intelligence: 'int',
+    wis: 'wis',
+    wisdom: 'wis',
+    cha: 'cha',
+    charisma: 'cha',
+    luck: 'luck'
+};
+
+const normalizeAbilityKey = (rawKey) => {
+    if (!rawKey) return '';
+    const key = String(rawKey).trim().toLowerCase();
+    return ABILITY_ALIASES[key] || '';
+};
+
+const getModifierValue = (modifiers, abilityKey) => {
+    const target = normalizeAbilityKey(abilityKey);
+    if (!target || !modifiers || typeof modifiers !== 'object') return 0;
+
+    for (const [rawKey, rawValue] of Object.entries(modifiers)) {
+        if (normalizeAbilityKey(rawKey) !== target) continue;
+        const parsed = Number(rawValue);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+};
+
+const parseAbilityScoreChoiceConfig = (entity) => {
+    if (!entity || typeof entity !== 'object') return null;
+
+    const choices = asObject(entity.choices);
+    const rawAbilityChoice =
+        choices.abilityScores ||
+        choices.abilityScore ||
+        choices.abilityScoreModifiers ||
+        null;
+
+    let chooseCount = 0;
+    let amount = 1;
+    let options = [...CORE_STAT_KEYS];
+
+    if (typeof rawAbilityChoice === 'string') {
+        const chooseMatch = rawAbilityChoice.match(/choose\s+(\d+)/i);
+        const amountMatch = rawAbilityChoice.match(/choose\s+\d+\s+(\d+)/i);
+        chooseCount = chooseMatch ? Number(chooseMatch[1]) : 0;
+        amount = amountMatch ? Number(amountMatch[1]) : 1;
+    } else if (rawAbilityChoice && typeof rawAbilityChoice === 'object') {
+        chooseCount = Number(
+            rawAbilityChoice.choose ??
+            rawAbilityChoice.count ??
+            rawAbilityChoice.amount ??
+            0
+        );
+        amount = Number(
+            rawAbilityChoice.value ??
+            rawAbilityChoice.modifier ??
+            rawAbilityChoice.points ??
+            1
+        );
+
+        if (Array.isArray(rawAbilityChoice.options) && rawAbilityChoice.options.length > 0) {
+            options = rawAbilityChoice.options
+                .map(normalizeAbilityKey)
+                .filter(Boolean);
+        }
+    }
+
+    if (chooseCount <= 0) {
+        const chooseFromBase = Number(entity?.abilityScoreModifiers?.choose || 0);
+        chooseCount = Number.isFinite(chooseFromBase) ? chooseFromBase : 0;
+    }
+
+    if (chooseCount <= 0) return null;
+
+    const fixedKeys = Object.keys(entity.abilityScoreModifiers || {})
+        .map(normalizeAbilityKey)
+        .filter((k) => k && k !== 'choose');
+
+    const uniqueOptions = [...new Set(options)];
+    const filteredOptions = uniqueOptions.filter((opt) => !fixedKeys.includes(opt));
+    const finalOptions = filteredOptions.length > 0 ? filteredOptions : uniqueOptions;
+    const finalChooseCount = Math.min(chooseCount, finalOptions.length);
+    const finalAmount = Number.isFinite(amount) && amount > 0 ? amount : 1;
+
+    if (finalChooseCount <= 0 || finalOptions.length === 0) return null;
+
+    return {
+        chooseCount: finalChooseCount,
+        amount: finalAmount,
+        options: finalOptions
+    };
+};
+
+const sanitizeChoiceMap = (rawChoiceMap, config) => {
+    if (!config || typeof config !== 'object') return {};
+    const source = asObject(rawChoiceMap);
+
+    const amount = Number(config.amount);
+    const chooseCount = Number(config.chooseCount);
+    const safeAmount = Number.isFinite(amount) && amount > 0 ? amount : 1;
+    const maxChoices = Number.isFinite(chooseCount) && chooseCount > 0 ? chooseCount : 0;
+    if (maxChoices <= 0) return {};
+
+    const allowedOptions = new Set(
+        (config.options || [])
+            .map(normalizeAbilityKey)
+            .filter(Boolean)
+    );
+    if (allowedOptions.size === 0) return {};
+
+    const out = {};
+    let picked = 0;
+    for (const [rawKey, rawValue] of Object.entries(source)) {
+        const key = normalizeAbilityKey(rawKey);
+        if (!key || !allowedOptions.has(key)) continue;
+
+        const numericValue = Number(rawValue);
+        if (!Number.isFinite(numericValue) || numericValue <= 0) continue;
+
+        out[key] = safeAmount;
+        picked += 1;
+        if (picked >= maxChoices) break;
+    }
+
+    return out;
+};
+
+const getChoiceBonus = (choiceMap, abilityKey) => {
+    const key = normalizeAbilityKey(abilityKey);
+    if (!key) return 0;
+    return Number(choiceMap?.[key] || 0);
+};
+
 const normalizeStories = (stories = {}) => {
     const relationshipsInput = asObject(stories.relationships);
     const relationships = Object.entries(relationshipsInput).reduce((acc, [name, value]) => {
@@ -235,9 +375,20 @@ module.exports = (socket) => {
             const classMods = asObject(cls?.baseStatModifier);
             const raceMods = asObject(race?.abilityScoreModifiers);
             const subraceMods = asObject(subrace?.abilityScoreModifiers);
+            const raceChoiceConfig = parseAbilityScoreChoiceConfig(race);
+            const subraceChoiceConfig = parseAbilityScoreChoiceConfig(subrace);
+            const raceChoiceMap = sanitizeChoiceMap(character?.abilityScoreChoices?.race, raceChoiceConfig);
+            const subraceChoiceMap = sanitizeChoiceMap(character?.abilityScoreChoices?.subrace, subraceChoiceConfig);
+
             const finalStats = {};
             CORE_STAT_KEYS.forEach((key) => {
-                const computed = baseStats[key] + (classMods[key] || 0) + (raceMods[key] || 0) + (subraceMods[key] || 0);
+                const computed =
+                    baseStats[key] +
+                    getModifierValue(classMods, key) +
+                    getModifierValue(raceMods, key) +
+                    getModifierValue(subraceMods, key) +
+                    getChoiceBonus(raceChoiceMap, key) +
+                    getChoiceBonus(subraceChoiceMap, key);
                 finalStats[key] = clamp(computed, 1, 30);
             });
 
@@ -249,6 +400,10 @@ module.exports = (socket) => {
                 WIS: buildStatRef(clamp(baseStats.wis, 1, 30), finalStats.wis),
                 CHA: buildStatRef(clamp(baseStats.cha, 1, 30), finalStats.cha),
                 LUCK: buildStatRef(clamp(baseStats.luck, 0, 30), clamp(baseStats.luck, 0, 30))
+            };
+            character.abilityScoreChoices = {
+                race: raceChoiceMap,
+                subrace: subraceChoiceMap
             };
 
             const resourceBase = (cls && (cls.resourceBase || cls.resourcePoolModifier)) || { HP: 0, MP: 0, STA: 0 };

@@ -18,6 +18,10 @@ export const defaultCharacter = {
   background: '',
   stats: { str: '', dex: '', con: '', int: '', wis: '', cha: '', luck: '' },
   abilityScoreMethod: 'random',
+  abilityScoreChoices: {
+    race: {},
+    subrace: {}
+  },
   inv: {
     gp: 0,
     items: {},

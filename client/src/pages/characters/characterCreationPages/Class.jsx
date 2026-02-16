@@ -188,101 +188,140 @@ const handleSkillToggle = (skillName) => {
 
     // 4. Logic: Handle Equipment Choice Selection
     const handleEquipmentChoice = (choiceKey, optionKey, items) => {
+        if (!selectedClass?.choices?.equipment?.[choiceKey]?.[optionKey]) return;
+
         const currentItems = { ...(values.inv?.items || {}) };
         const previousChoices = values.classEquipmentChoices || {};
-        
-        // Remove items from previous choice if exists
-        if (previousChoices[choiceKey]) {
-            const previousOptionKey = previousChoices[choiceKey].optionKey;
-            const previousItems = selectedClass.choices.equipment[choiceKey][previousOptionKey];
-            
-            // Find and remove all items from previous choice
-            Object.keys(currentItems).forEach(uniqueId => {
-                const shouldRemove = previousChoices[choiceKey].addedIds?.includes(uniqueId);
-                if (shouldRemove) {
-                    delete currentItems[uniqueId];
-                }
+        const previousChoice = previousChoices[choiceKey];
+        const previousOptionKey = previousChoice?.optionKey;
+        if (previousOptionKey === optionKey) return;
+
+        const nextAnySelections = { ...(values.classAnyItemSelections || {}) };
+
+        if (previousChoice) {
+            (previousChoice.addedIds || []).forEach((id) => {
+                if (currentItems[id]) delete currentItems[id];
+            });
+
+            Object.keys(nextAnySelections).forEach((key) => {
+                if (!key.startsWith(`${choiceKey}_${previousOptionKey}_`)) return;
+                const uniqueId = nextAnySelections[key]?.uniqueId;
+                if (uniqueId && currentItems[uniqueId]) delete currentItems[uniqueId];
+                delete nextAnySelections[key];
             });
         }
-        
-        // Process items - expand packs, skip "any" items
+
         const itemsToAdd = [];
         Object.entries(items).forEach(([name, qty]) => {
-            if (isAnyItem(name)) {
-                // Skip "any" items - they'll be handled by dropdown
-                return;
-            }
-            
+            if (isAnyItem(name)) return;
+
             if (isStartingPack(name)) {
-                // Add the pack container itself
                 itemsToAdd.push({ itemId: name, quantity: qty });
-                
-                // Add all items from the pack
                 const packContents = startingPacks[name].items;
-                packContents.forEach(itemStr => {
+                packContents.forEach((itemStr) => {
                     const parts = itemStr.split(':');
                     const itemName = parts[0];
-                    const itemQty = parseInt(parts[1]) || 1;
+                    const itemQty = parseInt(parts[1], 10) || 1;
                     itemsToAdd.push({ itemId: itemName, quantity: itemQty * qty });
                 });
-            } else {
-                // Regular item
-                itemsToAdd.push({ itemId: name, quantity: qty });
+                return;
             }
+
+            itemsToAdd.push({ itemId: name, quantity: qty });
         });
-        
-        // Convert items to inventory format using context-provided items map
+
         const newInventoryItems = addItemsToInventory(itemsToAdd, { itemsByItemId: maps.itemsByItemId });
         const addedIds = Object.keys(newInventoryItems);
         const updatedItems = { ...currentItems, ...newInventoryItems };
-        
+
         emit({
-            classEquipmentChoices: { 
-                ...previousChoices, 
+            classEquipmentChoices: {
+                ...previousChoices,
                 [choiceKey]: { optionKey, items, addedIds }
             },
-            inv: { 
-                ...values.inv, 
-                items: updatedItems 
+            classAnyItemSelections: nextAnySelections,
+            inv: {
+                ...values.inv,
+                items: updatedItems
             }
         });
     };
 
     // 5. Logic: Handle "Any" Item Selection (Dropdown)
     const handleAnyItemSelection = (choiceKey, optionKey, anyItemKey, selectedItem) => {
+        if (!selectedItem) return;
+
+        const choiceItems = selectedClass?.choices?.equipment?.[choiceKey]?.[optionKey];
+        if (!choiceItems) return;
+
         const currentItems = { ...(values.inv?.items || {}) };
-        const previousSelections = values.classAnyItemSelections || {};
-        
-        // Remove previous "any" selection for this specific key if exists
-        const prevSelectionKey = `${choiceKey}_${optionKey}_${anyItemKey}`;
-        if (previousSelections[prevSelectionKey]) {
-            const oldUniqueId = previousSelections[prevSelectionKey].uniqueId;
-            if (oldUniqueId && currentItems[oldUniqueId]) {
-                delete currentItems[oldUniqueId];
-            }
+        const nextAnySelections = { ...(values.classAnyItemSelections || {}) };
+        const nextChoices = { ...(values.classEquipmentChoices || {}) };
+        const previousChoice = nextChoices[choiceKey];
+        const previousOptionKey = previousChoice?.optionKey;
+        const isSwitching = Boolean(previousChoice) && previousOptionKey !== optionKey;
+
+        if (isSwitching) {
+            (previousChoice.addedIds || []).forEach((id) => {
+                if (currentItems[id]) delete currentItems[id];
+            });
+
+            Object.keys(nextAnySelections).forEach((key) => {
+                if (!key.startsWith(`${choiceKey}_${previousOptionKey}_`)) return;
+                const uniqueId = nextAnySelections[key]?.uniqueId;
+                if (uniqueId && currentItems[uniqueId]) delete currentItems[uniqueId];
+                delete nextAnySelections[key];
+            });
         }
-        
-        // Get quantity from the original "any" item
-        const originalItems = selectedClass.choices.equipment[choiceKey][optionKey];
-        const quantity = originalItems[anyItemKey];
-        
-        // Add the newly selected item
-        const itemsToAdd = [{ itemId: selectedItem, quantity }];
-        const newInventoryItems = addItemsToInventory(itemsToAdd, { itemsByItemId: maps.itemsByItemId });
-        const uniqueIds = Object.keys(newInventoryItems);
-        const updatedItems = { ...currentItems, ...newInventoryItems };
-        
-        emit({
-            classAnyItemSelections: {
-                ...previousSelections,
-                [prevSelectionKey]: {
-                    itemId: selectedItem,
-                    uniqueId: uniqueIds[0] // Store the first unique ID for removal later
+
+        if (!previousChoice || isSwitching) {
+            const itemsToAdd = [];
+            Object.entries(choiceItems).forEach(([name, qty]) => {
+                if (isAnyItem(name)) return;
+
+                if (isStartingPack(name)) {
+                    itemsToAdd.push({ itemId: name, quantity: qty });
+                    const packContents = startingPacks[name].items;
+                    packContents.forEach((itemStr) => {
+                        const parts = itemStr.split(':');
+                        const itemName = parts[0];
+                        const itemQty = parseInt(parts[1], 10) || 1;
+                        itemsToAdd.push({ itemId: itemName, quantity: itemQty * qty });
+                    });
+                    return;
                 }
-            },
-            inv: { 
-                ...values.inv, 
-                items: updatedItems 
+
+                itemsToAdd.push({ itemId: name, quantity: qty });
+            });
+
+            const fixedInventoryItems = addItemsToInventory(itemsToAdd, { itemsByItemId: maps.itemsByItemId });
+            const addedIds = Object.keys(fixedInventoryItems);
+            Object.assign(currentItems, fixedInventoryItems);
+            nextChoices[choiceKey] = { optionKey, items: choiceItems, addedIds };
+        }
+
+        const selectionKey = `${choiceKey}_${optionKey}_${anyItemKey}`;
+        const previousSelection = nextAnySelections[selectionKey];
+        if (previousSelection?.uniqueId && currentItems[previousSelection.uniqueId]) {
+            delete currentItems[previousSelection.uniqueId];
+        }
+
+        const quantity = Number(choiceItems[anyItemKey] || 1);
+        const selectedInventoryItems = addItemsToInventory([{ itemId: selectedItem, quantity }], { itemsByItemId: maps.itemsByItemId });
+        const uniqueIds = Object.keys(selectedInventoryItems);
+        Object.assign(currentItems, selectedInventoryItems);
+
+        nextAnySelections[selectionKey] = {
+            itemId: selectedItem,
+            uniqueId: uniqueIds[0]
+        };
+
+        emit({
+            classEquipmentChoices: nextChoices,
+            classAnyItemSelections: nextAnySelections,
+            inv: {
+                ...values.inv,
+                items: currentItems
             }
         });
     };
@@ -496,13 +535,7 @@ const handleSkillToggle = (skillName) => {
                                                                                     <select
                                                                                         className='flex-1 rounded border border-website-specials-500 bg-website-default-900 px-2 py-1 text-xs text-white focus:outline-none'
                                                                                         value={currentSelection}
-                                                                                        onChange={(e) => {
-                                                                                            handleAnyItemSelection(choiceKey, optionKey, itemName, e.target.value);
-                                                                                            // Auto-select this option when making a selection
-                                                                                            if (e.target.value && !isActive) {
-                                                                                                handleEquipmentChoice(choiceKey, optionKey, items);
-                                                                                            }
-                                                                                        }}
+                                                                                        onChange={(e) => handleAnyItemSelection(choiceKey, optionKey, itemName, e.target.value)}
                                                                                     >
                                                                                         <option value='' disabled>Select {toTitleCase(itemName.replace(/any/i, '').trim())}</option>
                                                                                         {dropdownOptions.map(opt => (

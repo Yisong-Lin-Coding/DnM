@@ -1,6 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Card } from '../../../pageComponents/card';
 import { useNavigate } from 'react-router-dom';
+import {
+  getChoiceBonus,
+  getModifierValue,
+  parseAbilityScoreChoiceConfig,
+  sanitizeChoiceMap
+} from '../utils/abilityScoreModifiers';
 
 const LABELS = {
   str: 'Strength',
@@ -46,6 +52,10 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
   const selectedRace = useMemo(() => races.find((r) => r._id === character.race), [races, character.race]);
   const selectedSubrace = useMemo(() => subraces.find((sr) => sr._id === character.subrace), [subraces, character.subrace]);
   const selectedBackground = useMemo(() => backgrounds.find((b) => b._id === character.background), [backgrounds, character.background]);
+  const raceChoiceConfig = useMemo(() => parseAbilityScoreChoiceConfig(selectedRace), [selectedRace]);
+  const subraceChoiceConfig = useMemo(() => parseAbilityScoreChoiceConfig(selectedSubrace), [selectedSubrace]);
+  const raceChoiceMap = useMemo(() => sanitizeChoiceMap(character?.abilityScoreChoices?.race, raceChoiceConfig), [character?.abilityScoreChoices?.race, raceChoiceConfig]);
+  const subraceChoiceMap = useMemo(() => sanitizeChoiceMap(character?.abilityScoreChoices?.subrace, subraceChoiceConfig), [character?.abilityScoreChoices?.subrace, subraceChoiceConfig]);
 
   // Compute modified stats
   const baseStats = character.stats || {};
@@ -56,11 +66,16 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
     const out = {};
     Object.keys(LABELS).forEach((k) => {
       const base = parseInt(baseStats[k], 10) || 0;
-      const bonus = (raceMods[k] || 0) + (subraceMods[k] || 0) + (classMods[k] || 0);
+      const bonus =
+        getModifierValue(raceMods, k) +
+        getModifierValue(subraceMods, k) +
+        getModifierValue(classMods, k) +
+        getChoiceBonus(raceChoiceMap, k) +
+        getChoiceBonus(subraceChoiceMap, k);
       out[k] = base + bonus;
     });
     return out;
-  }, [baseStats, selectedRace, selectedSubrace, selectedClass]);
+  }, [baseStats, selectedRace, selectedSubrace, selectedClass, raceChoiceMap, subraceChoiceMap]);
 
   // Proficiencies and languages
   const proficiencies = character?.skills?.proficiencies || {};
@@ -157,7 +172,7 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
         <Card className='bg-website-default-800 border-website-specials-500'>
           <Card.Header>
             <Card.Title className='text-website-default-100'>Ability Scores</Card.Title>
-            <Card.Description className='text-website-default-300'>Base vs final (after class/race/subrace modifiers).</Card.Description>
+            <Card.Description className='text-website-default-300'>Base vs final (after class, race, and subrace bonuses).</Card.Description>
           </Card.Header>
           <Card.Content className='grid grid-cols-1 md:grid-cols-2 gap-3'>
             {Object.keys(LABELS).map((code) => (

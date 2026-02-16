@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Card } from '../../../pageComponents/card';
-import { BookOpen } from 'lucide-react';
+import { CircleUser } from 'lucide-react';
 import { useGameData } from '../../../data/gameDataContext';
 import {
     toTitleCase,
@@ -207,132 +207,140 @@ export function Background({ values, onChange, backgrounds = [], items = [], cla
 
     // 4. Logic: Handle Equipment Choice Selection
     const handleEquipmentChoice = (choiceKey, optionKey, items) => {
+        if (!selectedBackground?.choices?.equipment?.[choiceKey]?.[optionKey]) return;
+
         const currentItems = { ...(values.inv?.items || {}) };
         const previousChoices = values.backgroundEquipmentChoices || {};
-        
-        // Remove items from previous choice if exists
-        if (previousChoices[choiceKey]) {
-            const previousOptionKey = previousChoices[choiceKey].optionKey;
-            
-            // Only remove if switching to a different option
-            if (previousOptionKey !== optionKey) {
-                const previousItems = selectedBackground.choices.equipment[choiceKey][previousOptionKey];
-                
-                // Find and remove all items from previous choice
-                Object.keys(currentItems).forEach(uniqueId => {
-                    const shouldRemove = previousChoices[choiceKey].addedIds?.includes(uniqueId);
-                    if (shouldRemove) {
-                        delete currentItems[uniqueId];
-                    }
-                });
-                
-                // Also remove any "any item" selections from the previous option
-                const previousAnySelections = { ...(values.backgroundAnyItemSelections || {}) };
-                Object.keys(previousAnySelections).forEach(key => {
-                    if (key.startsWith(`${choiceKey}_${previousOptionKey}_`)) {
-                        const uniqueId = previousAnySelections[key].uniqueId;
-                        if (uniqueId && currentItems[uniqueId]) {
-                            delete currentItems[uniqueId];
-                        }
-                        delete previousAnySelections[key];
-                    }
-                });
-                
-                // Update any item selections
-                emit({
-                    backgroundAnyItemSelections: previousAnySelections
-                });
-            }
-        }
-    
-    // Process items - expand packs, skip "any" items (they'll be handled by dropdown)
-    const itemsToAdd = [];
-    Object.entries(items).forEach(([name, qty]) => {
-        if (isAnyItem(name)) {
-            // Skip "any" items - they'll be handled by dropdown
-            return;
-        }
-        
-        if (isStartingPack(name)) {
-            // Add the pack container itself
-            itemsToAdd.push({ itemId: name, quantity: qty });
-            
-            // Add all items from the pack
-            const packContents = startingPacks[name].items;
-            packContents.forEach(itemStr => {
-                const parts = itemStr.split(':');
-                const itemName = parts[0];
-                const itemQty = parseInt(parts[1]) || 1;
-                itemsToAdd.push({ itemId: itemName, quantity: itemQty * qty });
+        const previousChoice = previousChoices[choiceKey];
+        const previousOptionKey = previousChoice?.optionKey;
+        if (previousOptionKey === optionKey) return;
+
+        const nextAnySelections = { ...(values.backgroundAnyItemSelections || {}) };
+
+        if (previousChoice) {
+            (previousChoice.addedIds || []).forEach((id) => {
+                if (currentItems[id]) delete currentItems[id];
             });
-        } else {
-            // Regular item
-            itemsToAdd.push({ itemId: name, quantity: qty });
+
+            Object.keys(nextAnySelections).forEach((key) => {
+                if (!key.startsWith(`${choiceKey}_${previousOptionKey}_`)) return;
+                const uniqueId = nextAnySelections[key]?.uniqueId;
+                if (uniqueId && currentItems[uniqueId]) delete currentItems[uniqueId];
+                delete nextAnySelections[key];
+            });
         }
-    });
-    
-    // Convert items to inventory format using context-provided items map
-    if (itemsToAdd.length > 0) {
+
+        const itemsToAdd = [];
+        Object.entries(items).forEach(([name, qty]) => {
+            if (isAnyItem(name)) return;
+
+            if (isStartingPack(name)) {
+                itemsToAdd.push({ itemId: name, quantity: qty });
+                const packContents = startingPacks[name].items;
+                packContents.forEach((itemStr) => {
+                    const parts = itemStr.split(':');
+                    const itemName = parts[0];
+                    const itemQty = parseInt(parts[1], 10) || 1;
+                    itemsToAdd.push({ itemId: itemName, quantity: itemQty * qty });
+                });
+                return;
+            }
+
+            itemsToAdd.push({ itemId: name, quantity: qty });
+        });
+
         const newInventoryItems = addItemsToInventory(itemsToAdd, { itemsByItemId: maps.itemsByItemId });
         const addedIds = Object.keys(newInventoryItems);
         const updatedItems = { ...currentItems, ...newInventoryItems };
-        
+
         emit({
-            backgroundEquipmentChoices: { 
-                ...previousChoices, 
+            backgroundEquipmentChoices: {
+                ...previousChoices,
                 [choiceKey]: { optionKey, items, addedIds }
             },
-            inv: { 
-                ...values.inv, 
-                items: updatedItems 
+            backgroundAnyItemSelections: nextAnySelections,
+            inv: {
+                ...values.inv,
+                items: updatedItems
             }
         });
-    } else {
-        // No regular items, only "any" items
-        emit({
-            backgroundEquipmentChoices: { 
-                ...previousChoices, 
-                [choiceKey]: { optionKey, items, addedIds: [] }
-            }
-        });
-    }
-};
+    };
 
     // 4b. Logic: Handle "Any" Item Selection (Dropdown)
     const handleAnyItemSelection = (choiceKey, optionKey, anyItemKey, selectedItem) => {
+        if (!selectedItem) return;
+
+        const choiceItems = selectedBackground?.choices?.equipment?.[choiceKey]?.[optionKey];
+        if (!choiceItems) return;
+
         const currentItems = { ...(values.inv?.items || {}) };
-        const previousSelections = values.backgroundAnyItemSelections || {};
-        
-        // Remove previous "any" selection for this specific key if exists
-        const prevSelectionKey = `${choiceKey}_${optionKey}_${anyItemKey}`;
-        if (previousSelections[prevSelectionKey]) {
-            const oldUniqueId = previousSelections[prevSelectionKey].uniqueId;
-            if (oldUniqueId && currentItems[oldUniqueId]) {
-                delete currentItems[oldUniqueId];
-            }
+        const nextAnySelections = { ...(values.backgroundAnyItemSelections || {}) };
+        const nextChoices = { ...(values.backgroundEquipmentChoices || {}) };
+        const previousChoice = nextChoices[choiceKey];
+        const previousOptionKey = previousChoice?.optionKey;
+        const isSwitching = Boolean(previousChoice) && previousOptionKey !== optionKey;
+
+        if (isSwitching) {
+            (previousChoice.addedIds || []).forEach((id) => {
+                if (currentItems[id]) delete currentItems[id];
+            });
+
+            Object.keys(nextAnySelections).forEach((key) => {
+                if (!key.startsWith(`${choiceKey}_${previousOptionKey}_`)) return;
+                const uniqueId = nextAnySelections[key]?.uniqueId;
+                if (uniqueId && currentItems[uniqueId]) delete currentItems[uniqueId];
+                delete nextAnySelections[key];
+            });
         }
-        
-        // Get quantity from the original "any" item
-        const originalItems = selectedBackground.choices.equipment[choiceKey][optionKey];
-        const quantity = originalItems[anyItemKey];
-        
-        // Add the newly selected item
-        const itemsToAdd = [{ itemId: selectedItem, quantity }];
-        const newInventoryItems = addItemsToInventory(itemsToAdd, { itemsByItemId: maps.itemsByItemId });
-        const uniqueIds = Object.keys(newInventoryItems);
-        const updatedItems = { ...currentItems, ...newInventoryItems };
-        
-        emit({
-            backgroundAnyItemSelections: {
-                ...previousSelections,
-                [prevSelectionKey]: {
-                    itemId: selectedItem,
-                    uniqueId: uniqueIds[0] // Store the first unique ID for removal later
+
+        if (!previousChoice || isSwitching) {
+            const itemsToAdd = [];
+            Object.entries(choiceItems).forEach(([name, qty]) => {
+                if (isAnyItem(name)) return;
+
+                if (isStartingPack(name)) {
+                    itemsToAdd.push({ itemId: name, quantity: qty });
+                    const packContents = startingPacks[name].items;
+                    packContents.forEach((itemStr) => {
+                        const parts = itemStr.split(':');
+                        const itemName = parts[0];
+                        const itemQty = parseInt(parts[1], 10) || 1;
+                        itemsToAdd.push({ itemId: itemName, quantity: itemQty * qty });
+                    });
+                    return;
                 }
-            },
-            inv: { 
-                ...values.inv, 
-                items: updatedItems 
+
+                itemsToAdd.push({ itemId: name, quantity: qty });
+            });
+
+            const fixedInventoryItems = addItemsToInventory(itemsToAdd, { itemsByItemId: maps.itemsByItemId });
+            const addedIds = Object.keys(fixedInventoryItems);
+            Object.assign(currentItems, fixedInventoryItems);
+            nextChoices[choiceKey] = { optionKey, items: choiceItems, addedIds };
+        }
+
+        const selectionKey = `${choiceKey}_${optionKey}_${anyItemKey}`;
+        const previousSelection = nextAnySelections[selectionKey];
+        if (previousSelection?.uniqueId && currentItems[previousSelection.uniqueId]) {
+            delete currentItems[previousSelection.uniqueId];
+        }
+
+        const quantity = Number(choiceItems[anyItemKey] || 1);
+        const selectedInventoryItems = addItemsToInventory([{ itemId: selectedItem, quantity }], { itemsByItemId: maps.itemsByItemId });
+        const uniqueIds = Object.keys(selectedInventoryItems);
+        Object.assign(currentItems, selectedInventoryItems);
+
+        nextAnySelections[selectionKey] = {
+            itemId: selectedItem,
+            uniqueId: uniqueIds[0]
+        };
+
+        emit({
+            backgroundEquipmentChoices: nextChoices,
+            backgroundAnyItemSelections: nextAnySelections,
+            inv: {
+                ...values.inv,
+                items: currentItems
             }
         });
     };
@@ -342,8 +350,8 @@ export function Background({ values, onChange, backgrounds = [], items = [], cla
             <div className='p-4 space-y-4 md:col-start-2'>
 
                 {/* Name Input */}
-                <div className='flex flex-row p-4 space-x-4 border-b border-website-specials-500'>
-                    <BookOpen size={48} />
+                <div className='flex flex-col sm:flex-row sm:items-center p-4 gap-3 sm:gap-4 border-b border-website-specials-500'>
+                    <CircleUser size={48} />
                     <div className='flex flex-col'>
                         <div className='text-left text-l font-semibold'>Character Name</div>
                         <input
@@ -684,13 +692,7 @@ export function Background({ values, onChange, backgrounds = [], items = [], cla
                                                                                         <select
                                                                                             className='flex-1 rounded border border-website-specials-500 bg-website-default-900 px-2 py-1 text-xs text-white focus:outline-none'
                                                                                             value={currentSelection}
-                                                                                            onChange={(e) => {
-                                                                                                handleAnyItemSelection(choiceKey, optionKey, itemName, e.target.value);
-                                                                                                // Auto-select this option when making a selection
-                                                                                                if (e.target.value && !isActive) {
-                                                                                                    handleEquipmentChoice(choiceKey, optionKey, items);
-                                                                                                }
-                                                                                            }}
+                                                                                            onChange={(e) => handleAnyItemSelection(choiceKey, optionKey, itemName, e.target.value)}
                                                                                         >
                                                                                             <option value='' disabled>Select {toTitleCase(itemName.replace(/any/i, '').trim())}</option>
                                                                                             {dropdownOptions.map(opt => (

@@ -11,6 +11,12 @@ import { Class } from "../characters/characterCreationPages/Class"
 import { Background } from "../characters/characterCreationPages/Background"
 import { AbilityScores } from "../characters/characterCreationPages/AbilityScores"
 import { Summary } from "../characters/characterCreationPages/Summary"
+import {
+  getChoiceBonus,
+  getModifierValue,
+  parseAbilityScoreChoiceConfig,
+  sanitizeChoiceMap
+} from "./utils/abilityScoreModifiers"
 
 export default function Test2(){
   const socket = useContext(SocketContext)
@@ -123,13 +129,23 @@ const updateDraft = React.useCallback((partial) => {
     const classMods = (cls && cls.baseStatModifier) || {};
     const raceMods = (race && race.abilityScoreModifiers) || {};
     const subraceMods = (subrace && subrace.abilityScoreModifiers) || {};
+    const raceChoiceConfig = parseAbilityScoreChoiceConfig(race);
+    const subraceChoiceConfig = parseAbilityScoreChoiceConfig(subrace);
+    const raceChoiceMap = sanitizeChoiceMap(characterDraft?.abilityScoreChoices?.race, raceChoiceConfig);
+    const subraceChoiceMap = sanitizeChoiceMap(characterDraft?.abilityScoreChoices?.subrace, subraceChoiceConfig);
 
     // Calculate final stats (Luck excluded from pipeline, but kept if present)
     const STAT_KEYS = ['str','dex','con','int','wis','cha'];
     const finalStats = {};
     for (const k of STAT_KEYS) {
       const base = parseInt(baseStats[k], 10) || 0;
-      finalStats[k] = base + (classMods[k] || 0) + (raceMods[k] || 0) + (subraceMods[k] || 0);
+      finalStats[k] =
+        base +
+        getModifierValue(classMods, k) +
+        getModifierValue(raceMods, k) +
+        getModifierValue(subraceMods, k) +
+        getChoiceBonus(raceChoiceMap, k) +
+        getChoiceBonus(subraceChoiceMap, k);
     }
     // Preserve any additional stats (e.g., luck) as-is
     Object.keys(baseStats || {}).forEach(k => {
@@ -164,6 +180,11 @@ const updateDraft = React.useCallback((partial) => {
     // Prepare payload aligned with server schema
     const payload = {
       ...characterDraft,
+      abilityScoreChoices: {
+        ...(characterDraft.abilityScoreChoices || {}),
+        race: raceChoiceMap,
+        subrace: subraceChoiceMap
+      },
       // Note: keep base stats as entered by user
       HP: { ...(characterDraft.HP || {}), max: maxHP, current: Math.max(0, Math.min(characterDraft.HP?.current ?? maxHP, maxHP)) },
       MP: { ...(characterDraft.MP || {}), max: maxMP, current: Math.max(0, Math.min(characterDraft.MP?.current ?? maxMP, maxMP)) },

@@ -1,7 +1,13 @@
-import React, { useMemo, useState, useContext } from 'react';
+import React, { useMemo } from 'react';
 import { Card } from '../../../pageComponents/card';
 import { useGameData } from '../../../data/gameDataContext';
 import { CircleUser, Shuffle } from 'lucide-react';
+import {
+  getChoiceBonus,
+  getModifierValue,
+  parseAbilityScoreChoiceConfig,
+  sanitizeChoiceMap
+} from '../utils/abilityScoreModifiers';
 
 // Stats used for buy/roll methods (exclude Luck from automated systems)
 const CORE_STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -45,6 +51,11 @@ export function AbilityScores({ values, onChange }) {
   const selectedSubrace = useMemo(() => subracesById[selectedSubraceId] || null, [subracesById, selectedSubraceId]);
   const selectedClass = useMemo(() => classesById[selectedClassId] || null, [classesById, selectedClassId]);
 
+  const raceChoiceConfig = useMemo(() => parseAbilityScoreChoiceConfig(selectedRace), [selectedRace]);
+  const subraceChoiceConfig = useMemo(() => parseAbilityScoreChoiceConfig(selectedSubrace), [selectedSubrace]);
+  const raceChoiceMap = useMemo(() => sanitizeChoiceMap(values?.abilityScoreChoices?.race, raceChoiceConfig), [values?.abilityScoreChoices?.race, raceChoiceConfig]);
+  const subraceChoiceMap = useMemo(() => sanitizeChoiceMap(values?.abilityScoreChoices?.subrace, subraceChoiceConfig), [values?.abilityScoreChoices?.subrace, subraceChoiceConfig]);
+
   // Compute modified stats = base + class + race + subrace modifiers
   const modifiedStats = useMemo(() => {
     const out = { ...stats };
@@ -54,11 +65,16 @@ export function AbilityScores({ values, onChange }) {
 
     Object.keys(out).forEach((k) => {
       const base = parseInt(out[k], 10) || 0;
-      const bonus = (raceMods[k] || 0) + (subraceMods[k] || 0) + (classMods[k] || 0);
+      const bonus =
+        getModifierValue(raceMods, k) +
+        getModifierValue(subraceMods, k) +
+        getModifierValue(classMods, k) +
+        getChoiceBonus(raceChoiceMap, k) +
+        getChoiceBonus(subraceChoiceMap, k);
       out[k] = base + bonus;
     });
     return out;
-  }, [stats, selectedRace, selectedSubrace, selectedClass]);
+  }, [stats, selectedRace, selectedSubrace, selectedClass, raceChoiceMap, subraceChoiceMap]);
 
   // Helpers to update base stats
   const updateStat = (key, val) => {

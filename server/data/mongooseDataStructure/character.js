@@ -48,9 +48,13 @@ const characterSchema   = new mongoose.Schema({
 
     water: { current: {type:Number, default: 0}, max: {type:Number, default:8} },
     food:{ current: {type:Number, default: 0}, max: {type:Number, default:12}, },
-    
+
 
     stats: statSchema,
+    abilityScoreChoices: {
+        race: { type: Map, of: Number, default: {} },
+        subrace: { type: Map, of: Number, default: {} }
+    },
     AR:ARSchema,
     inv:invSchema,
     skills: skillsSchema,
