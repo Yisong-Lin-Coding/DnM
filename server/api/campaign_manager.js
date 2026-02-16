@@ -43,11 +43,24 @@ const isCampaignMember = (campaign, playerID) => {
     return (campaign.players || []).some((memberID) => String(memberID) === normalizedPlayerID);
 };
 
+const isCampaignDM = (campaign, playerID) => {
+    const normalizedPlayerID = String(playerID || "");
+    if (!normalizedPlayerID || !campaign) return false;
+    return toObjectIdString(campaign.dmId) === normalizedPlayerID;
+};
+
+const isCampaignBanned = (campaign, playerID) => {
+    const normalizedPlayerID = String(playerID || "");
+    if (!normalizedPlayerID || !campaign) return false;
+    return (campaign.bannedPlayers || []).some((bannedID) => String(bannedID) === normalizedPlayerID);
+};
+
 const formatCampaign = (campaignDoc) => {
     const campaign = campaignDoc?.toObject ? campaignDoc.toObject() : campaignDoc;
     if (!campaign) return null;
 
     const players = Array.isArray(campaign.players) ? campaign.players : [];
+    const bannedPlayers = Array.isArray(campaign.bannedPlayers) ? campaign.bannedPlayers : [];
     const activeLobby = campaign.activeLobby || {};
 
     return {
@@ -62,6 +75,10 @@ const formatCampaign = (campaignDoc) => {
         setting: campaign.setting || "",
         memberCount: players.length,
         players: players.map((player) => ({
+            _id: toObjectIdString(player),
+            username: typeof player === "object" ? player.username || "" : "",
+        })),
+        bannedPlayers: bannedPlayers.map((player) => ({
             _id: toObjectIdString(player),
             username: typeof player === "object" ? player.username || "" : "",
         })),
@@ -127,6 +144,7 @@ const readCampaignForResponse = async (campaignID) =>
     Campaign.findById(campaignID)
         .populate({ path: "dmId", select: "_id username" })
         .populate({ path: "players", select: "_id username" })
+        .populate({ path: "bannedPlayers", select: "_id username" })
         .lean();
 
 module.exports = (socket) => {
@@ -144,7 +162,8 @@ module.exports = (socket) => {
 
             const campaign = await Campaign.findById(campaignID)
                 .populate({ path: "dmId", select: "_id username" })
-                .populate({ path: "players", select: "_id username" });
+                .populate({ path: "players", select: "_id username" })
+                .populate({ path: "bannedPlayers", select: "_id username" });
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
             }
@@ -204,7 +223,8 @@ module.exports = (socket) => {
             })
                 .sort({ createdAt: -1 })
                 .populate({ path: "dmId", select: "_id username" })
-                .populate({ path: "players", select: "_id username" });
+                .populate({ path: "players", select: "_id username" })
+                .populate({ path: "bannedPlayers", select: "_id username" });
 
             respond({
                 success: true,
@@ -304,6 +324,13 @@ module.exports = (socket) => {
                 return respond({ success: false, message: "Campaign code not found" });
             }
 
+            if (isCampaignBanned(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "You are banned from this campaign",
+                });
+            }
+
             if (isCampaignMember(campaign, playerID)) {
                 const existingCampaign = await readCampaignForResponse(campaign._id);
                 return respond({
@@ -352,10 +379,10 @@ module.exports = (socket) => {
                 return respond({ success: false, message: "Campaign not found" });
             }
 
-            if (!isCampaignMember(campaign, playerID)) {
+            if (!isCampaignDM(campaign, playerID)) {
                 return respond({
                     success: false,
-                    message: "You must be in this campaign to start its lobby",
+                    message: "Only the DM can start or reset this lobby",
                 });
             }
 
@@ -363,12 +390,21 @@ module.exports = (socket) => {
                 Campaign.exists({ "activeLobby.isActive": true, "activeLobby.lobbyCode": code })
             );
 
+            const defaultLobbyMembers = Array.from(
+                new Set([
+                    String(campaign.dmId),
+                    ...(Array.isArray(campaign.players)
+                        ? campaign.players.map((memberID) => String(memberID))
+                        : []),
+                ])
+            );
+
             campaign.activeLobby = {
                 isActive: true,
                 lobbyCode,
                 startedBy: playerID,
                 startedAt: new Date(),
-                members: [playerID],
+                members: defaultLobbyMembers,
             };
 
             await campaign.save();
@@ -422,13 +458,18 @@ module.exports = (socket) => {
                 return respond({ success: false, message: "Lobby code mismatch" });
             }
 
-            const existingLobbyMembers = Array.isArray(campaign.activeLobby.members)
+            const allowedLobbyMembers = Array.isArray(campaign.activeLobby.members)
                 ? campaign.activeLobby.members.map((member) => String(member))
                 : [];
 
-            if (!existingLobbyMembers.includes(String(playerID))) {
-                campaign.activeLobby.members.push(playerID);
-                await campaign.save();
+            if (
+                allowedLobbyMembers.length > 0 &&
+                !allowedLobbyMembers.includes(String(playerID))
+            ) {
+                return respond({
+                    success: false,
+                    message: "The DM has not granted this player access to the active lobby",
+                });
             }
 
             respond({
@@ -440,6 +481,268 @@ module.exports = (socket) => {
         } catch (error) {
             console.error("[campaign_joinLobby] failed", error);
             respond({ success: false, message: error.message || "Failed to join lobby" });
+        }
+    });
+
+    socket.on("campaign_setLobbyMembers", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({ success: false, message: "Valid playerID and campaignID are required" });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select("_id dmId players activeLobby");
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the DM can manage lobby players",
+                });
+            }
+
+            if (!campaign.activeLobby?.isActive || !campaign.activeLobby?.lobbyCode) {
+                return respond({
+                    success: false,
+                    message: "Start the lobby before managing players",
+                });
+            }
+
+            const campaignMemberIDs = new Set(
+                Array.isArray(campaign.players) ? campaign.players.map((member) => String(member)) : []
+            );
+            campaignMemberIDs.add(String(campaign.dmId));
+
+            const requestedMemberIDs = Array.isArray(data?.memberIDs) ? data.memberIDs : [];
+            const normalizedRequestedMembers = Array.from(
+                new Set(
+                    requestedMemberIDs
+                        .map((memberID) => String(memberID || "").trim())
+                        .filter((memberID) => mongoose.isValidObjectId(memberID))
+                )
+            );
+
+            const filteredMembers = normalizedRequestedMembers.filter((memberID) =>
+                campaignMemberIDs.has(memberID)
+            );
+            const nextLobbyMembers = Array.from(new Set([String(campaign.dmId), ...filteredMembers]));
+
+            campaign.activeLobby.members = nextLobbyMembers;
+            await campaign.save();
+
+            const campaignForClient = await readCampaignForResponse(campaign._id);
+            respond({
+                success: true,
+                campaign: formatCampaign(campaignForClient),
+                members: nextLobbyMembers,
+            });
+        } catch (error) {
+            console.error("[campaign_setLobbyMembers] failed", error);
+            respond({ success: false, message: error.message || "Failed to update lobby players" });
+        }
+    });
+
+    socket.on("campaign_managePlayer", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID, targetPlayerID } = data || {};
+        const action = String(data?.action || "").trim().toLowerCase();
+
+        try {
+            if (
+                !mongoose.isValidObjectId(playerID) ||
+                !mongoose.isValidObjectId(campaignID) ||
+                !mongoose.isValidObjectId(targetPlayerID)
+            ) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID, campaignID, and targetPlayerID are required",
+                });
+            }
+
+            if (!["kick", "ban", "unban"].includes(action)) {
+                return respond({
+                    success: false,
+                    message: "Action must be kick, ban, or unban",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players bannedPlayers activeLobby"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the DM can manage players",
+                });
+            }
+
+            if (toObjectIdString(campaign.dmId) === String(targetPlayerID)) {
+                return respond({
+                    success: false,
+                    message: "The DM cannot be removed or banned",
+                });
+            }
+
+            if (action === "unban") {
+                campaign.bannedPlayers = (campaign.bannedPlayers || []).filter(
+                    (member) => String(member) !== String(targetPlayerID)
+                );
+                await campaign.save();
+
+                const campaignForClient = await readCampaignForResponse(campaign._id);
+                return respond({
+                    success: true,
+                    campaign: formatCampaign(campaignForClient),
+                });
+            }
+
+            const campaignPlayers = Array.isArray(campaign.players)
+                ? campaign.players.map((member) => String(member))
+                : [];
+
+            if (!campaignPlayers.includes(String(targetPlayerID))) {
+                return respond({
+                    success: false,
+                    message: "Target player is not currently in this campaign",
+                });
+            }
+
+            campaign.players = (campaign.players || []).filter(
+                (member) => String(member) !== String(targetPlayerID)
+            );
+            if (Array.isArray(campaign.activeLobby?.members)) {
+                campaign.activeLobby.members = campaign.activeLobby.members.filter(
+                    (member) => String(member) !== String(targetPlayerID)
+                );
+            }
+
+            if (action === "ban") {
+                campaign.bannedPlayers.addToSet(targetPlayerID);
+            }
+
+            await campaign.save();
+            await Player.findByIdAndUpdate(targetPlayerID, {
+                $pull: { campaigns: campaign._id },
+            });
+
+            const campaignForClient = await readCampaignForResponse(campaign._id);
+            respond({
+                success: true,
+                campaign: formatCampaign(campaignForClient),
+            });
+        } catch (error) {
+            console.error("[campaign_managePlayer] failed", error);
+            respond({ success: false, message: error.message || "Failed to manage player" });
+        }
+    });
+
+    socket.on("campaign_invitePlayer", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+        const username = sanitizeText(data?.username, 40);
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            if (!username) {
+                return respond({
+                    success: false,
+                    message: "A username is required to invite a player",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players bannedPlayers maxPlayers activeLobby"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the DM can invite players",
+                });
+            }
+
+            const invitee = await Player.findOne({ username }).select("_id username");
+            if (!invitee) {
+                return respond({
+                    success: false,
+                    message: "Player not found for that username",
+                });
+            }
+
+            const inviteeID = String(invitee._id);
+            if (inviteeID === toObjectIdString(campaign.dmId)) {
+                return respond({
+                    success: false,
+                    message: "That player is already the DM of this campaign",
+                });
+            }
+
+            if (isCampaignBanned(campaign, inviteeID)) {
+                return respond({
+                    success: false,
+                    message: "That player is banned from this campaign",
+                });
+            }
+
+            if (isCampaignMember(campaign, inviteeID)) {
+                const existingCampaign = await readCampaignForResponse(campaign._id);
+                return respond({
+                    success: true,
+                    alreadyMember: true,
+                    campaign: formatCampaign(existingCampaign),
+                    invitedPlayer: {
+                        _id: inviteeID,
+                        username: invitee.username || username,
+                    },
+                });
+            }
+
+            if ((campaign.players || []).length >= campaign.maxPlayers) {
+                return respond({
+                    success: false,
+                    message: "This campaign is full",
+                });
+            }
+
+            campaign.players.addToSet(invitee._id);
+            if (campaign.activeLobby?.isActive) {
+                campaign.activeLobby.members.addToSet(invitee._id);
+            }
+            await campaign.save();
+
+            await Player.findByIdAndUpdate(invitee._id, {
+                $addToSet: { campaigns: campaign._id },
+            });
+
+            const campaignForClient = await readCampaignForResponse(campaign._id);
+            respond({
+                success: true,
+                campaign: formatCampaign(campaignForClient),
+                invitedPlayer: {
+                    _id: inviteeID,
+                    username: invitee.username || username,
+                },
+            });
+        } catch (error) {
+            console.error("[campaign_invitePlayer] failed", error);
+            respond({ success: false, message: error.message || "Failed to invite player" });
         }
     });
 
@@ -457,10 +760,10 @@ module.exports = (socket) => {
                 return respond({ success: false, message: "Campaign not found" });
             }
 
-            if (!isCampaignMember(campaign, playerID)) {
+            if (!isCampaignDM(campaign, playerID)) {
                 return respond({
                     success: false,
-                    message: "Only campaign members can create saves",
+                    message: "Only the DM can create saves",
                 });
             }
 
@@ -559,10 +862,10 @@ module.exports = (socket) => {
                 return respond({ success: false, message: "Campaign not found" });
             }
 
-            if (!isCampaignMember(campaign, playerID)) {
+            if (!isCampaignDM(campaign, playerID)) {
                 return respond({
                     success: false,
-                    message: "Only campaign members can load saves",
+                    message: "Only the DM can load saves",
                 });
             }
 

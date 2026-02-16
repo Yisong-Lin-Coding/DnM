@@ -16,6 +16,7 @@ const campaignSchema = new mongoose.Schema({
     description: { type: String, default: "", trim: true },
     dmId: { type: mongoose.Schema.Types.ObjectId, ref: "Player", required: true },
     players: [{ type: mongoose.Schema.Types.ObjectId, ref: "Player", default: [] }],
+    bannedPlayers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Player", default: [] }],
     joinCode: { type: String, required: true, unique: true, uppercase: true, trim: true },
     maxPlayers: { type: Number, default: 6, min: 2, max: 12 },
     isPrivate: { type: Boolean, default: false },

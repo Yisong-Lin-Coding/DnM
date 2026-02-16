@@ -44,7 +44,17 @@ function App() {
 
     socket.on("connect", () => {
       console.log("Connected with ID:", socket.id);
-      sessionStorage.setItem("session_ID", socket.id.toString());
+      const existingSessionID = sessionStorage.getItem("session_ID");
+      const stableSessionID = existingSessionID || socket.id.toString();
+      if (!existingSessionID) {
+        sessionStorage.setItem("session_ID", stableSessionID);
+      }
+
+      const playerID = localStorage.getItem("player_ID");
+      if (playerID) {
+        socket.emit("login_tokenSave", { playerID, sessionID: stableSessionID }, () => {});
+        socket.emit("playerData_logOn", { playerID });
+      }
       setIsConnected(true);
       setConnectionError(null);
     });
@@ -56,9 +66,6 @@ function App() {
 
     socket.on("welcome", (data) => {
       console.log("Server says:", data.message);
-      if(localStorage.getItem("player_ID")){
-        socket.emit("playerData_logOn", { playerID: localStorage.getItem("player_ID") });
-      }
     });
 
     socket.on("connect_error", (err) => {

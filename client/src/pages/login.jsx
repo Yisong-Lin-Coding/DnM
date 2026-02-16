@@ -94,10 +94,11 @@ useEffect(() => {
                 return;
             }
 
-            socket.emit("login_validityCheck", { playerID, sessionID }, (response) => {
+            socket.emit("login_tokenSave", { playerID, sessionID }, (response) => {
                 if (cancelled) return;
 
                 if (response.success) {
+                    socket.emit("playerData_logOn", { playerID });
                     if(lastLocation){
                         navigate(`/ISK/${sessionID}/${lastLocation}`)
                     }else {

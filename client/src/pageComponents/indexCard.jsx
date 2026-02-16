@@ -26,7 +26,8 @@ IndexCardFolder.File = function IndexCardFile({ children, className = "", to, hr
     const isClickable = to || href || onClick;
 
     const handleClick = (e) => {
-        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A') {
+        const clickedElement = e.target instanceof Element ? e.target : null;
+        if (clickedElement?.closest("button, a, [data-card-ignore-click='true']")) {
             return;
         }
 
