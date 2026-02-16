@@ -786,8 +786,8 @@ module.exports = (socket) => {
                   )
                 : [];
             nextAssignments.push({
-                playerId,
-                characterId,
+                playerId: playerID,
+                characterId: characterID,
                 selectedBy: playerID,
                 selectedAt: new Date(),
             });
