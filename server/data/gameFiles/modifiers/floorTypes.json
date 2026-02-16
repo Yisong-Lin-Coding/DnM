@@ -1,0 +1,113 @@
+[
+  {
+    "id": "stoneFloor",
+    "name": "Stone Floor",
+    "terrainType": "floor",
+    "description": "Stable carved stone with normal movement.",
+    "movementCost": 1,
+    "blocksMovement": false,
+    "effects": [
+      {
+        "id": "sureFooting",
+        "trigger": "onEnter",
+        "description": "No movement penalty."
+      }
+    ]
+  },
+  {
+    "id": "mudFloor",
+    "name": "Mud Floor",
+    "terrainType": "floor",
+    "description": "Sticky mud that slows travel.",
+    "movementCost": 2,
+    "blocksMovement": false,
+    "effects": [
+      {
+        "id": "slowed",
+        "trigger": "onEnter",
+        "magnitude": 1,
+        "description": "Increased movement cost while inside."
+      }
+    ]
+  },
+  {
+    "id": "spikeTrapFloor",
+    "name": "Spike Trap",
+    "terrainType": "floor",
+    "description": "Hidden spikes damage units that cross this tile.",
+    "movementCost": 1,
+    "blocksMovement": false,
+    "effects": [
+      {
+        "id": "pierceDamage",
+        "trigger": "onEnter",
+        "magnitude": 8,
+        "damageType": "piercing",
+        "description": "Deals damage on entry."
+      }
+    ]
+  },
+  {
+    "id": "stoneWall",
+    "name": "Stone Wall",
+    "terrainType": "wall",
+    "description": "Dense wall that blocks movement and line of sight.",
+    "movementCost": 0,
+    "blocksMovement": true,
+    "effects": [
+      {
+        "id": "hardCover",
+        "trigger": "passive",
+        "coverBonus": 5,
+        "description": "Provides hard cover."
+      }
+    ]
+  },
+  {
+    "id": "woodenWall",
+    "name": "Wooden Wall",
+    "terrainType": "wall",
+    "description": "Breakable wall, weaker than stone.",
+    "movementCost": 0,
+    "blocksMovement": true,
+    "effects": [
+      {
+        "id": "flammable",
+        "trigger": "onElementFire",
+        "multiplier": 1.5,
+        "description": "Takes extra fire damage."
+      }
+    ]
+  },
+  {
+    "id": "woodenCrate",
+    "name": "Wooden Crate",
+    "terrainType": "obstacle",
+    "description": "Portable obstacle that can be destroyed.",
+    "movementCost": 0,
+    "blocksMovement": true,
+    "effects": [
+      {
+        "id": "halfCover",
+        "trigger": "passive",
+        "coverBonus": 2,
+        "description": "Provides half cover."
+      }
+    ]
+  },
+  {
+    "id": "pillarObstacle",
+    "name": "Stone Pillar",
+    "terrainType": "obstacle",
+    "description": "Heavy obstacle with high durability.",
+    "movementCost": 0,
+    "blocksMovement": true,
+    "effects": [
+      {
+        "id": "lineBlock",
+        "trigger": "passive",
+        "description": "Blocks line of sight through center."
+      }
+    ]
+  }
+]

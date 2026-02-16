@@ -3,6 +3,88 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
 const GameContext = createContext();
 
 const DEFAULT_BACKGROUND_KEY = "calm1";
+const MIN_Z_LEVEL = -20;
+const MAX_Z_LEVEL = 20;
+const MIN_HITBOX_SCALE = 0.1;
+const MAX_HITBOX_SCALE = 5;
+
+const DEFAULT_MAX_HP_BY_TERRAIN = {
+    floor: 500,
+    wall: 1200,
+    obstacle: 700,
+};
+
+const DEFAULT_FLOOR_TYPE_BY_TERRAIN = {
+    floor: "stoneFloor",
+    wall: "stoneWall",
+    obstacle: "woodenCrate",
+};
+
+const DEFAULT_FLOOR_TYPES = [
+    {
+        id: "stoneFloor",
+        name: "Stone Floor",
+        terrainType: "floor",
+        description: "Solid stone tiles with stable footing.",
+        movementCost: 1,
+        blocksMovement: false,
+        effects: [{ id: "sureFooting", trigger: "onEnter", description: "Stable movement." }],
+    },
+    {
+        id: "mudFloor",
+        name: "Mud Floor",
+        terrainType: "floor",
+        description: "Heavy mud that slows movement.",
+        movementCost: 2,
+        blocksMovement: false,
+        effects: [{ id: "slowed", trigger: "onEnter", description: "Movement cost increased." }],
+    },
+    {
+        id: "spikeTrapFloor",
+        name: "Spike Trap",
+        terrainType: "floor",
+        description: "Hidden spikes can damage units that move across it.",
+        movementCost: 1,
+        blocksMovement: false,
+        effects: [{ id: "pierceDamage", trigger: "onEnter", value: 8, description: "Take damage on contact." }],
+    },
+    {
+        id: "stoneWall",
+        name: "Stone Wall",
+        terrainType: "wall",
+        description: "Heavy wall that blocks movement and vision.",
+        movementCost: 0,
+        blocksMovement: true,
+        effects: [{ id: "hardCover", trigger: "passive", description: "Provides hard cover." }],
+    },
+    {
+        id: "woodenWall",
+        name: "Wooden Wall",
+        terrainType: "wall",
+        description: "Breakable wooden partition.",
+        movementCost: 0,
+        blocksMovement: true,
+        effects: [{ id: "flammable", trigger: "onElementFire", description: "Extra fire damage." }],
+    },
+    {
+        id: "woodenCrate",
+        name: "Wooden Crate",
+        terrainType: "obstacle",
+        description: "Low obstacle with medium durability.",
+        movementCost: 0,
+        blocksMovement: true,
+        effects: [{ id: "halfCover", trigger: "passive", description: "Provides partial cover." }],
+    },
+    {
+        id: "pillarObstacle",
+        name: "Stone Pillar",
+        terrainType: "obstacle",
+        description: "Dense obstacle with high durability.",
+        movementCost: 0,
+        blocksMovement: true,
+        effects: [{ id: "lineBlock", trigger: "passive", description: "Blocks line of sight." }],
+    },
+];
 
 const BACKGROUND_OPTIONS = [
     "calm1",
@@ -58,9 +140,68 @@ const DEFAULT_CHARACTERS = [
 ];
 
 const DEFAULT_MAP_OBJECTS = [
-    { id: 1, type: "circle", x: 100, y: 100, z: 0, size: 30, color: "#3B82F6" },
-    { id: 2, type: "rect", x: 200, y: 150, z: 1, width: 50, height: 40, color: "#EF4444" },
-    { id: 3, type: "triangle", x: 300, y: 200, z: 0, size: 40, color: "#10B981" },
+    {
+        id: 1,
+        type: "rect",
+        terrainType: "floor",
+        floorTypeId: "stoneFloor",
+        zLevel: 0,
+        x: 100,
+        y: 100,
+        z: 0,
+        width: 120,
+        height: 100,
+        color: "#1D4ED8",
+        maxHP: 500,
+        hp: 500,
+        hitbox: {
+            type: "rect",
+            offsetX: 0,
+            offsetY: 0,
+            scale: 1,
+        },
+    },
+    {
+        id: 2,
+        type: "rect",
+        terrainType: "wall",
+        floorTypeId: "stoneWall",
+        zLevel: 0,
+        x: 200,
+        y: 150,
+        z: 1,
+        width: 50,
+        height: 40,
+        color: "#EF4444",
+        maxHP: 1200,
+        hp: 1200,
+        hitbox: {
+            type: "rect",
+            offsetX: 0,
+            offsetY: 0,
+            scale: 1,
+        },
+    },
+    {
+        id: 3,
+        type: "circle",
+        terrainType: "obstacle",
+        floorTypeId: "woodenCrate",
+        zLevel: 1,
+        x: 300,
+        y: 200,
+        z: 0,
+        size: 40,
+        color: "#10B981",
+        maxHP: 700,
+        hp: 700,
+        hitbox: {
+            type: "circle",
+            offsetX: 0,
+            offsetY: 0,
+            scale: 1,
+        },
+    },
 ];
 
 const toNumber = (value, fallback = 0) => {
@@ -81,18 +222,95 @@ const normalizeHexColor = (value, fallback = "#3B82F6") => {
     return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : fallback;
 };
 
+const normalizeTerrainType = (value) => {
+    const type = String(value || "").trim().toLowerCase();
+    if (type === "floor" || type === "wall" || type === "obstacle") return type;
+    return "obstacle";
+};
+
+const clampZLevel = (value) =>
+    Math.max(MIN_Z_LEVEL, Math.min(MAX_Z_LEVEL, Math.round(toNumber(value, 0))));
+
+const clampHitboxScale = (value) =>
+    Math.max(MIN_HITBOX_SCALE, Math.min(MAX_HITBOX_SCALE, toNumber(value, 1)));
+
+const normalizeFloorTypeID = (value, terrainType = "obstacle") => {
+    const candidate = String(value || "").trim();
+    if (candidate) return candidate;
+    return DEFAULT_FLOOR_TYPE_BY_TERRAIN[terrainType] || DEFAULT_FLOOR_TYPE_BY_TERRAIN.obstacle;
+};
+
+const normalizeFloorTypeDefinition = (raw = {}, fallbackIndex = 0) => {
+    const terrainType = normalizeTerrainType(raw.terrainType);
+    const id = String(raw.id || `floorType_${fallbackIndex + 1}`).trim() || `floorType_${fallbackIndex + 1}`;
+    return {
+        id,
+        name: String(raw.name || id).trim() || id,
+        terrainType,
+        description: String(raw.description || "").trim(),
+        movementCost: Math.max(0, toNumber(raw.movementCost, terrainType === "floor" ? 1 : 0)),
+        blocksMovement:
+            typeof raw.blocksMovement === "boolean"
+                ? raw.blocksMovement
+                : terrainType !== "floor",
+        effects: Array.isArray(raw.effects) ? raw.effects : [],
+    };
+};
+
+const normalizeFloorTypeCollection = (list = []) => {
+    const safeList = Array.isArray(list) ? list : [];
+    const byID = new Map();
+    safeList.forEach((entry, index) => {
+        const normalized = normalizeFloorTypeDefinition(entry, index);
+        if (!byID.has(normalized.id)) {
+            byID.set(normalized.id, normalized);
+        }
+    });
+    return Array.from(byID.values());
+};
+
 const getMaxObjectId = (objects = []) =>
     objects.reduce((max, obj) => Math.max(max, toNumber(obj?.id, 0)), 0);
 
 const normalizeMapObject = (raw = {}, fallbackId = 1) => {
     const type = normalizeObjectType(raw.type);
+    const terrainType = normalizeTerrainType(raw.terrainType);
+    const floorTypeId = normalizeFloorTypeID(raw.floorTypeId, terrainType);
+    const defaultMaxHP = DEFAULT_MAX_HP_BY_TERRAIN[terrainType] || DEFAULT_MAX_HP_BY_TERRAIN.obstacle;
+    const hasExplicitIndestructible =
+        raw.maxHP === null ||
+        raw.maxHP === "indestructible" ||
+        raw.maxHP === "infinite";
+    const maxHP = hasExplicitIndestructible
+        ? null
+        : Math.max(1, Math.round(toNumber(raw.maxHP, defaultMaxHP)));
+    const hp =
+        maxHP === null
+            ? null
+            : Math.max(0, Math.min(maxHP, Math.round(toNumber(raw.hp, maxHP))));
+    const hitboxSource =
+        raw.hitbox && typeof raw.hitbox === "object" && !Array.isArray(raw.hitbox)
+            ? raw.hitbox
+            : {};
+
     const normalized = {
         id: toNumber(raw.id, fallbackId),
         type,
         x: Math.round(toNumber(raw.x, 0)),
         y: Math.round(toNumber(raw.y, 0)),
         z: Math.round(toNumber(raw.z, 0)),
+        zLevel: clampZLevel(raw.zLevel),
+        terrainType,
+        floorTypeId,
         color: normalizeHexColor(raw.color),
+        maxHP,
+        hp,
+        hitbox: {
+            type: normalizeObjectType(hitboxSource.type || raw.hitboxType || type),
+            offsetX: Math.round(toNumber(hitboxSource.offsetX, 0)),
+            offsetY: Math.round(toNumber(hitboxSource.offsetY, 0)),
+            scale: clampHitboxScale(hitboxSource.scale ?? raw.hitboxScale),
+        },
     };
 
     if (type === "rect") {
@@ -135,6 +353,8 @@ export const GameProvider = ({ children }) => {
     const [currentMapId, setCurrentMapId] = useState("default_map");
     const [backgroundKey, setBackgroundKey] = useState(DEFAULT_BACKGROUND_KEY);
     const [mapObjectPlacement, setMapObjectPlacement] = useState(null);
+    const [currentZLevel, setCurrentZLevel] = useState(0);
+    const [floorTypes, setFloorTypes] = useState(DEFAULT_FLOOR_TYPES);
 
     const nextMapObjectIdRef = useRef(getMaxObjectId(DEFAULT_MAP_OBJECTS) + 1);
 
@@ -205,7 +425,16 @@ export const GameProvider = ({ children }) => {
         setMapObjects((prev) =>
             prev.map((obj) => {
                 if (toNumber(obj.id, -1) !== numericId) return obj;
-                return normalizeMapObject({ ...obj, ...updates }, obj.id);
+                const safeUpdates =
+                    updates && typeof updates === "object" && !Array.isArray(updates) ? updates : {};
+                const merged = { ...obj, ...safeUpdates };
+                if (safeUpdates.hitbox && typeof safeUpdates.hitbox === "object") {
+                    merged.hitbox = {
+                        ...(obj.hitbox || {}),
+                        ...safeUpdates.hitbox,
+                    };
+                }
+                return normalizeMapObject(merged, obj.id);
             })
         );
     }, []);
@@ -228,18 +457,47 @@ export const GameProvider = ({ children }) => {
 
     const armMapObjectPlacement = useCallback((config = {}) => {
         const type = normalizeObjectType(config.type);
+        const terrainType = normalizeTerrainType(config.terrainType);
+        const floorTypeId = normalizeFloorTypeID(config.floorTypeId, terrainType);
+        const defaultMaxHP = DEFAULT_MAX_HP_BY_TERRAIN[terrainType] || DEFAULT_MAX_HP_BY_TERRAIN.obstacle;
+        const maxHP =
+            config.maxHP === null || config.maxHP === "indestructible"
+                ? null
+                : Math.max(1, Math.round(toNumber(config.maxHP, defaultMaxHP)));
+        const hp =
+            maxHP === null
+                ? null
+                : Math.max(0, Math.min(maxHP, Math.round(toNumber(config.hp, maxHP))));
+
         setMapObjectPlacement({
             type,
+            terrainType,
+            floorTypeId,
+            zLevel: clampZLevel(config.zLevel),
             color: normalizeHexColor(config.color),
             z: Math.round(toNumber(config.z, 0)),
             size: toPositiveNumber(config.size, type === "triangle" ? 40 : 30),
             width: toPositiveNumber(config.width, 50),
             height: toPositiveNumber(config.height, 40),
+            maxHP,
+            hp,
+            hitbox: {
+                type: normalizeObjectType(config?.hitbox?.type || config.hitboxType || type),
+                offsetX: Math.round(toNumber(config?.hitbox?.offsetX, 0)),
+                offsetY: Math.round(toNumber(config?.hitbox?.offsetY, 0)),
+                scale: clampHitboxScale(config?.hitbox?.scale ?? config.hitboxScale),
+            },
         });
     }, []);
 
     const clearMapObjectPlacement = useCallback(() => {
         setMapObjectPlacement(null);
+    }, []);
+
+    const replaceFloorTypes = useCallback((newFloorTypes) => {
+        const normalized = normalizeFloorTypeCollection(newFloorTypes);
+        if (!normalized.length) return;
+        setFloorTypes(normalized);
     }, []);
 
     const placePendingMapObjectAt = useCallback(
@@ -277,6 +535,14 @@ export const GameProvider = ({ children }) => {
                 replaceAllMapObjects(snapshot.mapObjects);
             }
 
+            if (Number.isFinite(Number(snapshot.currentZLevel))) {
+                setCurrentZLevel(clampZLevel(snapshot.currentZLevel));
+            }
+
+            if (Array.isArray(snapshot.floorTypes)) {
+                replaceFloorTypes(snapshot.floorTypes);
+            }
+
             if (Array.isArray(snapshot.characters) && snapshot.characters.length > 0) {
                 setCharacters(
                     snapshot.characters.map((character, index) =>
@@ -285,7 +551,7 @@ export const GameProvider = ({ children }) => {
                 );
             }
         },
-        [replaceAllMapObjects]
+        [replaceAllMapObjects, replaceFloorTypes]
     );
 
     const saveMapToDatabase = useCallback(async () => {
@@ -294,6 +560,14 @@ export const GameProvider = ({ children }) => {
 
     const loadMapFromDatabase = useCallback(async (mapId) => {
         console.log("loadMapFromDatabase placeholder", { mapId });
+    }, []);
+
+    const stepZLevelUp = useCallback(() => {
+        setCurrentZLevel((prev) => clampZLevel(prev + 1));
+    }, []);
+
+    const stepZLevelDown = useCallback(() => {
+        setCurrentZLevel((prev) => clampZLevel(prev - 1));
     }, []);
 
     const screenToWorld = useCallback(
@@ -353,7 +627,13 @@ export const GameProvider = ({ children }) => {
         backgroundKey,
         setBackgroundKey,
         backgroundOptions: BACKGROUND_OPTIONS,
+        floorTypes,
+        replaceFloorTypes,
         mapObjectPlacement,
+        currentZLevel,
+        setCurrentZLevel,
+        stepZLevelUp,
+        stepZLevelDown,
 
         updateCharacter,
         moveCharacter,

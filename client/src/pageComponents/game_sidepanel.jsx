@@ -1,119 +1,147 @@
 import { Tabs } from "../pageComponents/tabs";
-import { Backpack, Map, Feather, Sparkles, Users, NotebookPen, ScrollText, Settings2, Wrench } from "lucide-react";
+import {
+  Backpack,
+  Map,
+  Feather,
+  Sparkles,
+  Users,
+  NotebookPen,
+  ScrollText,
+  Settings2,
+  Wrench,
+} from "lucide-react";
 import { useGame } from "../data/gameContext";
 
 import Admin from "./gamesidepanel/admin";
 import MapEditor from "./gamesidepanel/mapeditor";
 
+function PlaceholderPanel({ title, subtitle, hint }) {
+  return (
+    <div className="h-full min-h-0 overflow-y-auto px-4 py-4">
+      <div className="rounded-xl border border-slate-700/80 bg-slate-900/80 p-4">
+        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <p className="mt-2 text-sm text-slate-300">{subtitle}</p>
+        <p className="mt-3 text-xs uppercase tracking-wider text-slate-500">{hint}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function GameSidePanel() {
   const { isDM } = useGame();
 
   return (
-    <Tabs className="h-full grid grid-rows-[auto_1fr] border-l border-website-specials-500 bg-website-default-700 text-website-default-100">
-      {/* Navigation - Fixed height, scrolls horizontally if needed */}
-      <Tabs.Nav className="bg-website-default-700 text-website-default-100 flex flex-row overflow-x-auto justify-start items-center gap-2 border-b border-website-specials-500 flex-shrink-0">
+    <Tabs className="h-full min-h-0 grid grid-rows-[auto_1fr] border-l border-slate-700 bg-slate-950 text-slate-100">
+      <Tabs.Nav className="bg-slate-900/95 text-slate-100 flex flex-row overflow-x-auto justify-start items-center gap-1 border-b border-slate-700 px-2 py-1 flex-shrink-0">
         <Tabs.Tab label="Inventory" index={0}>
-          <Backpack />
+          <Backpack size={16} />
         </Tabs.Tab>
-        <Tabs.Tab label="Character Sheet" index={1}>
-          <ScrollText />
+        <Tabs.Tab label="Sheet" index={1}>
+          <ScrollText size={16} />
         </Tabs.Tab>
         <Tabs.Tab label="Spells" index={2}>
-          <Sparkles />
+          <Sparkles size={16} />
         </Tabs.Tab>
         <Tabs.Tab label="Quests" index={3}>
-          <Feather />
+          <Feather size={16} />
         </Tabs.Tab>
         <Tabs.Tab label="Map" index={4}>
-          <Map />
+          <Map size={16} />
         </Tabs.Tab>
         <Tabs.Tab label="Journal" index={5}>
-          <NotebookPen />
+          <NotebookPen size={16} />
         </Tabs.Tab>
         <Tabs.Tab label="Party" index={6}>
-          <Users />
+          <Users size={16} />
         </Tabs.Tab>
         <Tabs.Tab label="Settings" index={7}>
-          <Settings2 />
+          <Settings2 size={16} />
         </Tabs.Tab>
         {isDM && (
           <Tabs.Tab label="Admin" index={8}>
-            <Wrench />
+            <Wrench size={16} />
           </Tabs.Tab>
         )}
         {isDM && (
-          <Tabs.Tab label="MapEditor" index={9}>
-            <Map />
+          <Tabs.Tab label="Map Edit" index={9}>
+            <Map size={16} />
           </Tabs.Tab>
         )}
       </Tabs.Nav>
 
-      {/* Panels - Takes remaining space, each panel scrolls independently */}
-      <Tabs.Panels className="overflow-hidden">
-        <Tabs.Panel label="Inventory" index={0} className="h-full overflow-y-auto">
-          <div className="p-4">
-            <h3 className="text-lg font-bold">Inventory</h3>
-            <p className="text-gray-400">Your items will appear here</p>
-          </div>
+      <Tabs.Panels className="h-full min-h-0 overflow-hidden">
+        <Tabs.Panel index={0} className="!p-0 h-full min-h-0 overflow-y-auto">
+          <PlaceholderPanel
+            title="Inventory"
+            subtitle="Consumables, equipment, and loot from the current run."
+            hint="Item management tools will render here"
+          />
         </Tabs.Panel>
 
-        <Tabs.Panel label="Character Sheet" index={1} className="h-full overflow-y-auto">
-          <div className="p-4">
-            <h3 className="text-lg font-bold">Character Sheet</h3>
-            <p className="text-gray-400">Character stats will appear here</p>
-          </div>
+        <Tabs.Panel index={1} className="!p-0 h-full min-h-0 overflow-y-auto">
+          <PlaceholderPanel
+            title="Character Sheet"
+            subtitle="Core stats, passive bonuses, and your active build."
+            hint="Character details panel"
+          />
         </Tabs.Panel>
 
-        <Tabs.Panel label="Spells" index={2} className="h-full overflow-y-auto">
-          <div className="p-4">
-            <h3 className="text-lg font-bold">Spells</h3>
-            <p className="text-gray-400">Your spells will appear here</p>
-          </div>
+        <Tabs.Panel index={2} className="!p-0 h-full min-h-0 overflow-y-auto">
+          <PlaceholderPanel
+            title="Spells"
+            subtitle="Prepared spells, cooldowns, and casting resources."
+            hint="Spellbook and actions"
+          />
         </Tabs.Panel>
 
-        <Tabs.Panel label="Quests" index={3} className="h-full overflow-y-auto">
-          <div className="p-4">
-            <h3 className="text-lg font-bold">Quests</h3>
-            <p className="text-gray-400">Your quests will appear here</p>
-          </div>
+        <Tabs.Panel index={3} className="!p-0 h-full min-h-0 overflow-y-auto">
+          <PlaceholderPanel
+            title="Quests"
+            subtitle="Objective chains and current campaign progression."
+            hint="Quest tracker"
+          />
         </Tabs.Panel>
 
-        <Tabs.Panel label="Map" index={4} className="h-full overflow-y-auto">
-          <div className="p-4">
-            <h3 className="text-lg font-bold">Map</h3>
-            <p className="text-gray-400">Map overview will appear here</p>
-          </div>
+        <Tabs.Panel index={4} className="!p-0 h-full min-h-0 overflow-y-auto">
+          <PlaceholderPanel
+            title="Map"
+            subtitle="Quick world summary for the active encounter."
+            hint="Context-only map data"
+          />
         </Tabs.Panel>
 
-        <Tabs.Panel label="Journal" index={5} className="h-full overflow-y-auto">
-          <div className="p-4">
-            <h3 className="text-lg font-bold">Journal</h3>
-            <p className="text-gray-400">Your journal entries will appear here</p>
-          </div>
+        <Tabs.Panel index={5} className="!p-0 h-full min-h-0 overflow-y-auto">
+          <PlaceholderPanel
+            title="Journal"
+            subtitle="Session notes, lore snippets, and reminders."
+            hint="Journal timeline"
+          />
         </Tabs.Panel>
 
-        <Tabs.Panel label="Party" index={6} className="h-full overflow-y-auto">
-          <div className="p-4">
-            <h3 className="text-lg font-bold">Party</h3>
-            <p className="text-gray-400">Party members will appear here</p>
-          </div>
+        <Tabs.Panel index={6} className="!p-0 h-full min-h-0 overflow-y-auto">
+          <PlaceholderPanel
+            title="Party"
+            subtitle="Player roster and party role snapshots."
+            hint="Party overview"
+          />
         </Tabs.Panel>
 
-        <Tabs.Panel label="Settings" index={7} className="h-full overflow-y-auto">
-          <div className="p-4">
-            <h3 className="text-lg font-bold">Settings</h3>
-            <p className="text-gray-400">Game settings will appear here</p>
-          </div>
+        <Tabs.Panel index={7} className="!p-0 h-full min-h-0 overflow-y-auto">
+          <PlaceholderPanel
+            title="Settings"
+            subtitle="Camera, controls, and personal game preferences."
+            hint="Session settings"
+          />
         </Tabs.Panel>
 
         {isDM && (
-          <Tabs.Panel label="Admin" index={8} className="h-full overflow-y-auto">
+          <Tabs.Panel index={8} className="!p-0 h-full min-h-0 overflow-y-auto">
             <Admin />
           </Tabs.Panel>
         )}
 
         {isDM && (
-          <Tabs.Panel label="MapEditor" index={9} className="h-full overflow-y-auto">
+          <Tabs.Panel index={9} className="!p-0 h-full min-h-0 overflow-y-auto">
             <MapEditor />
           </Tabs.Panel>
         )}

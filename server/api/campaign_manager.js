@@ -4,6 +4,13 @@ const GameSave = require("../data/mongooseDataStructure/gameSave");
 const Player = require("../data/mongooseDataStructure/player");
 const Messages = require("../data/mongooseDataStructure/messages");
 const Character = require("../data/mongooseDataStructure/character");
+const rawFloorTypes = require("../data/gameFiles/modifiers/floorTypes");
+const {
+    normalizeFloorTypeCollection,
+    createEngineState,
+    updateEngineState,
+    applyObjectHPDelta,
+} = require("../worldEngine/campaignGameEngine");
 const {
     sanitizeCampaignStatePatch,
     extractCampaignStateFromCharacter,
@@ -17,6 +24,7 @@ const MAX_ALLOWED_PLAYERS = 12;
 const DEFAULT_MAX_PLAYERS = 6;
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const JOIN_CODE_LENGTH = 6;
+const GAME_ROOM_PREFIX = "campaign_game_room";
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -36,6 +44,42 @@ const sanitizeCode = (value) =>
 const toPlainObject = (value) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
     return value;
+};
+
+const FLOOR_TYPES = normalizeFloorTypeCollection(rawFloorTypes);
+const campaignRuntimeStateByID = new Map();
+
+const getCampaignGameRoom = (campaignID) => `${GAME_ROOM_PREFIX}:${String(campaignID || "")}`;
+
+const cloneEngineState = (state) => ({
+    campaignID: String(state?.campaignID || ""),
+    revision: Number(state?.revision) || 0,
+    updatedAt: Number(state?.updatedAt) || Date.now(),
+    snapshot: (() => {
+        try {
+            return JSON.parse(JSON.stringify(toPlainObject(state?.snapshot)));
+        } catch {
+            return toPlainObject(state?.snapshot);
+        }
+    })(),
+});
+
+const getOrCreateRuntimeState = (campaignID, snapshot = {}) => {
+    const key = String(campaignID || "");
+    if (!key) return createEngineState("", snapshot);
+
+    if (!campaignRuntimeStateByID.has(key)) {
+        campaignRuntimeStateByID.set(key, createEngineState(key, snapshot));
+    }
+
+    return campaignRuntimeStateByID.get(key);
+};
+
+const replaceRuntimeState = (campaignID, snapshot = {}) => {
+    const key = String(campaignID || "");
+    const nextState = createEngineState(key, snapshot);
+    campaignRuntimeStateByID.set(key, nextState);
+    return nextState;
 };
 
 const isCampaignMember = (campaign, playerID) => {
@@ -287,6 +331,8 @@ module.exports = (socket) => {
             }
 
             const isDM = isCampaignDM(campaign, playerID);
+            const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
+            socket.join(getCampaignGameRoom(campaign._id));
 
             respond({
                 success: true,
@@ -296,13 +342,195 @@ module.exports = (socket) => {
                     canEditWorld: isDM,
                 },
                 activeGameSave,
-                snapshot,
+                floorTypes: FLOOR_TYPES,
+                engineState: cloneEngineState(runtimeState),
+                snapshot: toPlainObject(runtimeState.snapshot),
             });
         } catch (error) {
             console.error("[campaign_getGameContext] failed", error);
             respond({
                 success: false,
                 message: error.message || "Failed to load game context",
+            });
+        }
+    });
+
+    socket.on("campaign_gameRequestState", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select("_id dmId players activeGameSave");
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can access game state",
+                });
+            }
+
+            let snapshot = {};
+            if (campaign.activeGameSave && mongoose.isValidObjectId(campaign.activeGameSave)) {
+                const saveDoc = await GameSave.findOne({
+                    _id: campaign.activeGameSave,
+                    campaignId: campaign._id,
+                }).select("snapshot");
+                if (saveDoc) {
+                    snapshot = toPlainObject(saveDoc.snapshot);
+                }
+            }
+
+            const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
+            socket.join(getCampaignGameRoom(campaign._id));
+
+            respond({
+                success: true,
+                campaignID: String(campaign._id),
+                floorTypes: FLOOR_TYPES,
+                engineState: cloneEngineState(runtimeState),
+            });
+        } catch (error) {
+            console.error("[campaign_gameRequestState] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to load runtime game state",
+            });
+        }
+    });
+
+    socket.on("campaign_gameSyncWorld", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID, statePatch } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select("_id dmId players activeGameSave");
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the DM can sync world state",
+                });
+            }
+
+            let snapshot = {};
+            if (!campaignRuntimeStateByID.has(String(campaign._id)) && campaign.activeGameSave) {
+                const saveDoc = await GameSave.findOne({
+                    _id: campaign.activeGameSave,
+                    campaignId: campaign._id,
+                }).select("snapshot");
+                if (saveDoc) {
+                    snapshot = toPlainObject(saveDoc.snapshot);
+                }
+            }
+
+            const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
+            updateEngineState(runtimeState, statePatch);
+
+            const payload = {
+                success: true,
+                campaignID: String(campaign._id),
+                floorTypes: FLOOR_TYPES,
+                engineState: cloneEngineState(runtimeState),
+            };
+            socket.join(getCampaignGameRoom(campaign._id));
+            socket.to(getCampaignGameRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
+            respond(payload);
+        } catch (error) {
+            console.error("[campaign_gameSyncWorld] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to sync world state",
+            });
+        }
+    });
+
+    socket.on("campaign_gameDamageObject", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID, objectID, amount } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select("_id dmId players activeGameSave");
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can modify objects",
+                });
+            }
+
+            let snapshot = {};
+            if (!campaignRuntimeStateByID.has(String(campaign._id)) && campaign.activeGameSave) {
+                const saveDoc = await GameSave.findOne({
+                    _id: campaign.activeGameSave,
+                    campaignId: campaign._id,
+                }).select("snapshot");
+                if (saveDoc) {
+                    snapshot = toPlainObject(saveDoc.snapshot);
+                }
+            }
+
+            const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
+            const damageAmount = Math.round(Number(amount) || 0);
+            if (!Number.isFinite(damageAmount) || damageAmount === 0) {
+                return respond({
+                    success: false,
+                    message: "Damage amount must be a non-zero number",
+                });
+            }
+
+            const result = applyObjectHPDelta(runtimeState, objectID, damageAmount);
+            if (!result?.success) {
+                return respond({
+                    success: false,
+                    message: result?.message || "Failed to apply object HP update",
+                });
+            }
+
+            const payload = {
+                success: true,
+                campaignID: String(campaign._id),
+                floorTypes: FLOOR_TYPES,
+                engineState: cloneEngineState(runtimeState),
+                object: result.object || null,
+            };
+            socket.join(getCampaignGameRoom(campaign._id));
+            socket.to(getCampaignGameRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
+            respond(payload);
+        } catch (error) {
+            console.error("[campaign_gameDamageObject] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to modify object HP",
             });
         }
     });
@@ -1463,7 +1691,13 @@ module.exports = (socket) => {
             const fallbackName = `Save ${now.toISOString().replace("T", " ").slice(0, 19)}`;
             const name = sanitizeText(data?.name, 120) || fallbackName;
             const description = sanitizeText(data?.description, 1000);
-            const snapshot = toPlainObject(data?.snapshot);
+            const snapshotInput = toPlainObject(data?.snapshot);
+            const runtimeState =
+                campaignRuntimeStateByID.get(String(campaign._id)) || createEngineState(campaign._id, {});
+            const snapshot =
+                Object.keys(snapshotInput).length > 0
+                    ? snapshotInput
+                    : toPlainObject(runtimeState?.snapshot);
             const metadata = toPlainObject(data?.metadata);
             const isAutoSave = Boolean(data?.isAutoSave);
             const makeActive = Boolean(data?.makeActive);
@@ -1483,12 +1717,15 @@ module.exports = (socket) => {
                 campaign.activeGameSave = gameSave._id;
             }
             await campaign.save();
+            const nextRuntimeState = replaceRuntimeState(campaign._id, snapshot);
 
             respond({
                 success: true,
                 gameSave: formatGameSave(gameSave),
                 campaignID: String(campaign._id),
                 activeGameSave: toObjectIdString(campaign.activeGameSave),
+                floorTypes: FLOOR_TYPES,
+                engineState: cloneEngineState(nextRuntimeState),
             });
         } catch (error) {
             console.error("[campaign_saveGame] failed", error);
@@ -1572,15 +1809,22 @@ module.exports = (socket) => {
             campaign.gameSaves.addToSet(gameSave._id);
             campaign.activeGameSave = gameSave._id;
             await campaign.save();
+            const runtimeState = replaceRuntimeState(campaign._id, toPlainObject(gameSave.snapshot));
 
-            respond({
+            const payload = {
                 success: true,
                 gameSave: formatGameSave(gameSave),
-                snapshot: toPlainObject(gameSave.snapshot),
+                snapshot: toPlainObject(runtimeState.snapshot),
+                floorTypes: FLOOR_TYPES,
+                engineState: cloneEngineState(runtimeState),
                 campaignID: String(campaign._id),
                 gameID: String(campaign._id),
                 activeGameSave: toObjectIdString(campaign.activeGameSave),
-            });
+            };
+            socket.join(getCampaignGameRoom(campaign._id));
+            socket.to(getCampaignGameRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
+
+            respond(payload);
         } catch (error) {
             console.error("[campaign_loadGame] failed", error);
             respond({ success: false, message: error.message || "Failed to load game save" });

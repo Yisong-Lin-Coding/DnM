@@ -1,8 +1,14 @@
-import { useContext, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useGame } from "../../data/gameContext";
 import { SocketContext } from "../../socket.io/context";
 import { emitWithAck } from "../../pages/campaign/socketEmit";
+
+const DEFAULT_MAX_HP_BY_TERRAIN = {
+    floor: 500,
+    wall: 1200,
+    obstacle: 700,
+};
 
 function MapEditor() {
     const socket = useContext(SocketContext);
@@ -20,21 +26,31 @@ function MapEditor() {
         backgroundKey,
         setBackgroundKey,
         backgroundOptions,
+        floorTypes,
         mapObjectPlacement,
         armMapObjectPlacement,
         clearMapObjectPlacement,
         placePendingMapObjectAt,
+        currentZLevel,
+        stepZLevelUp,
+        stepZLevelDown,
         characters,
     } = useGame();
 
     const [selectedObject, setSelectedObject] = useState(null);
     const [creationDraft, setCreationDraft] = useState({
         type: "circle",
+        terrainType: "obstacle",
+        floorTypeId: "woodenCrate",
+        zLevel: 0,
         color: "#3B82F6",
         z: 0,
         size: 30,
         width: 50,
         height: 40,
+        maxHP: 700,
+        hp: 700,
+        hitboxScale: 1,
     });
     const [saveName, setSaveName] = useState("");
     const [saveDescription, setSaveDescription] = useState("");
@@ -46,8 +62,47 @@ function MapEditor() {
 
     const placementLabel = useMemo(() => {
         if (!mapObjectPlacement) return "";
-        return `${mapObjectPlacement.type} @ (${Math.round(worldMouseCoords?.x || 0)}, ${Math.round(worldMouseCoords?.y || 0)})`;
+        return `${mapObjectPlacement.type} / ${mapObjectPlacement.terrainType || "obstacle"} / L${mapObjectPlacement.zLevel ?? 0} @ (${Math.round(worldMouseCoords?.x || 0)}, ${Math.round(worldMouseCoords?.y || 0)})`;
     }, [mapObjectPlacement, worldMouseCoords]);
+
+    const floorTypesByTerrain = useMemo(() => {
+        const byTerrain = {
+            floor: [],
+            wall: [],
+            obstacle: [],
+        };
+        (Array.isArray(floorTypes) ? floorTypes : []).forEach((entry) => {
+            const terrain = String(entry?.terrainType || "obstacle").toLowerCase();
+            if (!byTerrain[terrain]) return;
+            byTerrain[terrain].push(entry);
+        });
+        return byTerrain;
+    }, [floorTypes]);
+
+    const creationFloorTypeOptions = useMemo(() => {
+        const terrain = String(creationDraft.terrainType || "obstacle").toLowerCase();
+        const typedList = floorTypesByTerrain[terrain] || [];
+        if (typedList.length > 0) return typedList;
+        return Array.isArray(floorTypes) ? floorTypes : [];
+    }, [creationDraft.terrainType, floorTypesByTerrain, floorTypes]);
+
+    useEffect(() => {
+        setCreationDraft((prev) => ({ ...prev, zLevel: currentZLevel }));
+    }, [currentZLevel]);
+
+    useEffect(() => {
+        setCreationDraft((prev) => {
+            const terrain = String(prev.terrainType || "obstacle").toLowerCase();
+            const available = floorTypesByTerrain[terrain] || [];
+            if (!available.length) return prev;
+            const stillValid = available.some((entry) => entry.id === prev.floorTypeId);
+            if (stillValid) return prev;
+            return {
+                ...prev,
+                floorTypeId: available[0].id,
+            };
+        });
+    }, [floorTypesByTerrain, creationDraft.terrainType]);
 
     const armPlacement = () => {
         setError("");
@@ -60,12 +115,39 @@ function MapEditor() {
             setError("Arm placement first.");
             return;
         }
-        const placed = placePendingMapObjectAt(worldMouseCoords?.x || 0, worldMouseCoords?.y || 0);
+        const placed = placePendingMapObjectAt(worldMouseCoords?.x || 0, worldMouseCoords?.y || 0, {
+            zLevel: currentZLevel,
+        });
         if (placed) {
             setStatus(`Placed ${placed.type} #${placed.id}`);
             setError("");
             setSelectedObject(placed.id);
         }
+    };
+
+    const applyObjectHPDelta = async (objectID, amount) => {
+        if (!socket || !playerID || !gameID) {
+            setError("Missing game session context.");
+            return;
+        }
+
+        const response = await emitWithAck(socket, "campaign_gameDamageObject", {
+            playerID,
+            campaignID: gameID,
+            objectID,
+            amount,
+        });
+
+        if (!response?.success) {
+            setError(response?.message || "Failed to update object HP");
+            return;
+        }
+
+        if (response?.engineState?.snapshot) {
+            replaceAllMapObjects(response.engineState.snapshot.mapObjects || []);
+        }
+        setStatus(`Object #${objectID} HP updated`);
+        setError("");
     };
 
     const exportMap = () => {
@@ -119,6 +201,8 @@ function MapEditor() {
                 mapObjects,
                 backgroundKey,
                 characters,
+                currentZLevel,
+                floorTypes,
             },
             metadata: {
                 source: "map_editor",
@@ -152,7 +236,11 @@ function MapEditor() {
         );
     }
 
-    const sortedObjects = [...mapObjects].sort((a, b) => a.z - b.z);
+    const sortedObjects = [...mapObjects].sort((a, b) => {
+        const levelDiff = (Number(a?.zLevel) || 0) - (Number(b?.zLevel) || 0);
+        if (levelDiff !== 0) return levelDiff;
+        return (Number(a?.z) || 0) - (Number(b?.z) || 0);
+    });
 
     return (
         <div className="h-full flex flex-col bg-gray-900 text-white">
@@ -161,6 +249,7 @@ function MapEditor() {
 
                 <div className="text-sm bg-gray-800 p-3 rounded space-y-1">
                     <p>Map ID: {currentMapId}</p>
+                    <p>Active Z Level: {currentZLevel}</p>
                     <p>
                         Cursor: ({Math.round(worldMouseCoords?.x || 0)}, {Math.round(worldMouseCoords?.y || 0)})
                     </p>
@@ -170,6 +259,22 @@ function MapEditor() {
                     {mapObjectPlacement && (
                         <p className="text-emerald-300">Placement Active: {placementLabel}</p>
                     )}
+                    <div className="flex gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={stepZLevelDown}
+                            className="flex-1 bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-xs"
+                        >
+                            Level Down
+                        </button>
+                        <button
+                            type="button"
+                            onClick={stepZLevelUp}
+                            className="flex-1 bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-xs"
+                        >
+                            Level Up
+                        </button>
+                    </div>
                 </div>
 
                 <div className="bg-gray-800 p-3 rounded space-y-3">
@@ -204,6 +309,119 @@ function MapEditor() {
                                 {type}
                             </button>
                         ))}
+                    </div>
+
+                    <div>
+                        <label className="text-xs">Terrain Type</label>
+                        <div className="grid grid-cols-3 gap-2 mt-1">
+                            {["floor", "wall", "obstacle"].map((terrainType) => (
+                                <button
+                                    key={terrainType}
+                                    type="button"
+                                    onClick={() =>
+                                        setCreationDraft((prev) => {
+                                            const defaultHP =
+                                                DEFAULT_MAX_HP_BY_TERRAIN[terrainType] ||
+                                                DEFAULT_MAX_HP_BY_TERRAIN.obstacle;
+                                            return {
+                                                ...prev,
+                                                terrainType,
+                                                maxHP: prev.maxHP ?? defaultHP,
+                                                hp: prev.hp ?? defaultHP,
+                                            };
+                                        })
+                                    }
+                                    className={`px-2 py-2 rounded text-xs ${
+                                        creationDraft.terrainType === terrainType
+                                            ? "bg-purple-600"
+                                            : "bg-gray-700 hover:bg-gray-600"
+                                    }`}
+                                >
+                                    {terrainType}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 items-center">
+                        <label className="text-xs">Floor Type</label>
+                        <select
+                            value={creationDraft.floorTypeId}
+                            onChange={(e) =>
+                                setCreationDraft((prev) => ({ ...prev, floorTypeId: e.target.value }))
+                            }
+                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                        >
+                            {creationFloorTypeOptions.map((entry) => (
+                                <option key={entry.id} value={entry.id}>
+                                    {entry.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 items-center">
+                        <label className="text-xs">Z-Level</label>
+                        <input
+                            type="number"
+                            value={creationDraft.zLevel}
+                            onChange={(e) =>
+                                setCreationDraft((prev) => ({
+                                    ...prev,
+                                    zLevel: Number(e.target.value),
+                                }))
+                            }
+                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="text-xs">Max HP</label>
+                            <input
+                                type="number"
+                                value={creationDraft.maxHP ?? ""}
+                                onChange={(e) =>
+                                    setCreationDraft((prev) => ({
+                                        ...prev,
+                                        maxHP: e.target.value === "" ? null : Number(e.target.value),
+                                    }))
+                                }
+                                className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs">HP</label>
+                            <input
+                                type="number"
+                                value={creationDraft.hp ?? ""}
+                                onChange={(e) =>
+                                    setCreationDraft((prev) => ({
+                                        ...prev,
+                                        hp: e.target.value === "" ? null : Number(e.target.value),
+                                    }))
+                                }
+                                className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 items-center">
+                        <label className="text-xs">Hitbox Scale</label>
+                        <input
+                            type="number"
+                            step="0.1"
+                            min="0.1"
+                            max="5"
+                            value={creationDraft.hitboxScale}
+                            onChange={(e) =>
+                                setCreationDraft((prev) => ({
+                                    ...prev,
+                                    hitboxScale: Number(e.target.value),
+                                }))
+                            }
+                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                        />
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 items-center">
@@ -366,7 +584,7 @@ function MapEditor() {
                                         {obj.type} #{obj.id}
                                     </span>
                                     <p className="text-xs text-gray-400">
-                                        Pos: ({obj.x}, {obj.y}) Z: {obj.z}
+                                        Pos: ({obj.x}, {obj.y}) L:{obj.zLevel ?? 0} Z:{obj.z} {obj.terrainType ? `| ${obj.terrainType}` : ""} {obj.floorTypeId ? `| ${obj.floorTypeId}` : ""} {obj.maxHP != null ? `| HP ${obj.hp ?? 0}/${obj.maxHP}` : "| Indestructible"}
                                     </p>
                                 </div>
                                 <button
@@ -409,6 +627,128 @@ function MapEditor() {
                                                 className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
                                             />
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs">Terrain Type</label>
+                                        <select
+                                            value={obj.terrainType || "obstacle"}
+                                            onChange={(e) =>
+                                                updateMapObject(obj.id, {
+                                                    terrainType: e.target.value,
+                                                })
+                                            }
+                                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                                        >
+                                            <option value="floor">floor</option>
+                                            <option value="wall">wall</option>
+                                            <option value="obstacle">obstacle</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs">Floor Type</label>
+                                        <select
+                                            value={obj.floorTypeId || ""}
+                                            onChange={(e) =>
+                                                updateMapObject(obj.id, {
+                                                    floorTypeId: e.target.value,
+                                                })
+                                            }
+                                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                                        >
+                                            {(floorTypesByTerrain[obj.terrainType || "obstacle"] || floorTypes).map((entry) => (
+                                                <option key={entry.id} value={entry.id}>
+                                                    {entry.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs">Z-Level</label>
+                                        <input
+                                            type="number"
+                                            value={obj.zLevel ?? 0}
+                                            onChange={(e) =>
+                                                updateMapObject(obj.id, {
+                                                    zLevel: Number(e.target.value),
+                                                })
+                                            }
+                                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="text-xs">Max HP</label>
+                                            <input
+                                                type="number"
+                                                value={obj.maxHP ?? ""}
+                                                onChange={(e) =>
+                                                    updateMapObject(obj.id, {
+                                                        maxHP:
+                                                            e.target.value === ""
+                                                                ? null
+                                                                : Number(e.target.value),
+                                                    })
+                                                }
+                                                className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs">HP</label>
+                                            <input
+                                                type="number"
+                                                value={obj.hp ?? ""}
+                                                onChange={(e) =>
+                                                    updateMapObject(obj.id, {
+                                                        hp:
+                                                            e.target.value === ""
+                                                                ? null
+                                                                : Number(e.target.value),
+                                                    })
+                                                }
+                                                className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => applyObjectHPDelta(obj.id, 10)}
+                                            className="bg-red-700/70 hover:bg-red-700 text-xs px-2 py-1 rounded"
+                                        >
+                                            Damage 10
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => applyObjectHPDelta(obj.id, -10)}
+                                            className="bg-emerald-700/70 hover:bg-emerald-700 text-xs px-2 py-1 rounded"
+                                        >
+                                            Heal 10
+                                        </button>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs">Hitbox Scale</label>
+                                        <input
+                                            type="number"
+                                            min="0.1"
+                                            max="5"
+                                            step="0.1"
+                                            value={obj?.hitbox?.scale ?? 1}
+                                            onChange={(e) =>
+                                                updateMapObject(obj.id, {
+                                                    hitbox: {
+                                                        ...(obj.hitbox || {}),
+                                                        scale: Number(e.target.value),
+                                                    },
+                                                })
+                                            }
+                                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                                        />
                                     </div>
 
                                     <div>

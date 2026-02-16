@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { michelangeloEngine } from "./michelangeloEngine";
 import { backgroundLayer } from "./Map Layers/0Background";
@@ -44,22 +44,23 @@ function isPointInsideTriangle(worldX, worldY, objX, objY, size) {
 function isPointInsideMapObject(worldX, worldY, obj) {
     if (!obj) return false;
 
-    const type = String(obj.type || "circle").toLowerCase();
-    const x = Number(obj.x) || 0;
-    const y = Number(obj.y) || 0;
+    const type = String(obj?.hitbox?.type || obj.type || "circle").toLowerCase();
+    const hitboxScale = Math.max(0.1, Number(obj?.hitbox?.scale) || 1);
+    const x = (Number(obj.x) || 0) + (Number(obj?.hitbox?.offsetX) || 0);
+    const y = (Number(obj.y) || 0) + (Number(obj?.hitbox?.offsetY) || 0);
 
     if (type === "rect") {
-        const width = Math.max(1, Number(obj.width) || 0);
-        const height = Math.max(1, Number(obj.height) || 0);
+        const width = Math.max(1, (Number(obj.width) || 0) * hitboxScale);
+        const height = Math.max(1, (Number(obj.height) || 0) * hitboxScale);
         return Math.abs(worldX - x) <= width / 2 && Math.abs(worldY - y) <= height / 2;
     }
 
     if (type === "triangle") {
-        const size = Math.max(1, Number(obj.size) || 0);
+        const size = Math.max(1, (Number(obj.size) || 0) * hitboxScale);
         return isPointInsideTriangle(worldX, worldY, x, y, size);
     }
 
-    const radius = Math.max(1, Number(obj.size) || 0);
+    const radius = Math.max(1, (Number(obj.size) || 0) * hitboxScale);
     const dx = worldX - x;
     const dy = worldY - y;
     return dx * dx + dy * dy <= radius * radius;
@@ -68,6 +69,17 @@ function isPointInsideMapObject(worldX, worldY, obj) {
 function findTopMapObjectAt(worldX, worldY, mapObjects = []) {
     const sorted = [...mapObjects].sort((a, b) => (Number(b.z) || 0) - (Number(a.z) || 0));
     return sorted.find((obj) => isPointInsideMapObject(worldX, worldY, obj)) || null;
+}
+
+function getObjectZLevel(obj) {
+    return Math.round(Number(obj?.zLevel) || 0);
+}
+
+function isTypingTarget(target) {
+    if (!target || typeof target !== "object") return false;
+    const tag = String(target.tagName || "").toUpperCase();
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    return Boolean(target.isContentEditable);
 }
 
 function resolveDMPermission(response, playerID) {
@@ -133,6 +145,11 @@ function GameComponent() {
         isDM,
         setIsDM,
         backgroundKey,
+        floorTypes,
+        replaceFloorTypes,
+        currentZLevel,
+        stepZLevelUp,
+        stepZLevelDown,
         mapObjectPlacement,
         clearMapObjectPlacement,
         placePendingMapObjectAt,
@@ -147,10 +164,11 @@ function GameComponent() {
     const [loadingGameContext, setLoadingGameContext] = useState(true);
     const [placementDrag, setPlacementDrag] = useState(null);
 
-    const spacePressed = useRef(false);
     const isPanning = useRef(false);
     const layerRefs = useRef({});
     const prevStateRef = useRef(null);
+    const applyingServerStateRef = useRef(false);
+    const syncingWorldRef = useRef(false);
     const keysPressed = useRef({
         KeyW: false,
         KeyA: false,
@@ -205,7 +223,17 @@ function GameComponent() {
             setIsDM(canEdit);
             setGameContextError("");
             setLoadingGameContext(false);
-            loadGameSnapshot(response?.snapshot || {});
+
+            if (Array.isArray(response?.floorTypes)) {
+                replaceFloorTypes(response.floorTypes);
+            }
+
+            const initialSnapshot =
+                response?.engineState?.snapshot && typeof response.engineState.snapshot === "object"
+                    ? response.engineState.snapshot
+                    : response?.snapshot || {};
+            applyingServerStateRef.current = true;
+            loadGameSnapshot(initialSnapshot);
         }
 
         bootstrapGameContext();
@@ -213,7 +241,91 @@ function GameComponent() {
         return () => {
             cancelled = true;
         };
-    }, [socket, playerID, gameID, setIsDM, loadGameSnapshot]);
+    }, [socket, playerID, gameID, setIsDM, loadGameSnapshot, replaceFloorTypes]);
+
+    useEffect(() => {
+        if (!socket || !gameID) return undefined;
+
+        const handleServerWorldUpdate = (payload = {}) => {
+            if (String(payload?.campaignID || "") !== String(gameID)) return;
+            const snapshot =
+                payload?.engineState?.snapshot && typeof payload.engineState.snapshot === "object"
+                    ? payload.engineState.snapshot
+                    : null;
+            if (!snapshot) return;
+
+            if (Array.isArray(payload?.floorTypes)) {
+                replaceFloorTypes(payload.floorTypes);
+            }
+            applyingServerStateRef.current = true;
+            loadGameSnapshot(snapshot);
+        };
+
+        socket.on("campaign_gameStateUpdated", handleServerWorldUpdate);
+        return () => {
+            socket.off("campaign_gameStateUpdated", handleServerWorldUpdate);
+        };
+    }, [socket, gameID, loadGameSnapshot, replaceFloorTypes]);
+
+    useEffect(() => {
+        if (!socket || !playerID || !gameID || !isDM || loadingGameContext) return undefined;
+        if (applyingServerStateRef.current) {
+            applyingServerStateRef.current = false;
+            return undefined;
+        }
+
+        const timer = setTimeout(async () => {
+            if (syncingWorldRef.current) return;
+            syncingWorldRef.current = true;
+
+            const response = await emitWithAck(socket, "campaign_gameSyncWorld", {
+                playerID,
+                campaignID: gameID,
+                statePatch: {
+                    mapObjects,
+                    backgroundKey,
+                    characters,
+                    floorTypes,
+                },
+            });
+            syncingWorldRef.current = false;
+
+            if (!response?.success) {
+                if (response?.message) {
+                    setGameContextError((prev) => prev || response.message);
+                }
+                return;
+            }
+
+            const snapshot =
+                response?.engineState?.snapshot && typeof response.engineState.snapshot === "object"
+                    ? response.engineState.snapshot
+                    : null;
+            if (!snapshot) return;
+
+            setGameContextError("");
+
+            if (Array.isArray(response?.floorTypes)) {
+                replaceFloorTypes(response.floorTypes);
+            }
+            applyingServerStateRef.current = true;
+            loadGameSnapshot(snapshot);
+        }, 160);
+
+        return () => clearTimeout(timer);
+    }, [
+        socket,
+        playerID,
+        gameID,
+        isDM,
+        loadingGameContext,
+        mapObjects,
+        backgroundKey,
+        characters,
+        floorTypes,
+        loadGameSnapshot,
+        replaceFloorTypes,
+    ]);
 
     const formatCanvas = (canvas) => {
         const dpr = window.devicePixelRatio || 1;
@@ -296,6 +408,11 @@ function GameComponent() {
         return null;
     };
 
+    const activeMapObjects = useMemo(
+        () => mapObjects.filter((obj) => getObjectZLevel(obj) === currentZLevel),
+        [mapObjects, currentZLevel]
+    );
+
     useEffect(() => {
         let raf;
 
@@ -327,6 +444,8 @@ function GameComponent() {
                 bgImage: cameraSnapshot.bgImage,
                 camera: cameraSnapshot,
                 mapObjects,
+                floorTypes,
+                currentZLevel,
             };
 
             michelangeloEngine({
@@ -341,7 +460,7 @@ function GameComponent() {
 
         loop();
         return () => cancelAnimationFrame(raf);
-    }, [camera, mapObjects]);
+    }, [camera, mapObjects, floorTypes, currentZLevel]);
 
     useEffect(() => {
         const onMouseMove = (event) => {
@@ -368,6 +487,7 @@ function GameComponent() {
 
     useEffect(() => {
         const onKeyDown = (event) => {
+            if (isTypingTarget(event.target)) return;
             if (keysPressed.current.hasOwnProperty(event.code)) {
                 keysPressed.current[event.code] = true;
                 event.preventDefault();
@@ -375,6 +495,7 @@ function GameComponent() {
         };
 
         const onKeyUp = (event) => {
+            if (isTypingTarget(event.target)) return;
             if (keysPressed.current.hasOwnProperty(event.code)) {
                 keysPressed.current[event.code] = false;
                 event.preventDefault();
@@ -392,9 +513,18 @@ function GameComponent() {
 
     useEffect(() => {
         const onKeyDown = (event) => {
+            if (isTypingTarget(event.target)) return;
+
             if (event.code === "Space") {
                 event.preventDefault();
-                spacePressed.current = true;
+                stepZLevelUp();
+                return;
+            }
+
+            if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
+                event.preventDefault();
+                stepZLevelDown();
+                return;
             }
 
             const dx = PAN_SPEED;
@@ -415,20 +545,11 @@ function GameComponent() {
             }
         };
 
-        const onKeyUp = (event) => {
-            if (event.code === "Space") {
-                spacePressed.current = false;
-                isPanning.current = false;
-            }
-        };
-
         window.addEventListener("keydown", onKeyDown);
-        window.addEventListener("keyup", onKeyUp);
         return () => {
             window.removeEventListener("keydown", onKeyDown);
-            window.removeEventListener("keyup", onKeyUp);
         };
-    }, [camera]);
+    }, [camera, stepZLevelDown, stepZLevelUp]);
 
     useEffect(() => {
         const onEscape = (event) => {
@@ -464,13 +585,13 @@ function GameComponent() {
             return;
         }
 
-        if (event.button === 1 || (event.button === 0 && spacePressed.current)) {
+        if (event.button === 1) {
             event.preventDefault();
             isPanning.current = true;
             return;
         }
 
-        if (event.button !== 0 || spacePressed.current) {
+        if (event.button !== 0) {
             return;
         }
 
@@ -486,7 +607,7 @@ function GameComponent() {
         }
 
         if (isDM) {
-            const objectTarget = findTopMapObjectAt(world.x, world.y, mapObjects);
+            const objectTarget = findTopMapObjectAt(world.x, world.y, activeMapObjects);
             if (objectTarget) {
                 setDragTarget({
                     type: "mapObject",
@@ -574,7 +695,9 @@ function GameComponent() {
             );
 
             if (dragDistancePx <= CLICK_DRAG_THRESHOLD_PX) {
-                placePendingMapObjectAt(placementDrag.startWorld.x, placementDrag.startWorld.y);
+                placePendingMapObjectAt(placementDrag.startWorld.x, placementDrag.startWorld.y, {
+                    zLevel: currentZLevel,
+                });
             } else {
                 const draggedPlacement = buildPlacementFromDrag(
                     mapObjectPlacement,
@@ -584,7 +707,10 @@ function GameComponent() {
                 placePendingMapObjectAt(
                     draggedPlacement.x,
                     draggedPlacement.y,
-                    draggedPlacement.overrides
+                    {
+                        ...draggedPlacement.overrides,
+                        zLevel: currentZLevel,
+                    }
                 );
             }
 
@@ -685,9 +811,9 @@ function GameComponent() {
     })();
 
     return (
-        <div>
+        <div className="h-screen overflow-hidden">
             <div
-                className="w-full h-screen relative"
+                className="w-full h-full relative overflow-hidden"
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -718,6 +844,9 @@ function GameComponent() {
                         }`}
                     >
                         {isDM ? "DM Mode" : "Player Mode"}
+                    </span>
+                    <span className="text-xs px-3 py-2 rounded border bg-slate-900/70 border-slate-500 text-slate-200">
+                        Level {currentZLevel} (Space up, Shift down)
                     </span>
                     {mapObjectPlacement && (
                         <span className="text-xs px-3 py-2 rounded border bg-blue-900/70 border-blue-500 text-blue-200">
@@ -788,6 +917,31 @@ function GameComponent() {
                     </svg>
                 )}
 
+                <div
+                    className="absolute bottom-4 z-[132] flex items-center gap-2"
+                    style={{ right: Math.max(12, sideWidth + 12) }}
+                >
+                    <button
+                        type="button"
+                        onClick={stepZLevelDown}
+                        className="h-9 min-w-9 px-2 rounded bg-gray-900/90 border border-slate-500 text-white text-sm hover:bg-gray-800"
+                        title="Go down one z-level (Shift)"
+                    >
+                        Z-
+                    </button>
+                    <span className="h-9 px-3 flex items-center rounded bg-slate-900/90 border border-slate-500 text-slate-100 text-xs">
+                        Level {currentZLevel}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={stepZLevelUp}
+                        className="h-9 min-w-9 px-2 rounded bg-gray-900/90 border border-slate-500 text-white text-sm hover:bg-gray-800"
+                        title="Go up one z-level (Space)"
+                    >
+                        Z+
+                    </button>
+                </div>
+
                 {contextMenu && (
                     <div
                         className="absolute bg-gray-800 border border-gray-600 rounded shadow-lg z-50"
@@ -826,7 +980,7 @@ function GameComponent() {
             </div>
 
             <div
-                className="grid max-h-screen bg-gray-800 absolute top-0 right-0 h-full"
+                className="grid h-full min-h-0 overflow-hidden bg-gray-800 absolute top-0 right-0"
                 style={{ gridTemplateColumns: `1fr 6px ${sideWidth}px`, zIndex: 120 }}
             >
                 <div

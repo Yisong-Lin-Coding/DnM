@@ -5,7 +5,7 @@ import { Check } from 'lucide-react';
 const TabContext = createContext();
 
 // Main Tab Container (like your Skeleton pattern)
-export function Tabs({ children, defaultTab = 0, onTabChange }) {
+export function Tabs({ children, defaultTab = 0, onTabChange, className = "" }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
   
   const handleTabChange = (index) => {
@@ -15,7 +15,7 @@ export function Tabs({ children, defaultTab = 0, onTabChange }) {
 
   return (
     <TabContext.Provider value={{ activeTab, setActiveTab: handleTabChange }}>
-      <div className="w-full">
+      <div className={`w-full min-h-0 ${className}`}>
         {children}
       </div>
     </TabContext.Provider>
@@ -32,13 +32,21 @@ Tabs.Nav = function TabNav({ children, className = "" }) {
 };
 
 // Individual Tab Button
-Tabs.Tab = function Tab({ children, index, disabled = false, completed = false, className = "" }) {
+Tabs.Tab = function Tab({
+  children,
+  label = "",
+  index,
+  disabled = false,
+  completed = false,
+  className = "",
+}) {
   const { activeTab, setActiveTab } = useContext(TabContext);
   const isActive = activeTab === index;
-  
-  const baseClasses = "flex items-center gap-2 px-4 py-3 font-medium text-sm transition-colors duration-200 border-b-2";
+
+  const hasLabel = typeof label === "string" && label.trim().length > 0;
+  const baseClasses = "flex items-center gap-2 px-3 py-2 font-medium text-sm transition-colors duration-200 border-b-2 whitespace-nowrap";
   const activeClasses = isActive 
-    ? "text-website-highlights-100 border-website-highlights-500 bg-gradient-to-t from-website-highlights-500 to-webiste-default-900" 
+    ? "text-website-highlights-100 border-website-highlights-500 bg-gradient-to-t from-website-highlights-500/20 to-transparent" 
     : "text-website-highlights-100 border-transparent hover:text-website-specials-200 hover:border-website-highlights-300";
   const disabledClasses = disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer";
   const completedClasses = completed && !isActive ? "text-green-600" : "";
@@ -50,6 +58,7 @@ Tabs.Tab = function Tab({ children, index, disabled = false, completed = false, 
       disabled={disabled}
     >
       {children}
+      {hasLabel && <span className="text-[11px] tracking-wide uppercase">{label}</span>}
       {completed && !isActive && <Check className="w-4 h-4 text-green-500" />}
     </button>
   );
@@ -91,7 +100,7 @@ Tabs.Next = function TabNext({ max, className = "", disabled: disabledProp, chil
 // Tab Content Panels
 Tabs.Panels = function TabPanels({ children, className = "" }) {
   return (
-    <div className={`bg-website-default-900 ${className}`}>
+    <div className={`bg-website-default-900 h-full min-h-0 ${className}`}>
       {children}
     </div>
   );
@@ -104,7 +113,7 @@ Tabs.Panel = function TabPanel({ children, index, className = "" }) {
   if (activeTab !== index) return null;
   
   return (
-    <div className={`p-6 ${className}`}>
+    <div className={`p-6 h-full min-h-0 ${className}`}>
       {children}
     </div>
   );
