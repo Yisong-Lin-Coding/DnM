@@ -78,7 +78,7 @@ const CORE_CHARACTER_ACTIONS = [
  * Then looks up nested references from server files (traits, features, enchantments)
  */
 class CharacterBuilder {
-    constructor(socket) {
+    constructor(socket, options = {}) {
         if (!socket) {
             throw new Error('CharacterBuilder requires a socket instance');
         }
@@ -87,15 +87,128 @@ class CharacterBuilder {
         this.data = null;
         this.logPrefix = '[CharacterBuilder]';
         
-        // ==================================================
-        // TODO: REPLACE THESE WITH YOUR ACTUAL FILE PATHS
-        // ==================================================
+        const modifiersRoot = path.resolve(__dirname, '../../data/gameFiles/modifiers');
+        const defaultFilePaths = {
+            // These can point to either extensionless paths, .json files, .js files, or directories.
+            traits: path.join(modifiersRoot, 'traits'),
+            features: path.join(modifiersRoot, 'features'),
+            enchantments: path.join(modifiersRoot, 'enchantments'),
+            backgrounds: path.join(modifiersRoot, 'backgrounds')
+        };
+
         this.filePaths = {
-            // Nested references (loaded from files)
-            traits: '/path/to/traits',              // Race/subrace traits
-            features: '/path/to/features',          // Class/subclass features
-            enchantments: '/path/to/enchantments',  // Item enchantments
-            backgrounds: '/path/to/backgrounds'     // Background features (if needed)
+            ...defaultFilePaths,
+            ...(options.filePaths || {})
+        };
+    }
+
+    async _resolveDataPath(basePath) {
+        if (!basePath) return null;
+
+        const normalizedPath = String(basePath);
+        const candidates = [normalizedPath];
+        if (!path.extname(normalizedPath)) {
+            // Prefer JS when both exist so modifiers can be authored as executable code.
+            candidates.push(`${normalizedPath}.js`, `${normalizedPath}.json`);
+        }
+
+        for (const candidate of candidates) {
+            try {
+                await fs.access(candidate);
+                return candidate;
+            } catch (error) {
+                // Try next candidate.
+            }
+        }
+
+        return null;
+    }
+
+    async _loadDataFile(filePath) {
+        const extension = path.extname(filePath).toLowerCase();
+
+        if (extension === '.js' || extension === '.cjs') {
+            const resolvedPath = path.resolve(filePath);
+            delete require.cache[require.resolve(resolvedPath)];
+            const loaded = require(resolvedPath);
+            return loaded?.default ?? loaded;
+        }
+
+        const content = await fs.readFile(filePath, 'utf8');
+        return JSON.parse(content);
+    }
+
+    _matchesId(candidateId, targetId) {
+        if (candidateId === undefined || candidateId === null) return false;
+        if (targetId === undefined || targetId === null) return false;
+        return String(candidateId) === String(targetId);
+    }
+
+    _findById(data, id) {
+        if (Array.isArray(data)) {
+            return data.find((item) =>
+                this._matchesId(item?._id, id) ||
+                this._matchesId(item?.id, id) ||
+                this._matchesId(item?.itemId, id)
+            ) || null;
+        }
+
+        if (data && typeof data === 'object') {
+            if (
+                this._matchesId(data._id, id) ||
+                this._matchesId(data.id, id) ||
+                this._matchesId(data.itemId, id)
+            ) {
+                return data;
+            }
+
+            const idKey = String(id);
+            if (Object.prototype.hasOwnProperty.call(data, idKey)) {
+                return data[idKey];
+            }
+        }
+
+        return null;
+    }
+
+    _compileModifierAction(actionValue, modifierName = 'Unknown Modifier') {
+        if (typeof actionValue === 'function') return actionValue;
+        if (typeof actionValue !== 'string') return null;
+
+        const actionCode = actionValue.trim();
+        if (!actionCode) return null;
+
+        try {
+            const compiled = new Function(`"use strict"; return (${actionCode});`)();
+            if (typeof compiled === 'function') {
+                return compiled;
+            }
+        } catch (error) {
+            // Fall through to body-form parser.
+        }
+
+        try {
+            return new Function('context', actionCode);
+        } catch (error) {
+            console.warn(`${this.logPrefix} invalid modifier action`, {
+                modifierName,
+                message: error.message
+            });
+            return null;
+        }
+    }
+
+    _normalizeModifier(modifier, ownerName = 'unknown') {
+        if (!modifier || typeof modifier !== 'object') {
+            return null;
+        }
+
+        return {
+            ...modifier,
+            action: this._compileModifierAction(
+                modifier.action,
+                `${ownerName}:${modifier.name || modifier.id || 'modifier'}`
+            )
         };
     }
 
@@ -149,35 +262,47 @@ class CharacterBuilder {
     /**
      * Load data from a file by ID
      * Supports:
-     * - Directory with individual JSON files
-     * - Single JSON file with array
-     * - Single JSON file with object (ID as key)
+     * - Directory with individual .js/.json files
+     * - Single .js/.json file with array
+     * - Single .js/.json file with object (ID as key)
      */
     async _loadFromFile(basePath, id) {
         try {
-            const stats = await fs.stat(basePath);
+            const resolvedBasePath = await this._resolveDataPath(basePath);
+            if (!resolvedBasePath) {
+                console.warn(`${this.logPrefix} data path not found`, { basePath, id: String(id) });
+                return null;
+            }
+
+            const stats = await fs.stat(resolvedBasePath);
             
             if (stats.isDirectory()) {
-                // Directory: Look for file named {id}.json
-                const filePath = path.join(basePath, `${id}.json`);
-                const content = await fs.readFile(filePath, 'utf8');
-                return JSON.parse(content);
+                // Directory: look for named data file by ID (prefer .js, then .json).
+                const idKey = String(id);
+                const candidates = [
+                    path.join(resolvedBasePath, `${idKey}.js`),
+                    path.join(resolvedBasePath, `${idKey}.json`),
+                    path.join(resolvedBasePath, idKey)
+                ];
+
+                for (const candidate of candidates) {
+                    const resolvedCandidate = await this._resolveDataPath(candidate);
+                    if (!resolvedCandidate) continue;
+                    return await this._loadDataFile(resolvedCandidate);
+                }
+
+                return null;
                 
             } else if (stats.isFile()) {
                 // Single file: Load and search
-                const content = await fs.readFile(basePath, 'utf8');
-                const data = JSON.parse(content);
+                const data = await this._loadDataFile(resolvedBasePath);
                 
                 if (Array.isArray(data)) {
                     // Array of objects: Find by ID
-                    return data.find(item => 
-                        item._id === id || 
-                        item.id === id ||
-                        item._id?.toString() === id?.toString()
-                    );
+                    return this._findById(data, id);
                 } else if (typeof data === 'object') {
-                    // Object with ID keys: Direct lookup
-                    return data[id] || data[id.toString()];
+                    // Object with ID keys or a singular object.
+                    return this._findById(data, id);
                 }
             }
             
@@ -222,9 +347,17 @@ class CharacterBuilder {
         }
         
         if (typeof feature === 'object' && feature !== null) {
+            const rawModifiers = Array.isArray(feature.modifiers) ? feature.modifiers : [];
+            const normalizedModifiers = rawModifiers
+                .map((modifier) => this._normalizeModifier(
+                    modifier,
+                    feature.name || feature.id || feature._id || 'feature'
+                ))
+                .filter(Boolean);
+
             return {
                 ...feature,
-                modifiers: Array.isArray(feature.modifiers) ? feature.modifiers : []
+                modifiers: normalizedModifiers
             };
         }
         
@@ -627,6 +760,7 @@ class CharacterBuilder {
             background: null,
             
             // Collections
+            inv: rawData.inv || { equipment: [], items: {} },
             inventory: [],
             equippedItems: [],
             statusEffects: [],
@@ -857,7 +991,18 @@ class CharacterBuilder {
                         
                         // Combine item with its enchantments
                         // Enchantments are treated as modifiers on the item
-                        const allModifiers = enchantments.flatMap(e => e.modifiers || []);
+                        const intrinsicModifiers = Array.isArray(item.modifiers)
+                            ? item.modifiers
+                                .map((modifier) => this._normalizeModifier(
+                                    modifier,
+                                    item.name || item.itemId || String(itemId)
+                                ))
+                                .filter(Boolean)
+                            : [];
+                        const allModifiers = [
+                            ...intrinsicModifiers,
+                            ...enchantments.flatMap((enchantment) => enchantment.modifiers || [])
+                        ];
                         
                         return {
                             ...item,

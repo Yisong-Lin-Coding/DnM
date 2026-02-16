@@ -116,6 +116,7 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
   const personalityTags = toTagArray(stories.personality);
   const idealTags = toTagArray(stories.ideals);
   const flawTags = toTagArray(stories.flaws);
+  const saveLabel = character?._id ? 'Save Changes' : 'Save Character';
   const currentClassChoices = Object.values(character?.classEquipmentChoices || {}).map((choice) => choice?.optionKey).filter(Boolean);
   const currentBackgroundChoices = Object.values(character?.backgroundEquipmentChoices || {}).map((choice) => choice?.optionKey).filter(Boolean);
 
@@ -430,7 +431,7 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
             onClick={handleSave}
             disabled={isSaving}
           >
-            {isSaving ? 'Saving...' : 'Save Character'}
+            {isSaving ? 'Saving...' : saveLabel}
           </button>
         </div>
       </div>

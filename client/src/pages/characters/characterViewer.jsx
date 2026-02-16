@@ -1,7 +1,8 @@
 import Body from "../../pageComponents/bodySkeleton";
 import { SocketContext } from "../../socket.io/context";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Equipment from "./characterViewerPages/equipment";
 import InventoryBox from "./characterViewerPages/inventory";
 import EffectsTab from "./characterViewerPages/effects";
@@ -258,77 +259,120 @@ const mergeCharacterForViewer = (rawCharacter, builtCharacter) => {
 
 export default function CharacterViewer() {
   const socket = useContext(SocketContext);
+  const navigate = useNavigate();
   const { characterID } = useParams();
+  const playerID = localStorage.getItem("player_ID");
   const [character, setCharacter] = useState(null);
+  const [viewContexts, setViewContexts] = useState([]);
+  const [selectedContextKey, setSelectedContextKey] = useState("");
+  const [activeContext, setActiveContext] = useState(null);
+  const [contextsLoaded, setContextsLoaded] = useState(false);
+  const [canEditBase, setCanEditBase] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!socket || !characterID) {
+    if (!socket || !characterID || !playerID) {
       setLoading(false);
+      setContextsLoaded(false);
       return;
     }
 
-    let isCancelled = false;
+    let cancelled = false;
+    setContextsLoaded(false);
     setLoading(true);
     setError(null);
 
-    const fetchBuiltCharacter = () =>
-      new Promise((resolve) => {
-        socket.emit("character_builder", { characterID }, resolve);
-      });
+    socket.emit(
+      "character_getViewContexts",
+      { playerID, characterID },
+      (response) => {
+        if (cancelled) return;
 
-    const fetchRawCharacter = () =>
-      new Promise((resolve) => {
-        socket.emit(
-          "database_query",
-          {
-            collection: "characters",
-            operation: "findById",
-            filter: { _id: characterID },
-          },
-          resolve
-        );
-      });
-
-    (async () => {
-      try {
-        const [builtResponse, rawResponse] = await Promise.all([
-          fetchBuiltCharacter(),
-          fetchRawCharacter(),
-        ]);
-
-        const builtCharacter = builtResponse?.success ? builtResponse.character : null;
-        const rawCharacter = rawResponse?.success ? rawResponse.data : null;
-
-        if (!builtCharacter && !rawCharacter) {
-          throw new Error(
-            builtResponse?.message ||
-              rawResponse?.message ||
-              "Failed to load character"
-          );
-        }
-
-        if (!isCancelled) {
-          setCharacter(mergeCharacterForViewer(rawCharacter, builtCharacter));
-          setError(null);
-        }
-      } catch (err) {
-        if (!isCancelled) {
+        if (!response?.success) {
           setCharacter(null);
-          setError(err.message || "Failed to load character");
-        }
-      } finally {
-        if (!isCancelled) {
+          setViewContexts([]);
+          setSelectedContextKey("");
+          setCanEditBase(false);
+          setError(response?.message || "Failed to load character contexts");
           setLoading(false);
+          setContextsLoaded(false);
+          return;
         }
+
+        const contexts = Array.isArray(response.contexts) ? response.contexts : [];
+        const fallbackContextKey = contexts[0]?.key || "";
+        const defaultKey = response.defaultContextKey || fallbackContextKey;
+
+        setViewContexts(contexts);
+        setCanEditBase(Boolean(response.canEditBase));
+        setSelectedContextKey(defaultKey);
+        setError(null);
+        setContextsLoaded(true);
       }
-    })();
+    );
 
     return () => {
-      isCancelled = true;
+      cancelled = true;
     };
-  }, [socket, characterID]);
+  }, [socket, characterID, playerID]);
+
+  useEffect(() => {
+    if (!socket || !characterID || !playerID || !contextsLoaded || !selectedContextKey) {
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    const requestedCampaignID = selectedContextKey.startsWith("campaign:")
+      ? selectedContextKey.slice("campaign:".length)
+      : "";
+
+    socket.emit(
+      "character_getViewData",
+      {
+        playerID,
+        characterID,
+        contextKey: selectedContextKey,
+        campaignID: requestedCampaignID,
+      },
+      (response) => {
+        if (cancelled) return;
+
+        if (!response?.success) {
+          setCharacter(null);
+          setActiveContext(null);
+          setError(response?.message || "Failed to load character");
+          setLoading(false);
+          return;
+        }
+
+        const merged = mergeCharacterForViewer(
+          response.rawCharacter || {},
+          response.builtCharacter || {}
+        );
+        setCharacter(merged);
+        setActiveContext(response.context || null);
+        setCanEditBase(Boolean(response.canEditBase));
+        setError(null);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [socket, characterID, playerID, contextsLoaded, selectedContextKey]);
+
+  const selectedContext = useMemo(() => {
+    return (
+      viewContexts.find((context) => context.key === selectedContextKey) ||
+      activeContext ||
+      null
+    );
+  }, [viewContexts, selectedContextKey, activeContext]);
 
   if (loading) return <div className="text-white p-10">Loading...</div>;
   if (error) return <div className="text-red-400 p-10">Error: {error}</div>;
@@ -342,16 +386,47 @@ export default function CharacterViewer() {
     character?.classType?.name ||
     character?.className ||
     (typeof character?.classType === "string" ? character.classType : undefined);
-  const characterId =
-    character?._id?.$oid || character?._id || character?.id || characterID;
+  const characterId = toIdString(character?._id || character?.id || characterID);
+  const safeSessionID = sessionStorage.getItem("session_ID") || "default";
+  const isBaseContext = selectedContextKey === "base";
+  const contextLabel =
+    selectedContext?.type === "campaign"
+      ? selectedContext?.campaignName || "Campaign"
+      : "Base Character";
 
   return (
     <Body className="bg-website-default-900">
-      {/* 1. Use the static Header sub-component provided by your Body skeleton */}
       <Body.Header title={character.name || "Character"} />
 
-      {/* 2. Wrap main content in Center to use the '5fr' column */}
       <Body.Center className="p-6 text-left">
+        <div className="mb-5 flex flex-wrap items-center justify-end gap-3">
+          <div className="text-xs uppercase tracking-widest text-website-default-400">
+            Viewing: {contextLabel}
+          </div>
+          <select
+            value={selectedContextKey}
+            onChange={(event) => setSelectedContextKey(String(event.target.value || ""))}
+            className="rounded-md border border-website-default-600 bg-website-default-800 px-3 py-2 text-sm text-website-default-100"
+          >
+            {viewContexts.map((context) => (
+              <option key={context.key} value={context.key}>
+                {context.type === "base"
+                  ? "Base Character"
+                  : `Campaign: ${context.campaignName || "Campaign"}`}
+              </option>
+            ))}
+          </select>
+          {canEditBase && isBaseContext && (
+            <button
+              type="button"
+              onClick={() => navigate(`/ISK/${safeSessionID}/character/edit/${characterId}`)}
+              className="rounded-md border border-website-highlights-500 bg-website-highlights-600/20 px-3 py-2 text-sm text-website-highlights-200 hover:bg-website-highlights-600/30"
+            >
+              Edit Character
+            </button>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] gap-6">
           
           {/* LEFT COLUMN: Vitals & XP */}

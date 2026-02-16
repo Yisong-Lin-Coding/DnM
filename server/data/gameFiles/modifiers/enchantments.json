@@ -26,5 +26,19 @@
         "action": "(context) => { context.damageParts.push({ dice: 'd6', type: 'poison', source: 'Rune of Poison - Empowered' }); context.target.addStatusEffect({id: 'weakPoison', duration: 3, stack: 1}); }"
       }
     ]
+    },
+    {
+        "name":"Rune of Poison - Greater",
+        "id": "runeOfPoison-L2",
+        "tier": 3,
+        "description": "",
+        "modifiers": [
+      {
+        "name": "Rune of Poison - Greater Modifier",
+        "hook": "onDamageCalc",
+        "priority": 50,
+        "action": "(context) => { context.damageParts.push({ dice: 'd8', type: 'poison', source: 'Rune of Poison - Greater' }); context.target.addStatusEffect({id: 'weakPoison', duration: 3, stack: 1}); }"
+      }
+    ]
     }
 ]

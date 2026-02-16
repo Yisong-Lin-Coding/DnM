@@ -1189,15 +1189,41 @@ class CHARACTER {
         return this.actionTree;
     }
 
+    _toExecutableModifierAction(actionValue, modifierName = 'Unknown Modifier') {
+        if (typeof actionValue === 'function') return actionValue;
+        if (typeof actionValue !== 'string') return null;
+
+        const actionCode = actionValue.trim();
+        if (!actionCode) return null;
+
+        try {
+            const compiled = new Function(`"use strict"; return (${actionCode});`)();
+            if (typeof compiled === 'function') {
+                return compiled;
+            }
+        } catch (error) {
+            // Fall through to body-form parser.
+        }
+
+        try {
+            return new Function('context', actionCode);
+        } catch (error) {
+            console.warn(`Modifier "${modifierName}" has invalid action code: ${error.message}`);
+            return null;
+        }
+    }
+
     /**
      * Get all modifiers from all sources for a specific hook
      * @param {string} hookName - The hook to filter by (e.g., 'onStatCalc_STR')
      * @returns {Array} Sorted array of modifiers
      */
     getModifiersForHook(hookName) {
-        const equipmentSources = Array.isArray(this.inv?.equipment)
+        const equippedItemSources = Array.isArray(this.equippedItems) ? this.equippedItems : [];
+        const legacyEquipmentSources = Array.isArray(this.inv?.equipment)
             ? this.inv.equipment
             : Object.values(this.inv?.equipment || {});
+        const equipmentSources = [...equippedItemSources, ...legacyEquipmentSources];
         const effectSources = Array.isArray(this.effects)
             ? this.effects
             : Object.values(this.effects || {});
@@ -1245,8 +1271,16 @@ class CHARACTER {
         
         modifiers.forEach(modifier => {
             try {
-                if (typeof modifier.action === 'function') {
-                    modifier.action(context);
+                let executableAction = modifier.action;
+                if (typeof executableAction !== 'function') {
+                    executableAction = this._toExecutableModifierAction(modifier.action, modifier.name);
+                    if (executableAction) {
+                        modifier.action = executableAction;
+                    }
+                }
+
+                if (typeof executableAction === 'function') {
+                    executableAction(context);
                 } else {
                     console.warn(`Modifier "${modifier.name}" has no executable action`);
                 }

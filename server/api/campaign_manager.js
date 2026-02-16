@@ -4,6 +4,13 @@ const GameSave = require("../data/mongooseDataStructure/gameSave");
 const Player = require("../data/mongooseDataStructure/player");
 const Messages = require("../data/mongooseDataStructure/messages");
 const Character = require("../data/mongooseDataStructure/character");
+const {
+    sanitizeCampaignStatePatch,
+    extractCampaignStateFromCharacter,
+    findCampaignCharacterState,
+    upsertCampaignCharacterState,
+    toObjectIdString,
+} = require("../handlers/campaignCharacterState");
 
 const MIN_ALLOWED_PLAYERS = 2;
 const MAX_ALLOWED_PLAYERS = 12;
@@ -25,12 +32,6 @@ const sanitizeCode = (value) =>
         .trim()
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "");
-
-const toObjectIdString = (value) => {
-    if (!value) return "";
-    if (typeof value === "object" && value._id) return String(value._id);
-    return String(value);
-};
 
 const toPlainObject = (value) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -72,6 +73,21 @@ const buildCampaignMemberIDSet = (campaign) => {
     return memberIDs;
 };
 
+const isCharacterInCampaign = (campaign, characterID) => {
+    const targetCharacterID = toObjectIdString(characterID);
+    if (!targetCharacterID || !campaign) return false;
+
+    const hasAssignment = Array.isArray(campaign.characterAssignments)
+        ? campaign.characterAssignments.some(
+              (assignment) =>
+                  toObjectIdString(assignment?.characterId) === targetCharacterID
+          )
+        : false;
+    if (hasAssignment) return true;
+
+    return Boolean(findCampaignCharacterState(campaign, targetCharacterID));
+};
+
 const formatCharacterSummary = (characterDoc) => {
     const character = characterDoc?.toObject ? characterDoc.toObject() : characterDoc;
     if (!character) return null;
@@ -92,6 +108,14 @@ const formatCampaign = (campaignDoc) => {
     const bannedPlayers = Array.isArray(campaign.bannedPlayers) ? campaign.bannedPlayers : [];
     const activeLobby = campaign.activeLobby || {};
     const memberIDs = buildCampaignMemberIDSet(campaign);
+    const campaignStatesByCharacterID = new Map();
+    if (Array.isArray(campaign.characterStates)) {
+        campaign.characterStates.forEach((stateEntry) => {
+            const characterID = toObjectIdString(stateEntry?.characterId);
+            if (!characterID || campaignStatesByCharacterID.has(characterID)) return;
+            campaignStatesByCharacterID.set(characterID, toPlainObject(stateEntry?.state));
+        });
+    }
 
     const characterAssignments = new Map();
     if (Array.isArray(campaign.characterAssignments)) {
@@ -110,13 +134,18 @@ const formatCampaign = (campaignDoc) => {
                 assignment?.playerId && typeof assignment.playerId === "object"
                     ? assignment.playerId
                     : null;
+            const campaignState = campaignStatesByCharacterID.get(characterID);
+            const campaignStateLevel = Number(campaignState?.level);
 
             characterAssignments.set(playerID, {
                 playerId: playerID,
                 playerName: playerRef?.username || "",
                 characterId: characterID,
                 characterName: characterRef?.name || "",
-                characterLevel: Number(characterRef?.level) || null,
+                characterLevel: Number.isFinite(campaignStateLevel)
+                    ? campaignStateLevel
+                    : Number(characterRef?.level) || null,
+                hasCampaignState: Boolean(campaignState),
                 selectedBy: toObjectIdString(assignment?.selectedBy),
                 selectedAt: assignment?.selectedAt || null,
             });
@@ -637,109 +666,29 @@ module.exports = (socket) => {
 
             let allCharactersByPlayer = [];
             if (isDM) {
-                const memberIDs = Array.from(buildCampaignMemberIDSet(campaign)).filter((memberID) =>
-                    mongoose.isValidObjectId(memberID)
-                );
-                const assignmentByPlayer = new Map(
-                    (formattedCampaign?.characterAssignments || [])
-                        .filter((assignment) => Boolean(assignment?.playerId))
-                        .map((assignment) => [assignment.playerId, assignment])
-                );
-                const dmID = toObjectIdString(campaign.dmId);
-
-                const [playersWithCharacters, charactersByPlayerId] = await Promise.all([
-                    Player.find({
-                        _id: { $in: memberIDs },
-                    })
-                        .select("_id username characters")
-                        .populate({ path: "characters", select: "_id name level playerId" }),
-                    Character.find({
-                        playerId: { $in: memberIDs },
-                    })
-                        .select("_id name level playerId")
-                        .sort({ updatedAt: -1, createdAt: -1 }),
-                ]);
-
-                const charactersByPlayer = new Map();
-                (Array.isArray(charactersByPlayerId) ? charactersByPlayerId : []).forEach((characterDoc) => {
-                    const summary = formatCharacterSummary(characterDoc);
-                    if (!summary?._id) return;
-
-                    const ownerID = toObjectIdString(characterDoc?.playerId || summary.playerId);
-                    if (!ownerID) return;
-
-                    const existing = charactersByPlayer.get(ownerID) || [];
-                    existing.push({
-                        ...summary,
-                        playerId: ownerID,
-                    });
-                    charactersByPlayer.set(ownerID, existing);
-                });
-
-                allCharactersByPlayer = playersWithCharacters
-                    .map((member) => {
-                        const memberID = String(member._id);
-                        const assignment = assignmentByPlayer.get(memberID) || null;
-                        const assignedCharacterId = assignment?.characterId || "";
-
-                        const linkedCharacters = Array.isArray(member.characters)
-                            ? member.characters
-                                  .map((characterDoc) => {
-                                      const summary = formatCharacterSummary(characterDoc);
-                                      if (!summary) return null;
-                                      return {
-                                          ...summary,
-                                          playerId: summary.playerId || memberID,
-                                      };
-                                  })
-                                  .filter(Boolean)
-                            : [];
-                        const ownedCharacters = charactersByPlayer.get(memberID) || [];
-
-                        const dedupedCharactersByID = new Map();
-                        [...linkedCharacters, ...ownedCharacters].forEach((character) => {
-                            const characterID = toObjectIdString(character?._id || character?.id);
-                            if (!characterID) return;
-                            if (dedupedCharactersByID.has(characterID)) return;
-                            dedupedCharactersByID.set(characterID, {
-                                ...character,
-                                _id: characterID,
-                                playerId: toObjectIdString(character.playerId) || memberID,
-                            });
-                        });
-
-                        if (assignedCharacterId && !dedupedCharactersByID.has(assignedCharacterId)) {
-                            dedupedCharactersByID.set(assignedCharacterId, {
-                                _id: assignedCharacterId,
-                                name: assignment?.characterName || "Assigned Character",
-                                level: Number(assignment?.characterLevel) || 1,
-                                playerId: memberID,
-                            });
-                        }
-
-                        const characters = Array.from(dedupedCharactersByID.values())
-                            .map((character) => ({
-                                ...character,
-                                isSelected: toObjectIdString(character?._id || character?.id) === assignedCharacterId,
-                            }))
-                            .sort((a, b) => {
-                                const aSelected = Boolean(a?.isSelected);
-                                const bSelected = Boolean(b?.isSelected);
-                                if (aSelected !== bSelected) return aSelected ? -1 : 1;
-                                return String(a?.name || "").localeCompare(String(b?.name || ""));
-                            });
+                allCharactersByPlayer = (formattedCampaign?.characterAssignments || [])
+                    .filter(
+                        (assignment) =>
+                            Boolean(assignment?.playerId) && Boolean(assignment?.characterId)
+                    )
+                    .map((assignment) => {
+                        const memberID = toObjectIdString(assignment.playerId);
+                        const selectedCharacterID = toObjectIdString(assignment.characterId);
 
                         return {
                             playerId: memberID,
-                            playerName: member.username || "",
-                            assignedCharacterId,
-                            characters,
+                            playerName: assignment?.playerName || "",
+                            assignedCharacterId: selectedCharacterID,
+                            characters: [
+                                {
+                                    _id: selectedCharacterID,
+                                    name: assignment?.characterName || "Assigned Character",
+                                    level: Number(assignment?.characterLevel) || 1,
+                                    playerId: memberID,
+                                    isSelected: true,
+                                },
+                            ],
                         };
-                    })
-                    .sort((a, b) => {
-                        if (a.playerId === dmID) return -1;
-                        if (b.playerId === dmID) return 1;
-                        return (a.playerName || "").localeCompare(b.playerName || "");
                     });
             }
 
@@ -780,7 +729,7 @@ module.exports = (socket) => {
             }
 
             const campaign = await Campaign.findById(campaignID).select(
-                "_id dmId players activeLobby characterAssignments"
+                "_id dmId players activeLobby characterAssignments characterStates"
             );
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
@@ -813,7 +762,9 @@ module.exports = (socket) => {
                 });
             }
 
-            const character = await Character.findById(characterID).select("_id name level playerId");
+            const character = await Character.findById(characterID).select(
+                "_id name level playerId experience HP MP STA water food stats skills inv effects actions"
+            );
             if (!character) {
                 return respond({ success: false, message: "Character not found" });
             }
@@ -836,6 +787,26 @@ module.exports = (socket) => {
 
             if (String(character.playerId || "") !== String(playerID)) {
                 await Character.updateOne({ _id: character._id }, { $set: { playerId: playerID } });
+            }
+
+            const existingState = findCampaignCharacterState(campaign, character._id);
+            if (!existingState) {
+                const seededState = extractCampaignStateFromCharacter(character);
+                upsertCampaignCharacterState(campaign, {
+                    characterID: character._id,
+                    playerID,
+                    statePatch: seededState,
+                    replace: true,
+                });
+                campaign.markModified("characterStates");
+            } else if (toObjectIdString(existingState.playerId) !== String(playerID)) {
+                upsertCampaignCharacterState(campaign, {
+                    characterID: character._id,
+                    playerID,
+                    statePatch: {},
+                    replace: false,
+                });
+                campaign.markModified("characterStates");
             }
 
             const nextAssignments = Array.isArray(campaign.characterAssignments)
@@ -975,6 +946,111 @@ module.exports = (socket) => {
         }
     });
 
+    socket.on("campaign_saveCharacterState", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID, characterID } = data || {};
+        const statePatch = toPlainObject(data?.statePatch);
+
+        try {
+            if (
+                !mongoose.isValidObjectId(playerID) ||
+                !mongoose.isValidObjectId(campaignID) ||
+                !mongoose.isValidObjectId(characterID)
+            ) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID, campaignID, and characterID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players characterAssignments characterStates"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can update campaign character state",
+                });
+            }
+
+            if (!isCharacterInCampaign(campaign, characterID)) {
+                return respond({
+                    success: false,
+                    message: "Character is not assigned in this campaign",
+                });
+            }
+
+            const assignment = Array.isArray(campaign.characterAssignments)
+                ? campaign.characterAssignments.find(
+                      (entry) => toObjectIdString(entry?.characterId) === String(characterID)
+                  ) || null
+                : null;
+            const stateEntry = findCampaignCharacterState(campaign, characterID);
+            const ownerID =
+                toObjectIdString(assignment?.playerId) ||
+                toObjectIdString(stateEntry?.playerId);
+
+            if (!isCampaignDM(campaign, playerID) && ownerID && ownerID !== String(playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the character owner or DM can update this campaign state",
+                });
+            }
+
+            const cleanedPatch = sanitizeCampaignStatePatch(statePatch);
+            if (Object.keys(cleanedPatch).length === 0) {
+                return respond({
+                    success: false,
+                    message: "No supported state fields were provided",
+                });
+            }
+
+            const stateExists = Boolean(stateEntry);
+            let nextStatePatch = cleanedPatch;
+            if (!stateExists) {
+                const baseCharacter = await Character.findById(characterID).select(
+                    "_id name level playerId experience HP MP STA water food stats skills inv effects actions"
+                );
+                const seededState = baseCharacter
+                    ? extractCampaignStateFromCharacter(baseCharacter)
+                    : {};
+                nextStatePatch = {
+                    ...seededState,
+                    ...cleanedPatch,
+                };
+            }
+
+            upsertCampaignCharacterState(campaign, {
+                characterID,
+                playerID: ownerID || playerID,
+                statePatch: nextStatePatch,
+                replace: !stateExists,
+            });
+            campaign.markModified("characterStates");
+
+            await campaign.save();
+
+            const updatedState = findCampaignCharacterState(campaign, characterID);
+            const campaignForClient = await readCampaignForResponse(campaign._id);
+            respond({
+                success: true,
+                campaign: formatCampaign(campaignForClient),
+                characterID: String(characterID),
+                campaignState: toPlainObject(updatedState?.state),
+            });
+        } catch (error) {
+            console.error("[campaign_saveCharacterState] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to save campaign character state",
+            });
+        }
+    });
+
     socket.on("campaign_leave", async (data, callback) => {
         const respond = safeCallback(callback);
         const { playerID, campaignID } = data || {};
@@ -988,7 +1064,7 @@ module.exports = (socket) => {
             }
 
             const campaign = await Campaign.findById(campaignID).select(
-                "_id dmId players activeLobby characterAssignments"
+                "_id dmId players activeLobby characterAssignments characterStates"
             );
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
@@ -1009,6 +1085,11 @@ module.exports = (socket) => {
                 });
             }
 
+            const removedCharacterIDs = (campaign.characterAssignments || [])
+                .filter((assignment) => String(assignment?.playerId) === String(playerID))
+                .map((assignment) => toObjectIdString(assignment?.characterId))
+                .filter(Boolean);
+
             campaign.players = (campaign.players || []).filter(
                 (member) => String(member) !== String(playerID)
             );
@@ -1020,6 +1101,14 @@ module.exports = (socket) => {
             campaign.characterAssignments = (campaign.characterAssignments || []).filter(
                 (assignment) => String(assignment?.playerId) !== String(playerID)
             );
+            if (Array.isArray(campaign.characterStates)) {
+                campaign.characterStates = campaign.characterStates.filter((stateEntry) => {
+                    const statePlayerID = toObjectIdString(stateEntry?.playerId);
+                    const stateCharacterID = toObjectIdString(stateEntry?.characterId);
+                    if (statePlayerID && statePlayerID === String(playerID)) return false;
+                    return !removedCharacterIDs.includes(stateCharacterID);
+                });
+            }
 
             await campaign.save();
 
@@ -1126,7 +1215,7 @@ module.exports = (socket) => {
             }
 
             const campaign = await Campaign.findById(campaignID).select(
-                "_id dmId players bannedPlayers activeLobby characterAssignments"
+                "_id dmId players bannedPlayers activeLobby characterAssignments characterStates"
             );
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
@@ -1170,6 +1259,11 @@ module.exports = (socket) => {
                 });
             }
 
+            const removedCharacterIDs = (campaign.characterAssignments || [])
+                .filter((assignment) => String(assignment?.playerId) === String(targetPlayerID))
+                .map((assignment) => toObjectIdString(assignment?.characterId))
+                .filter(Boolean);
+
             campaign.players = (campaign.players || []).filter(
                 (member) => String(member) !== String(targetPlayerID)
             );
@@ -1181,6 +1275,14 @@ module.exports = (socket) => {
             campaign.characterAssignments = (campaign.characterAssignments || []).filter(
                 (assignment) => String(assignment?.playerId) !== String(targetPlayerID)
             );
+            if (Array.isArray(campaign.characterStates)) {
+                campaign.characterStates = campaign.characterStates.filter((stateEntry) => {
+                    const statePlayerID = toObjectIdString(stateEntry?.playerId);
+                    const stateCharacterID = toObjectIdString(stateEntry?.characterId);
+                    if (statePlayerID && statePlayerID === String(targetPlayerID)) return false;
+                    return !removedCharacterIDs.includes(stateCharacterID);
+                });
+            }
 
             if (action === "ban") {
                 campaign.bannedPlayers.addToSet(targetPlayerID);

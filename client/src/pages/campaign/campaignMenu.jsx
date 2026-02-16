@@ -196,8 +196,73 @@ function LobbyMenu() {
         [playerID]
     );
 
+    const buildFallbackCharacterState = useCallback(
+        async (campaign) => {
+            const campaignID = campaign?._id;
+            if (!socket || !playerID || !campaignID) return null;
+
+            const roster = buildCampaignRoster(campaign);
+            const rosterNameByID = new Map(
+                roster.map((member) => [toID(member?._id), member?.username || "Player"])
+            );
+            const assignmentList = Array.isArray(campaign.characterAssignments)
+                ? campaign.characterAssignments
+                : [];
+            const dmID = toID(campaign?.dmId);
+            const allCharactersByPlayer = assignmentList
+                .filter((assignment) => Boolean(toID(assignment?.playerId) && toID(assignment?.characterId)))
+                .map((assignment) => {
+                    const memberID = toID(assignment?.playerId);
+                    const selectedCharacterID = toID(assignment?.characterId);
+                    return {
+                        playerId: memberID,
+                        playerName:
+                            assignment?.playerName ||
+                            rosterNameByID.get(memberID) ||
+                            (memberID === dmID
+                                ? campaign?.dmName || "DM"
+                                : fallbackPlayerLabel(memberID)),
+                        assignedCharacterId: selectedCharacterID,
+                        characters: [
+                            {
+                                _id: selectedCharacterID,
+                                name:
+                                    assignment?.characterName ||
+                                    `Character ${selectedCharacterID.slice(-4).toUpperCase()}`,
+                                level: Number(assignment?.characterLevel) || 1,
+                                playerId: memberID,
+                                isSelected: true,
+                            },
+                        ],
+                    };
+                });
+
+            const myCharactersResponse = await emitWithAck(socket, "playerData_getCharacter", {
+                playerID,
+            });
+            const myCharacters =
+                myCharactersResponse?.success && Array.isArray(myCharactersResponse.characters)
+                    ? myCharactersResponse.characters.map((character) => ({
+                          _id: toID(character?._id || character?.id),
+                          name: character?.name || "Unnamed Character",
+                          level: Number(character?.level) || 1,
+                          playerId: toID(playerID),
+                      }))
+                    : [];
+
+            return {
+                assignments: assignmentList,
+                availableCharacters: myCharacters,
+                allCharactersByPlayer,
+                canManageAllCharacters: isCampaignDM(campaign),
+                loadedFromFallback: true,
+            };
+        },
+        [socket, playerID, isCampaignDM]
+    );
+
     const refreshCampaignCharacterState = useCallback(
-        async (campaignID) => {
+        async (campaignID, campaignHint = null) => {
             if (!socket || !playerID || !campaignID) {
                 return { success: false, state: null };
             }
@@ -207,37 +272,60 @@ function LobbyMenu() {
                 campaignID,
             });
 
-            if (!response?.success) {
-                return {
-                    success: false,
-                    state: null,
-                    message: response?.message || "Failed to load campaign character state",
-                };
+            const primaryState = response?.success
+                ? {
+                      assignments: Array.isArray(response.assignments)
+                          ? response.assignments
+                          : Array.isArray(response.campaign?.characterAssignments)
+                          ? response.campaign.characterAssignments
+                          : [],
+                      availableCharacters: Array.isArray(response.availableCharacters)
+                          ? response.availableCharacters
+                          : [],
+                      allCharactersByPlayer: Array.isArray(response.allCharactersByPlayer)
+                          ? response.allCharactersByPlayer
+                          : [],
+                      canManageAllCharacters: Boolean(response.canManageAllCharacters),
+                  }
+                : null;
+
+            const fallbackCampaign =
+                campaignHint ||
+                campaigns.find((campaign) => campaign?._id === campaignID) ||
+                response?.campaign ||
+                null;
+            const shouldUseFallback =
+                !response?.success ||
+                (isCampaignDM(fallbackCampaign) &&
+                    (!primaryState || !Array.isArray(primaryState.allCharactersByPlayer) ||
+                        primaryState.allCharactersByPlayer.length === 0));
+
+            if (shouldUseFallback && fallbackCampaign) {
+                const fallbackState = await buildFallbackCharacterState(fallbackCampaign);
+                if (fallbackState) {
+                    setCharacterStateByCampaign((prev) => ({
+                        ...prev,
+                        [campaignID]: fallbackState,
+                    }));
+                    return { success: true, state: fallbackState, fallbackUsed: true };
+                }
             }
 
-            const nextState = {
-                assignments: Array.isArray(response.assignments)
-                    ? response.assignments
-                    : Array.isArray(response.campaign?.characterAssignments)
-                    ? response.campaign.characterAssignments
-                    : [],
-                availableCharacters: Array.isArray(response.availableCharacters)
-                    ? response.availableCharacters
-                    : [],
-                allCharactersByPlayer: Array.isArray(response.allCharactersByPlayer)
-                    ? response.allCharactersByPlayer
-                    : [],
-                canManageAllCharacters: Boolean(response.canManageAllCharacters),
+            if (primaryState) {
+                setCharacterStateByCampaign((prev) => ({
+                    ...prev,
+                    [campaignID]: primaryState,
+                }));
+                return { success: true, state: primaryState };
+            }
+
+            return {
+                success: false,
+                state: null,
+                message: response?.message || "Failed to load campaign character state",
             };
-
-            setCharacterStateByCampaign((prev) => ({
-                ...prev,
-                [campaignID]: nextState,
-            }));
-
-            return { success: true, state: nextState };
         },
-        [socket, playerID]
+        [socket, playerID, campaigns, isCampaignDM, buildFallbackCharacterState]
     );
 
     const getAssignmentsForCampaign = useCallback(
@@ -283,7 +371,7 @@ function LobbyMenu() {
 
         campaigns.forEach((campaign) => {
             if (!campaign?._id) return;
-            refreshCampaignCharacterState(campaign._id);
+            refreshCampaignCharacterState(campaign._id, campaign);
         });
     }, [campaigns, refreshCampaignCharacterState]);
 
@@ -364,7 +452,7 @@ function LobbyMenu() {
             let availableCharacters = getAvailableCharactersForCampaign(campaignID);
 
             if (!availableCharacters.length) {
-                const refreshResult = await refreshCampaignCharacterState(campaignID);
+                const refreshResult = await refreshCampaignCharacterState(campaignID, campaign);
                 if (refreshResult?.success) {
                     availableCharacters = Array.isArray(refreshResult.state?.availableCharacters)
                         ? refreshResult.state.availableCharacters
@@ -494,7 +582,7 @@ function LobbyMenu() {
             upsertCampaignFromResponse(response.campaign);
         }
 
-        await refreshCampaignCharacterState(campaignID);
+        await refreshCampaignCharacterState(campaignID, response.campaign || null);
         setCharacterPickerState({
             isOpen: false,
             campaignID: "",
@@ -575,7 +663,7 @@ function LobbyMenu() {
             if (response.campaign) {
                 upsertCampaignFromResponse(response.campaign);
             }
-            await refreshCampaignCharacterState(campaignID);
+            await refreshCampaignCharacterState(campaignID, response.campaign || campaign);
             setStatus(`${ownerName} must choose a new character.`);
         },
         [socket, playerID, upsertCampaignFromResponse, refreshCampaignCharacterState]
@@ -738,7 +826,7 @@ function LobbyMenu() {
 
             setStatus("Lobby players updated.");
             if (upsertCampaignFromResponse(response.campaign)) {
-                await refreshCampaignCharacterState(campaignID);
+                await refreshCampaignCharacterState(campaignID, response.campaign || campaign);
                 return;
             }
 
@@ -793,7 +881,7 @@ function LobbyMenu() {
                 setStatus(`${targetName} has been removed.`);
             }
             if (upsertCampaignFromResponse(response.campaign)) {
-                await refreshCampaignCharacterState(campaignID);
+                await refreshCampaignCharacterState(campaignID, response.campaign || campaign);
                 return;
             }
             await loadCampaigns();
@@ -918,13 +1006,30 @@ function LobbyMenu() {
                             const bannedPlayers = Array.isArray(campaign.bannedPlayers)
                                 ? campaign.bannedPlayers
                                 : [];
-                            const characterState = characterStateByCampaign[campaignID] || {};
                             const lobbyAssignments = getAssignmentsForCampaign(campaignID, campaign).filter(
                                 (assignment) => toID(assignment?.characterId)
                             );
-                            const allCharactersByPlayer = Array.isArray(characterState.allCharactersByPlayer)
-                                ? characterState.allCharactersByPlayer
-                                : [];
+                            const selectedAssignmentsForDM = lobbyAssignments
+                                .map((assignment) => {
+                                    const selectedPlayerID = toID(assignment?.playerId);
+                                    const selectedCharacterID = toID(assignment?.characterId);
+                                    return {
+                                        ...assignment,
+                                        playerId: selectedPlayerID,
+                                        playerName:
+                                            assignment?.playerName ||
+                                            rosterByID.get(selectedPlayerID) ||
+                                            fallbackPlayerLabel(selectedPlayerID),
+                                        characterId: selectedCharacterID,
+                                        characterName:
+                                            assignment?.characterName ||
+                                            `Character ${selectedCharacterID.slice(-4).toUpperCase()}`,
+                                        characterLevel: Number(assignment?.characterLevel) || 1,
+                                    };
+                                })
+                                .sort((a, b) =>
+                                    String(a?.playerName || "").localeCompare(String(b?.playerName || ""))
+                                );
                             const saves = saveLists[campaignID] || [];
                             const isSaveLoading = Boolean(saveLoading[campaignID]);
                             const activeSaveID = activeSaveMap[campaignID] || campaign.activeGameSave || "";
@@ -1281,33 +1386,33 @@ function LobbyMenu() {
 
                                                 <div className="border-t border-slate-700/80 pt-3">
                                                     <div className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
-                                                        Character Roster
+                                                        Selected Characters
                                                     </div>
-                                                    {allCharactersByPlayer.length === 0 && (
+                                                    {selectedAssignmentsForDM.length === 0 && (
                                                         <div className="mt-2 text-xs text-slate-400">
-                                                            No character data loaded yet.
+                                                            No players have selected a character yet.
                                                         </div>
                                                     )}
-                                                    {allCharactersByPlayer.map((playerGroup) => {
-                                                        const groupPlayerID = toID(playerGroup?.playerId);
-                                                        const playerName =
-                                                            playerGroup?.playerName ||
-                                                            rosterByID.get(groupPlayerID) ||
-                                                            fallbackPlayerLabel(groupPlayerID);
-                                                        const groupCharacters = Array.isArray(
-                                                            playerGroup?.characters
-                                                        )
-                                                            ? playerGroup.characters
-                                                            : [];
-                                                        const selectedCharacterID = toID(
-                                                            playerGroup?.assignedCharacterId
-                                                        );
+                                                    {selectedAssignmentsForDM.map((assignment) => {
+                                                        const groupPlayerID = toID(assignment?.playerId);
+                                                        const playerName = assignment?.playerName;
+                                                        const selectedCharacterID = toID(assignment?.characterId);
+                                                        const characterName =
+                                                            assignment?.characterName ||
+                                                            `Character ${selectedCharacterID.slice(-4).toUpperCase()}`;
                                                         const canForceRemove =
-                                                            groupPlayerID &&
+                                                            Boolean(groupPlayerID) &&
                                                             groupPlayerID !== toID(campaign.dmId);
                                                         const forceRemoveBusy =
                                                             busyAction ===
                                                             `force-remove:${campaignID}:${groupPlayerID}`;
+                                                        const assignmentForPreview = {
+                                                            playerId: groupPlayerID,
+                                                            playerName,
+                                                            characterId: selectedCharacterID,
+                                                            characterName,
+                                                            characterLevel: Number(assignment?.characterLevel) || 1,
+                                                        };
 
                                                         return (
                                                             <div
@@ -1320,78 +1425,42 @@ function LobbyMenu() {
                                                                         ? " (DM)"
                                                                         : ""}
                                                                 </div>
-                                                                {groupCharacters.length === 0 && (
-                                                                    <div className="mt-1 text-[11px] text-slate-500">
-                                                                        No characters.
-                                                                    </div>
-                                                                )}
-                                                                {groupCharacters.map((character) => {
-                                                                    const characterID = toID(
-                                                                        character?._id || character?.id
-                                                                    );
-                                                                    if (!characterID) return null;
-
-                                                                    const isSelected =
-                                                                        selectedCharacterID === characterID ||
-                                                                        Boolean(character?.isSelected);
-                                                                    const characterName =
-                                                                        character?.name ||
-                                                                        `Character ${characterID
-                                                                            .slice(-4)
-                                                                            .toUpperCase()}`;
-                                                                    const assignmentForPreview = {
-                                                                        playerId: groupPlayerID,
-                                                                        playerName,
-                                                                        characterId: characterID,
-                                                                        characterName,
-                                                                        characterLevel:
-                                                                            Number(character?.level) || 1,
-                                                                    };
-
-                                                                    return (
-                                                                        <div
-                                                                            key={characterID}
-                                                                            className="mt-2 flex items-center justify-between gap-2 rounded border border-slate-700/70 bg-slate-900/40 px-2 py-1"
+                                                                <div className="mt-2 flex items-center justify-between gap-2 rounded border border-slate-700/70 bg-slate-900/40 px-2 py-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            handleOpenCharacterPreview(
+                                                                                campaign,
+                                                                                assignmentForPreview,
+                                                                                playerName
+                                                                            )
+                                                                        }
+                                                                        className="truncate text-left text-[11px] text-slate-200 hover:text-website-neutral-100"
+                                                                    >
+                                                                        {characterName} (Lv{" "}
+                                                                        {Number(assignment?.characterLevel) || 1}) -
+                                                                        Selected
+                                                                    </button>
+                                                                    {canForceRemove && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                handleForceRemoveCharacterAssignment(
+                                                                                    campaign,
+                                                                                    assignmentForPreview
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                forceRemoveBusy ||
+                                                                                isForceRemoveBusy
+                                                                            }
+                                                                            className="inline-flex items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-60"
                                                                         >
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() =>
-                                                                                    handleOpenCharacterPreview(
-                                                                                        campaign,
-                                                                                        assignmentForPreview,
-                                                                                        playerName
-                                                                                    )
-                                                                                }
-                                                                                className="truncate text-left text-[11px] text-slate-200 hover:text-website-neutral-100"
-                                                                            >
-                                                                                {characterName} (Lv{" "}
-                                                                                {Number(character?.level) || 1})
-                                                                                {isSelected
-                                                                                    ? " - Selected"
-                                                                                    : ""}
-                                                                            </button>
-                                                                            {isSelected && canForceRemove && (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() =>
-                                                                                        handleForceRemoveCharacterAssignment(
-                                                                                            campaign,
-                                                                                            assignmentForPreview
-                                                                                        )
-                                                                                    }
-                                                                                    disabled={
-                                                                                        forceRemoveBusy ||
-                                                                                        isForceRemoveBusy
-                                                                                    }
-                                                                                    className="inline-flex items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-60"
-                                                                                >
-                                                                                    <UserX className="size-3" />
-                                                                                    Force Remove
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })}
+                                                                            <UserX className="size-3" />
+                                                                            Force Remove
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         );
                                                     })}
