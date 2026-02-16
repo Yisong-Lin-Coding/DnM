@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Campaign = require("../data/mongooseDataStructure/campaign");
+const GameSave = require("../data/mongooseDataStructure/gameSave");
 const Player = require("../data/mongooseDataStructure/player");
 
 const MIN_ALLOWED_PLAYERS = 2;
@@ -27,6 +28,11 @@ const toObjectIdString = (value) => {
     if (!value) return "";
     if (typeof value === "object" && value._id) return String(value._id);
     return String(value);
+};
+
+const toPlainObject = (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return value;
 };
 
 const isCampaignMember = (campaign, playerID) => {
@@ -73,6 +79,29 @@ const formatCampaign = (campaignDoc) => {
                 : [],
         },
         createdAt: campaign.createdAt || null,
+    };
+};
+
+const formatGameSave = (gameSaveDoc) => {
+    const gameSave = gameSaveDoc?.toObject ? gameSaveDoc.toObject() : gameSaveDoc;
+    if (!gameSave) return null;
+
+    const metadata =
+        gameSave.metadata instanceof Map
+            ? Object.fromEntries(gameSave.metadata.entries())
+            : toPlainObject(gameSave.metadata);
+
+    return {
+        _id: String(gameSave._id),
+        campaignId: toObjectIdString(gameSave.campaignId),
+        name: gameSave.name || "Untitled Save",
+        description: gameSave.description || "",
+        savedBy: toObjectIdString(gameSave.savedBy),
+        version: Number(gameSave.version) || 1,
+        isAutoSave: Boolean(gameSave.isAutoSave),
+        metadata,
+        createdAt: gameSave.createdAt || null,
+        updatedAt: gameSave.updatedAt || null,
     };
 };
 
@@ -351,6 +380,155 @@ module.exports = (socket) => {
         } catch (error) {
             console.error("[campaign_joinLobby] failed", error);
             respond({ success: false, message: error.message || "Failed to join lobby" });
+        }
+    });
+
+    socket.on("campaign_saveGame", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({ success: false, message: "Valid playerID and campaignID are required" });
+            }
+
+            const campaign = await Campaign.findById(campaignID);
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can create saves",
+                });
+            }
+
+            const now = new Date();
+            const fallbackName = `Save ${now.toISOString().replace("T", " ").slice(0, 19)}`;
+            const name = sanitizeText(data?.name, 120) || fallbackName;
+            const description = sanitizeText(data?.description, 1000);
+            const snapshot = toPlainObject(data?.snapshot);
+            const metadata = toPlainObject(data?.metadata);
+            const isAutoSave = Boolean(data?.isAutoSave);
+            const makeActive = Boolean(data?.makeActive);
+
+            const gameSave = await GameSave.create({
+                campaignId: campaign._id,
+                name,
+                description,
+                savedBy: playerID,
+                snapshot,
+                metadata,
+                isAutoSave,
+            });
+
+            campaign.gameSaves.addToSet(gameSave._id);
+            if (makeActive || !campaign.activeGameSave) {
+                campaign.activeGameSave = gameSave._id;
+            }
+            await campaign.save();
+
+            respond({
+                success: true,
+                gameSave: formatGameSave(gameSave),
+                campaignID: String(campaign._id),
+                activeGameSave: toObjectIdString(campaign.activeGameSave),
+            });
+        } catch (error) {
+            console.error("[campaign_saveGame] failed", error);
+            respond({ success: false, message: error.message || "Failed to save campaign state" });
+        }
+    });
+
+    socket.on("campaign_listGameSaves", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({ success: false, message: "Valid playerID and campaignID are required" });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select("_id dmId players activeGameSave");
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can view saves",
+                });
+            }
+
+            const gameSaves = await GameSave.find({ campaignId: campaign._id })
+                .sort({ updatedAt: -1 })
+                .limit(100);
+
+            respond({
+                success: true,
+                gameSaves: gameSaves.map((save) => formatGameSave(save)).filter(Boolean),
+                activeGameSave: toObjectIdString(campaign.activeGameSave),
+                campaignID: String(campaign._id),
+            });
+        } catch (error) {
+            console.error("[campaign_listGameSaves] failed", error);
+            respond({ success: false, message: error.message || "Failed to list campaign saves" });
+        }
+    });
+
+    socket.on("campaign_loadGame", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID, gameSaveID } = data || {};
+
+        try {
+            if (
+                !mongoose.isValidObjectId(playerID) ||
+                !mongoose.isValidObjectId(campaignID) ||
+                !mongoose.isValidObjectId(gameSaveID)
+            ) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID, campaignID, and gameSaveID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID);
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can load saves",
+                });
+            }
+
+            const gameSave = await GameSave.findOne({
+                _id: gameSaveID,
+                campaignId: campaign._id,
+            });
+            if (!gameSave) {
+                return respond({ success: false, message: "Game save not found for this campaign" });
+            }
+
+            campaign.gameSaves.addToSet(gameSave._id);
+            campaign.activeGameSave = gameSave._id;
+            await campaign.save();
+
+            respond({
+                success: true,
+                gameSave: formatGameSave(gameSave),
+                snapshot: toPlainObject(gameSave.snapshot),
+                campaignID: String(campaign._id),
+                gameID: String(campaign._id),
+                activeGameSave: toObjectIdString(campaign.activeGameSave),
+            });
+        } catch (error) {
+            console.error("[campaign_loadGame] failed", error);
+            respond({ success: false, message: error.message || "Failed to load game save" });
         }
     });
 };

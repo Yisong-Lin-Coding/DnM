@@ -120,6 +120,7 @@ function App() {
             </Route>
 
             <Route path="lobby" element ={<LobbyLayout />}>
+              <Route index element ={<LobbyMenu />} />
               <Route path="menu" element ={<LobbyMenu />} />
               <Route path="join" element ={<JoinLobby />} />
               <Route path="create" element ={<CreateLobby />} />
