@@ -4,7 +4,18 @@ const ARSchema = require("./characterSheetRef/AR");
 const invSchema = require("./characterSheetRef/inv"); 
 const skillsSchema = require('./characterSheetRef/skills');
 const appliedEffectSchema = require('./characterSheetRef/appliedEffects');
-const { ServerClosedEvent } = require("mongodb");
+
+const characterActionSchema = new mongoose.Schema({
+    id: { type: String, default: "" },
+    name: { type: String, required: true },
+    actionType: { type: String, default: "action" },
+    source: { type: String, default: "custom" },
+    sourceId: { type: String, default: "" },
+    description: { type: String, default: "" },
+    cost: { type: String, default: "" },
+    requirements: { type: [String], default: [] },
+    enabled: { type: Boolean, default: true }
+}, { _id: false });
 
 const characterSchema   = new mongoose.Schema({
     playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', required: true },
@@ -24,8 +35,12 @@ const characterSchema   = new mongoose.Schema({
 
     customization: {
       skinColor: { type: String, default: null},  
+      skinColorCustom: { type: String, default: null},
       eyeColor: { type: String, default: null},
+      eyeColorCustom: { type: String, default: null},
       hairColor: { type: String, default: null},
+      hairColorCustom: { type: String, default: null},
+      additionalTraits: { type: [String], default: []},
     },
 
     stories: { 
@@ -58,6 +73,10 @@ const characterSchema   = new mongoose.Schema({
     AR:ARSchema,
     inv:invSchema,
     skills: skillsSchema,
+    actions: {
+        type: [characterActionSchema],
+        default: []
+    },
     effects: [{
         type: appliedEffectSchema,
         default: []

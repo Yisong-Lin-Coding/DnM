@@ -17,6 +17,29 @@ const LABELS = {
   cha: 'Charisma',
 };
 
+const toTagArray = (value) => {
+  if (Array.isArray(value)) {
+    return [...new Set(value.map((entry) => String(entry).trim()).filter(Boolean))];
+  }
+  if (typeof value === 'string') {
+    return [...new Set(
+      value
+        .split(/[\n,]/g)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    )];
+  }
+  return [];
+};
+
+const toTitleCase = (value) => {
+  if (!value) return '';
+  return String(value)
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (char) => char.toUpperCase())
+    .trim();
+};
+
 export function Summary({ values, onSave, classes = [], subclasses = [], races = [], subraces = [], backgrounds = [] }) {
   const character = values || {};
   const [isSaving, setIsSaving] = useState(false);
@@ -87,6 +110,57 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
   // Simple inventory summary
   const gp = character?.inv?.gp ?? 0;
   const itemCount = character?.inv?.items ? Object.keys(character.inv.items).length : 0;
+  const customization = character?.customization || {};
+  const stories = character?.stories || {};
+  const additionalTraitTags = toTagArray(customization.additionalTraits);
+  const personalityTags = toTagArray(stories.personality);
+  const idealTags = toTagArray(stories.ideals);
+  const flawTags = toTagArray(stories.flaws);
+  const currentClassChoices = Object.values(character?.classEquipmentChoices || {}).map((choice) => choice?.optionKey).filter(Boolean);
+  const currentBackgroundChoices = Object.values(character?.backgroundEquipmentChoices || {}).map((choice) => choice?.optionKey).filter(Boolean);
+
+  const requiredChecklist = [
+    { label: 'Name', complete: Boolean(character.name) },
+    { label: 'Class', complete: Boolean(character.class) },
+    { label: 'Race', complete: Boolean(character.race) },
+    { label: 'Background', complete: Boolean(character.background) },
+    {
+      label: 'Ability Scores',
+      complete: Object.keys(LABELS).every((code) => Number.isFinite(parseInt(baseStats[code], 10)))
+    }
+  ];
+  const completeCount = requiredChecklist.filter((item) => item.complete).length;
+  const completionPercent = Math.round((completeCount / requiredChecklist.length) * 100);
+
+  const resolveColorValue = (baseKey, customKey) => {
+    const baseValue = String(customization?.[baseKey] || '').trim();
+    const customValue = String(customization?.[customKey] || '').trim();
+    if (!baseValue) return '';
+    if (baseValue === 'other' && customValue) return customValue;
+    return baseValue;
+  };
+
+  const appearanceColors = {
+    skin: resolveColorValue('skinColor', 'skinColorCustom'),
+    eyes: resolveColorValue('eyeColor', 'eyeColorCustom'),
+    hair: resolveColorValue('hairColor', 'hairColorCustom')
+  };
+
+  const renderTagGroup = (label, tags) => (
+    <div className='space-y-2'>
+      <div className='text-website-default-300 text-xs uppercase tracking-wider'>{label}</div>
+      <div className='flex flex-wrap gap-2'>
+        {tags.length === 0 && (
+          <span className='text-website-default-400 text-xs'>None</span>
+        )}
+        {tags.map((tag) => (
+          <span key={`${label}_${tag}`} className='px-2 py-1 bg-website-default-900 border border-website-default-700 rounded text-xs text-white'>
+            {tag}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 
   const StatRow = ({ code }) => {
     const base = parseInt(baseStats[code], 10) || 0;
@@ -97,7 +171,7 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
         <div className='text-website-default-100 text-sm'>{LABELS[code]}</div>
         <div className='text-sm'>
           <span className='text-website-default-300'>Base:</span> <span className='text-white font-semibold'>{base}</span>
-          <span className='mx-2 text-website-default-500'>→</span>
+          <span className='mx-2 text-website-default-500'>-&gt;</span>
           <span className='text-website-default-300'>Final:</span> <span className='text-white font-semibold'>{mod}</span>
           {delta !== 0 && (
             <span className={`ml-2 text-xs ${delta > 0 ? 'text-website-highlights-400' : 'text-website-specials-400'}`}>{delta > 0 ? `+${delta}` : `${delta}`}</span>
@@ -120,7 +194,7 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
             <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
               <div>
                 <div className='text-website-default-300 text-sm'>Name</div>
-                <div className='text-white font-semibold text-lg'>{character.name || '—'}</div>
+                <div className='text-white font-semibold text-lg'>{character.name || '-'}</div>
               </div>
               <div className='text-right'>
                 <div className='text-website-default-300 text-sm'>Level</div>
@@ -131,39 +205,135 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
             <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
               <div className='p-3 bg-website-default-900/50 border border-website-default-700 rounded'>
                 <div className='text-website-default-300 text-xs'>Race</div>
-                <div className='text-white font-semibold'>{selectedRace?.name || '—'}</div>
+                <div className='text-white font-semibold'>{selectedRace?.name || '-'}</div>
                 {selectedRace?.description && (
                   <div className='text-website-default-400 text-xs mt-1'>{selectedRace.description}</div>
                 )}
               </div>
               <div className='p-3 bg-website-default-900/50 border border-website-default-700 rounded'>
                 <div className='text-website-default-300 text-xs'>Subrace</div>
-                <div className='text-white font-semibold'>{selectedSubrace?.name || '—'}</div>
+                <div className='text-white font-semibold'>{selectedSubrace?.name || '-'}</div>
                 {selectedSubrace?.description && (
                   <div className='text-website-default-400 text-xs mt-1'>{selectedSubrace.description}</div>
                 )}
               </div>
               <div className='p-3 bg-website-default-900/50 border border-website-default-700 rounded'>
                 <div className='text-website-default-300 text-xs'>Class</div>
-                <div className='text-white font-semibold'>{selectedClass?.name || '—'}</div>
+                <div className='text-white font-semibold'>{selectedClass?.name || '-'}</div>
                 {selectedClass?.description && (
                   <div className='text-website-default-400 text-xs mt-1'>{selectedClass.description}</div>
                 )}
               </div>
               <div className='p-3 bg-website-default-900/50 border border-website-default-700 rounded'>
                 <div className='text-website-default-300 text-xs'>Subclass</div>
-                <div className='text-white font-semibold'>{selectedSubclass?.name || '—'}</div>
+                <div className='text-white font-semibold'>{selectedSubclass?.name || '-'}</div>
                 {selectedSubclass?.description && (
                   <div className='text-website-default-400 text-xs mt-1'>{selectedSubclass.description}</div>
                 )}
               </div>
               <div className='p-3 bg-website-default-900/50 border border-website-default-700 rounded md:col-span-2'>
                 <div className='text-website-default-300 text-xs'>Background</div>
-                <div className='text-white font-semibold'>{selectedBackground?.name || '—'}</div>
+                <div className='text-white font-semibold'>{selectedBackground?.name || '-'}</div>
                 {selectedBackground?.description && (
                   <div className='text-website-default-400 text-xs mt-1'>{selectedBackground.description}</div>
                 )}
               </div>
+            </div>
+          </Card.Content>
+        </Card>
+
+        {/* Completion */}
+        <Card className='bg-website-default-800 border-website-specials-500'>
+          <Card.Header>
+            <Card.Title className='text-website-default-100'>Creation Readiness</Card.Title>
+            <Card.Description className='text-website-default-300'>Quick completion check before save.</Card.Description>
+          </Card.Header>
+          <Card.Content className='space-y-4'>
+            <div className='flex items-center justify-between text-sm'>
+              <span className='text-website-default-300'>Completion</span>
+              <span className='text-white font-semibold'>{completionPercent}%</span>
+            </div>
+            <div className='h-2 rounded bg-website-default-900 overflow-hidden'>
+              <div
+                className='h-full bg-website-highlights-500 transition-all duration-300'
+                style={{ width: `${completionPercent}%` }}
+              />
+            </div>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+              {requiredChecklist.map((item) => (
+                <div key={item.label} className='flex items-center justify-between rounded border border-website-default-700 bg-website-default-900/50 px-3 py-2 text-xs'>
+                  <span className='text-website-default-200'>{item.label}</span>
+                  <span className={item.complete ? 'text-website-highlights-400' : 'text-website-specials-400'}>
+                    {item.complete ? 'Ready' : 'Missing'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-website-default-300'>
+              <div className='rounded border border-website-default-700 bg-website-default-900/50 px-3 py-2'>
+                Class Equipment Choices: {currentClassChoices.length > 0 ? currentClassChoices.join(', ') : 'None'}
+              </div>
+              <div className='rounded border border-website-default-700 bg-website-default-900/50 px-3 py-2'>
+                Background Equipment Choices: {currentBackgroundChoices.length > 0 ? currentBackgroundChoices.join(', ') : 'None'}
+              </div>
+            </div>
+          </Card.Content>
+        </Card>
+
+        {/* Appearance & Story */}
+        <Card className='bg-website-default-800 border-website-specials-500'>
+          <Card.Header>
+            <Card.Title className='text-website-default-100'>Appearance & Persona</Card.Title>
+            <Card.Description className='text-website-default-300'>Color choices and story tags.</Card.Description>
+          </Card.Header>
+          <Card.Content className='space-y-4'>
+            <div className='grid grid-cols-2 md:grid-cols-4 gap-3'>
+              <div className='p-3 bg-website-default-900/50 border border-website-default-700 rounded'>
+                <div className='text-website-default-300 text-xs'>Gender</div>
+                <div className='text-white text-sm font-semibold'>{character?.gender || '-'}</div>
+              </div>
+              <div className='p-3 bg-website-default-900/50 border border-website-default-700 rounded'>
+                <div className='text-website-default-300 text-xs'>Alignment</div>
+                <div className='text-white text-sm font-semibold'>{character?.alignment || '-'}</div>
+              </div>
+              <div className='p-3 bg-website-default-900/50 border border-website-default-700 rounded'>
+                <div className='text-website-default-300 text-xs'>Age</div>
+                <div className='text-white text-sm font-semibold'>{character?.age?.years || '-'}</div>
+              </div>
+              <div className='p-3 bg-website-default-900/50 border border-website-default-700 rounded'>
+                <div className='text-website-default-300 text-xs'>Size</div>
+                <div className='text-white text-sm font-semibold'>{toTitleCase(character?.model?.size) || '-'}</div>
+              </div>
+            </div>
+
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
+              {Object.entries(appearanceColors).map(([key, value]) => {
+                const isHex = /^#[0-9a-fA-F]{6}$/.test(value || '');
+                const label = key.charAt(0).toUpperCase() + key.slice(1);
+                return (
+                  <div key={key} className='p-3 bg-website-default-900/50 border border-website-default-700 rounded'>
+                    <div className='text-website-default-300 text-xs'>{label} Color</div>
+                    <div className='mt-1 flex items-center gap-2'>
+                      {value && (
+                        <span
+                          className='inline-block h-3 w-3 rounded-full border border-website-default-500'
+                          style={isHex ? { backgroundColor: value } : undefined}
+                        />
+                      )}
+                      <span className='text-white text-sm font-semibold'>
+                        {value ? (isHex ? value : toTitleCase(value)) : '-'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+              {renderTagGroup('Additional Traits', additionalTraitTags)}
+              {renderTagGroup('Personality', personalityTags)}
+              {renderTagGroup('Ideals', idealTags)}
+              {renderTagGroup('Flaws', flawTags)}
             </div>
           </Card.Content>
         </Card>
@@ -194,7 +364,7 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
               )}
               {Object.entries(proficiencies).map(([name, level]) => (
                 <span key={name} className='px-2 py-1 bg-website-default-900 border border-website-default-700 rounded text-sm text-white'>
-                  {name} 
+                  {toTitleCase(name)}
                   {typeof level === 'string' ? ` (${level})` : ''}
                 </span>
               ))}
@@ -215,7 +385,7 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
               )}
               {(languages || []).map((lang) => (
                 <span key={lang} className='px-2 py-1 bg-website-default-900 border border-website-default-700 rounded text-sm text-white'>
-                  {lang}
+                  {toTitleCase(lang)}
                 </span>
               ))}
             </div>
@@ -241,8 +411,8 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
               <div className='p-3 bg-website-default-900/50 border border-website-default-700 rounded'>
                 <div className='text-website-default-300 text-xs'>Resources</div>
                 <div className='text-white text-sm'>
-                  HP {character.HP?.current ?? 0}/{character.HP?.max ?? 0} ·
-                  {' '}STA {character.STA?.current ?? 0}/{character.STA?.max ?? 0} ·
+                  HP {character.HP?.current ?? 0}/{character.HP?.max ?? 0} |
+                  {' '}STA {character.STA?.current ?? 0}/{character.STA?.max ?? 0} |
                   {' '}MP {character.MP?.current ?? 0}/{character.MP?.max ?? 0}
                 </div>
               </div>
@@ -270,3 +440,4 @@ export function Summary({ values, onSave, classes = [], subclasses = [], races =
 }
 
 export default Summary;
+

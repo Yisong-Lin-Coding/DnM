@@ -3,6 +3,7 @@ import Header from "../../pageComponents/header";
 import IndexCardFolder from "../../pageComponents/indexCard";
 import { useContext, useEffect, useRef, useState } from "react";
 import { SocketContext } from "../../socket.io/context";
+import { useNavigate } from "react-router-dom";
 import { Plus, Edit2, Trash2, Eye } from "lucide-react"; // Added icons
 import CharacterCard from "../../pageComponents/characterCard";
 
@@ -48,6 +49,7 @@ function normalizeCharacterForCard(rawCharacter, fallbackCharacter = {}) {
 
 export default function CharacterMenu() {
     const socket = useContext(SocketContext);
+    const navigate = useNavigate();
     const [characters, setCharacters] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -127,6 +129,13 @@ export default function CharacterMenu() {
     // Close menu when clicking elsewhere
     const closeContextMenu = () => {
         setContextMenu((prev) => ({ ...prev, show: false, character: null }));
+    };
+
+    const handleViewCharacter = (characterID) => {
+        if (!characterID) return;
+        closeContextMenu();
+        const sessionID = sessionStorage.getItem("session_ID") || "default";
+        navigate(`/ISK/${sessionID}/character/view/${characterID}`);
     };
 
 useEffect(() => {
@@ -237,7 +246,7 @@ useEffect(() => {
 
                         {/* Action: View (High contrast text-website-default-100) */}
                         <button 
-                            onClick={() => console.log("View", contextMenu.character.id)}
+                            onClick={() => handleViewCharacter(contextMenu.character?.id)}
                             className="w-full flex items-center px-4 py-2.5 text-website-default-100 hover:bg-website-default-700 transition-all duration-150 group"
                         >
                             <Eye className="size-4 mr-3 text-website-default-400 group-hover:text-website-default-100" />

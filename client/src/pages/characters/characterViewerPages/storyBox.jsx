@@ -4,6 +4,7 @@ export default function StoryBox({ character }) {
   if (!character) return null;
 
   const { stories } = character;
+  const shortId = String(character?._id?.$oid || character?._id || character?.id || '').substring(0, 8);
 
   // Helper to render lists (Personality, Ideals, Flaws)
   const StorySection = ({ title, items }) => (
@@ -64,7 +65,7 @@ export default function StoryBox({ character }) {
       {/* Footer Decoration */}
       <div className="p-3 bg-black/40 border-t border-white/5 flex justify-between items-center px-6">
          <span className="text-[9px] text-gray-600 font-bold uppercase italic">
-            Character ID: {character._id?.$oid?.substring(0, 8)}...
+            Character ID: {shortId || 'unknown'}...
          </span>
          <div className="flex gap-2 opacity-20">
             <div className="w-1 h-1 rounded-full bg-white" />

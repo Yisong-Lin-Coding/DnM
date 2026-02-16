@@ -13,6 +13,20 @@ const SKILL_NAMES = [
     'insight', 'intimidation', 'investigation', 'medicine', 'nature', 'perception',
     'performance', 'persuasion', 'religion', 'sleightOfHand', 'stealth', 'survival'
 ];
+const ACTION_TYPE_ALIASES = {
+    action: 'action',
+    standard: 'action',
+    main: 'action',
+    bonus: 'bonusAction',
+    bonusaction: 'bonusAction',
+    reaction: 'reaction',
+    move: 'movement',
+    movement: 'movement',
+    free: 'free',
+    freeaction: 'free',
+    passive: 'passive',
+    special: 'special'
+};
 
 const toUniqueArray = (arr) => [...new Set((arr || []).filter(Boolean).map((v) => String(v)))];
 
@@ -34,6 +48,72 @@ const toStringArray = (value) => {
             .filter(Boolean);
     }
     return [];
+};
+
+const toActionId = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const normalizeActionType = (rawType) => {
+    const normalized = String(rawType || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '');
+    return ACTION_TYPE_ALIASES[normalized] || 'action';
+};
+
+const normalizeCharacterActions = (rawActions) => {
+    let entries = [];
+
+    if (Array.isArray(rawActions)) {
+        entries = rawActions;
+    } else if (typeof rawActions === 'string') {
+        entries = [rawActions];
+    } else if (rawActions && typeof rawActions === 'object') {
+        entries = Object.entries(rawActions).map(([name, value]) => {
+            if (value && typeof value === 'object' && !Array.isArray(value)) {
+                return { ...value, name: value.name || name };
+            }
+            if (typeof value === 'string') {
+                return { name, description: value };
+            }
+            return { name };
+        });
+    }
+
+    const dedupe = new Set();
+    const actions = [];
+
+    entries.forEach((entry, index) => {
+        const source = typeof entry === 'string'
+            ? { name: entry }
+            : (entry && typeof entry === 'object' ? entry : null);
+        if (!source) return;
+
+        const name = String(source.name || source.label || source.title || '').trim();
+        if (!name) return;
+
+        const normalized = {
+            id: String(source.id || toActionId(name) || `action_${index + 1}`),
+            name,
+            actionType: normalizeActionType(source.actionType || source.type || source.kind),
+            source: String(source.source || source.sourceType || 'custom'),
+            sourceId: String(source.sourceId || source.sourceKey || ''),
+            description: String(source.description || ''),
+            cost: String(source.cost || ''),
+            requirements: toStringArray(source.requirements),
+            enabled: source.enabled !== false
+        };
+
+        const dedupeKey = `${normalized.id}|${normalized.actionType}|${normalized.source}`.toLowerCase();
+        if (dedupe.has(dedupeKey)) return;
+        dedupe.add(dedupeKey);
+        actions.push(normalized);
+    });
+
+    return actions;
 };
 
 const buildStatRef = (baseValue, totalValue) => ({
@@ -197,6 +277,54 @@ const getChoiceBonus = (choiceMap, abilityKey) => {
     const key = normalizeAbilityKey(abilityKey);
     if (!key) return 0;
     return Number(choiceMap?.[key] || 0);
+};
+
+const normalizeHexColor = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw.toLowerCase() : '';
+};
+
+const normalizeCustomization = (customization = {}) => {
+    const source = asObject(customization);
+    const normalizeColorSelection = (baseValue, customValue) => {
+        const base = String(baseValue || '').trim();
+        const custom = normalizeHexColor(customValue);
+        const baseAsHex = normalizeHexColor(base);
+
+        if (baseAsHex) {
+            return {
+                value: 'other',
+                custom: custom || baseAsHex
+            };
+        }
+
+        if (base === 'other') {
+            return {
+                value: 'other',
+                custom
+            };
+        }
+
+        return {
+            value: base,
+            custom: ''
+        };
+    };
+
+    const skin = normalizeColorSelection(source.skinColor, source.skinColorCustom);
+    const eye = normalizeColorSelection(source.eyeColor, source.eyeColorCustom);
+    const hair = normalizeColorSelection(source.hairColor, source.hairColorCustom);
+
+    return {
+        skinColor: skin.value,
+        skinColorCustom: skin.custom,
+        eyeColor: eye.value,
+        eyeColorCustom: eye.custom,
+        hairColor: hair.value,
+        hairColorCustom: hair.custom,
+        additionalTraits: toStringArray(source.additionalTraits)
+    };
 };
 
 const normalizeStories = (stories = {}) => {
@@ -379,16 +507,19 @@ module.exports = (socket) => {
             const subraceChoiceConfig = parseAbilityScoreChoiceConfig(subrace);
             const raceChoiceMap = sanitizeChoiceMap(character?.abilityScoreChoices?.race, raceChoiceConfig);
             const subraceChoiceMap = sanitizeChoiceMap(character?.abilityScoreChoices?.subrace, subraceChoiceConfig);
+            const choiceAppliedToBase = Boolean(character?.abilityScoreChoicesAppliedToBase);
 
             const finalStats = {};
             CORE_STAT_KEYS.forEach((key) => {
+                const choiceBonus = choiceAppliedToBase
+                    ? 0
+                    : getChoiceBonus(raceChoiceMap, key) + getChoiceBonus(subraceChoiceMap, key);
                 const computed =
                     baseStats[key] +
                     getModifierValue(classMods, key) +
                     getModifierValue(raceMods, key) +
                     getModifierValue(subraceMods, key) +
-                    getChoiceBonus(raceChoiceMap, key) +
-                    getChoiceBonus(subraceChoiceMap, key);
+                    choiceBonus;
                 finalStats[key] = clamp(computed, 1, 30);
             });
 
@@ -438,24 +569,56 @@ module.exports = (socket) => {
                 proficiencies: normalizeProficiencies(character.skills?.proficiencies, cls),
                 languages: normalizeLanguages(character.skills?.languages, race, subrace)
             };
+            character.actions = normalizeCharacterActions(character.actions);
+            character.customization = normalizeCustomization(character.customization);
             character.stories = normalizeStories(character.stories);
+            delete character.abilityScoreChoicesAppliedToBase;
 
-            const characterCleaner = (obj) => {
+            const PRESERVE_EMPTY_ARRAY_PATHS = new Set([
+                'stories.personality',
+                'stories.ideals',
+                'stories.flaws',
+                'customization.additionalTraits',
+                'actions'
+            ]);
+            const PRESERVE_EMPTY_OBJECT_PATHS = new Set([
+                'abilityScoreChoices',
+                'abilityScoreChoices.race',
+                'abilityScoreChoices.subrace',
+                'stories.relationships'
+            ]);
+
+            const characterCleaner = (obj, path = '') => {
                 if (Array.isArray(obj)) {
-                    return obj
-                        .map((attribute) => characterCleaner(attribute))
+                    const cleanedArray = obj
+                        .map((attribute, index) => characterCleaner(attribute, `${path}[${index}]`))
                         .filter((attribute) => attribute !== null);
+                    if (cleanedArray.length === 0 && PRESERVE_EMPTY_ARRAY_PATHS.has(path)) {
+                        return [];
+                    }
+                    return cleanedArray;
                 }
                 if (obj !== null && typeof obj === 'object') {
                     const result = {};
                     for (const key in obj) {
-                        const value = characterCleaner(obj[key]);
+                        const childPath = path ? `${path}.${key}` : key;
+                        const value = characterCleaner(obj[key], childPath);
 
                         if (value === '') continue;
-                        if (Array.isArray(value) && value.length === 0) continue;
-                        if (typeof value === 'object' && value !== null && Object.keys(value).length === 0) continue;
+                        if (Array.isArray(value) && value.length === 0 && !PRESERVE_EMPTY_ARRAY_PATHS.has(childPath)) continue;
+                        if (
+                            typeof value === 'object' &&
+                            value !== null &&
+                            Object.keys(value).length === 0 &&
+                            !PRESERVE_EMPTY_OBJECT_PATHS.has(childPath)
+                        ) {
+                            continue;
+                        }
 
                         result[key] = value;
+                    }
+                    if (Object.keys(result).length === 0 && PRESERVE_EMPTY_OBJECT_PATHS.has(path)) {
+                        return {};
                     }
                     return result;
                 }

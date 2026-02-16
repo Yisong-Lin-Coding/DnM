@@ -25,6 +25,7 @@ module.exports = (socket) => {
         maxHP: c.maxHP,
         inv: c.inv,
         stats: c.stats,
+        actions: c.actions || [],
       }));
 
       console.log('playerData_getCharacter returning', { playerID, count: characters.length });

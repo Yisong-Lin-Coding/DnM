@@ -1,5 +1,5 @@
-import React, { useState, useContext, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, HashRouter, useParams } from 'react-router-dom';
+import React, { useState, useContext, useEffect, useCallback } from "react";
+import { Link, useNavigate } from 'react-router-dom';
 import { SocketContext } from '../socket.io/context';
 import getImage from "../handlers/getImage";
 
@@ -7,9 +7,31 @@ import getImage from "../handlers/getImage";
 function Login() {
     const socket = useContext(SocketContext);
     const navigate = useNavigate();
-    const perm = useParams()
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+
+    const waitForSessionID = useCallback((timeoutMs = 5000, intervalMs = 50) => {
+        return new Promise((resolve) => {
+            const startedAt = Date.now();
+
+            const poll = () => {
+                const sessionID = sessionStorage.getItem("session_ID") || socket?.id || null;
+                if (sessionID) {
+                    resolve(sessionID);
+                    return;
+                }
+
+                if (Date.now() - startedAt >= timeoutMs) {
+                    resolve(null);
+                    return;
+                }
+
+                setTimeout(poll, intervalMs);
+            };
+
+            poll();
+        });
+    }, [socket]);
 
     function handleLogin() {
         
@@ -26,12 +48,13 @@ function Login() {
                         console.log(response.message)
                     })
 
-                    while(sessionStorage.getItem("session_ID") === null){
-                        setTimeout(() => {
-                            }, 100)
-                    }
-                    
-                    navigate(`/ISK/${sessionStorage.getItem(`session_ID`)}/home`);
+                    waitForSessionID().then((resolvedSessionID) => {
+                        if (!resolvedSessionID) {
+                            alert("Unable to establish a session. Please try again.");
+                            return;
+                        }
+                        navigate(`/ISK/${resolvedSessionID}/home`);
+                    });
                 } 
                 else {
                     console.log(`Login Failed: ${response.message}`)
@@ -44,34 +67,44 @@ function Login() {
     }
 
 useEffect(() => {
+    let cancelled = false;
+
     function autoLogin() {
         const playerID = (localStorage.getItem("player_ID") || "");
         
         const lastLocation = (sessionStorage.getItem("lastLocation") || "")
-
-        while(sessionStorage.getItem("session_ID") === null){
-            setTimeout(() => {
-                }, 100)
+        if (!playerID) {
+            return;
         }
-        const sessionID = (sessionStorage.getItem("session_ID"))
-        
-        socket.emit("login_validityCheck", { playerID, sessionID }, (response) => {
-            if (response.success) {
-                if(lastLocation){
-                    navigate(`/ISK/${sessionID}/${lastLocation}`)
-                }else {
-                    navigate(`/ISK/${sessionID}/home`);
-                }
-            } 
-            else {
-                console.log(response.error || response.message);
-                console.log("Error with autologin")
+
+        waitForSessionID().then((sessionID) => {
+            if (cancelled || !sessionID) {
+                return;
             }
+
+            socket.emit("login_validityCheck", { playerID, sessionID }, (response) => {
+                if (cancelled) return;
+
+                if (response.success) {
+                    if(lastLocation){
+                        navigate(`/ISK/${sessionID}/${lastLocation}`)
+                    }else {
+                        navigate(`/ISK/${sessionID}/home`);
+                    }
+                } 
+                else {
+                    console.log(response.error || response.message);
+                    console.log("Error with autologin")
+                }
+            });
         });
     }
     
     autoLogin();
-}, []);
+    return () => {
+        cancelled = true;
+    };
+}, [socket, navigate, waitForSessionID]);
 
 return( 
 

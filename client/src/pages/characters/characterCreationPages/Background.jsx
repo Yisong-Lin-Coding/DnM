@@ -672,40 +672,7 @@ export function Background({ values, onChange, backgrounds = [], items = [], cla
                                                             {Object.entries(options).map(([optionKey, items]) => {
                                                                 const isActive = values.backgroundEquipmentChoices?.[choiceKey]?.optionKey === optionKey;
                                                                 const hasAnyItems = Object.keys(items).some(key => isAnyItem(key));
-                                                                const onlyAnyItems = Object.keys(items).every(key => isAnyItem(key));
-                                                                
-                                                                // If option only has "any" items, show dropdowns directly
-                                                                if (onlyAnyItems) {
-                                                                    return (
-                                                                        <div key={optionKey} className="space-y-2 p-3 bg-website-default-900 rounded border border-website-default-700">
-                                                                            {Object.entries(items).map(([itemName, quantity]) => {
-                                                                                const dropdownOptions = getAnyOptions(itemName);
-                                                                                const selectionKey = `${choiceKey}_${optionKey}_${itemName}`;
-                                                                                const selectionData = values.backgroundAnyItemSelections?.[selectionKey];
-                                                                                const currentSelection = selectionData?.itemId || '';
-                                                                                
-                                                                                return (
-                                                                                    <div key={itemName} className="flex items-center gap-2">
-                                                                                        <span className="text-xs text-website-default-300">
-                                                                                            <span className="text-website-specials-400 font-bold">{quantity}x</span> {toTitleCase(itemName)}:
-                                                                                        </span>
-                                                                                        <select
-                                                                                            className='flex-1 rounded border border-website-specials-500 bg-website-default-900 px-2 py-1 text-xs text-white focus:outline-none'
-                                                                                            value={currentSelection}
-                                                                                            onChange={(e) => handleAnyItemSelection(choiceKey, optionKey, itemName, e.target.value)}
-                                                                                        >
-                                                                                            <option value='' disabled>Select {toTitleCase(itemName.replace(/any/i, '').trim())}</option>
-                                                                                            {dropdownOptions.map(opt => (
-                                                                                                <option key={opt} value={opt}>{toTitleCase(opt)}</option>
-                                                                                            ))}
-                                                                                        </select>
-                                                                                    </div>
-                                                                                );
-                                                                            })}
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                                
+
                                                                 // Regular option with button and optional dropdowns
                                                                 return (
                                                                     <div key={optionKey} className="space-y-2">

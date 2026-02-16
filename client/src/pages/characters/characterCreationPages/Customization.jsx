@@ -4,6 +4,34 @@ import {genderOptions}  from "../../../data/genderOptions";
 import { CircleUser, Shuffle } from 'lucide-react';
 import { Card } from "../../../pageComponents/card";
 
+const DEFAULT_TAGS = {
+  additionalTraits: ['scarred', 'tattooed', 'pierced', 'freckled', 'mysterious aura'],
+  personality: ['brave', 'curious', 'loyal', 'sarcastic', 'patient', 'stubborn'],
+  ideals: ['justice', 'freedom', 'knowledge', 'honor', 'balance', 'compassion'],
+  flaws: ['greedy', 'impulsive', 'arrogant', 'secretive', 'vengeful', 'reckless']
+};
+
+const COLOR_OPTIONS = {
+  hair: ['black', 'brown', 'blonde', 'red', 'gray', 'white'],
+  skin: ['light', 'tan', 'brown', 'dark', 'olive'],
+  eye: ['brown', 'blue', 'green', 'gray', 'hazel']
+};
+
+const toTagArray = (value) => {
+  if (Array.isArray(value)) {
+    return [...new Set(value.map((entry) => String(entry).trim()).filter(Boolean))];
+  }
+  if (typeof value === 'string') {
+    return [...new Set(
+      value
+        .split(/[\n,]/g)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    )];
+  }
+  return [];
+};
+
 // Controlled + Uncontrolled component:
 // - If `values` and `onChange` props are provided, this component is controlled by parent.
 // - Otherwise it manages its own local state for backward compatibility.
@@ -27,18 +55,30 @@ export function Customization({ values, onChange }){
   const [localCharacter, setLocalCharacter] = useState(() => createDefaultCharacter());
   const character = values || localCharacter;
 
-  const [personalityTraits, setPersonalityTraits] = useState([""]); // start with one input
   const [relationships, setRelationships] = useState({"":{"name":"","relationship":"","description":""}}); // start with one input
+  const [tagInputs, setTagInputs] = useState({
+    additionalTraits: '',
+    personality: '',
+    ideals: '',
+    flaws: ''
+  });
 
-  // Update a specific personality input
-  const handleChange = (index, value) => {
-    setPersonalityTraits((prev) => {
-      const next = [...prev];
-      next[index] = value;
-      emitPartial({ stories: { ...(character.stories || {}), personality: next } });
-      return next;
-    });
-  };
+  const additionalTraitTags = useMemo(
+    () => toTagArray(character.customization?.additionalTraits),
+    [character.customization?.additionalTraits]
+  );
+  const personalityTags = useMemo(
+    () => toTagArray(character.stories?.personality),
+    [character.stories?.personality]
+  );
+  const idealTags = useMemo(
+    () => toTagArray(character.stories?.ideals),
+    [character.stories?.ideals]
+  );
+  const flawTags = useMemo(
+    () => toTagArray(character.stories?.flaws),
+    [character.stories?.flaws]
+  );
 
   const removeRelationship = (id) =>{
     setRelationships(prev=>{
@@ -48,10 +88,6 @@ export function Customization({ values, onChange }){
       return updated;
     });
   }
-  
-  const addPersonalityTraits = () => {
-    setPersonalityTraits([...personalityTraits, ""]);
-  };
 
   const addRelationship = () =>{
     const id = Date.now().toString();
@@ -60,14 +96,6 @@ export function Customization({ values, onChange }){
       [id]:{}
     }))
   }
-
-  const removePersonalityTraits = (index) => {
-    setPersonalityTraits((prev) => {
-      const filtered = prev.filter((_, i) => i !== index);
-      emitPartial({ stories: { ...(character.stories || {}), personality: filtered } });
-      return filtered;
-    });
-  };
 
   const changeRelationships = (id, field, value) => {
     setRelationships(prev => {
@@ -116,13 +144,6 @@ export function Customization({ values, onChange }){
     emitPartial({ stories: { ...(character.stories||{}), relationships: formatted } });
   };
 
-  useEffect(() => {
-    const nextPersonality = Array.isArray(character.stories?.personality) && character.stories.personality.length > 0
-      ? character.stories.personality
-      : [""];
-    setPersonalityTraits(nextPersonality);
-  }, [character.stories?.personality]);
-
   // setCharacter: supports dot-path updates and functional updates
   const setCharacter = (pathOrUpdater, value) => {
     if (typeof pathOrUpdater === 'function') {
@@ -141,6 +162,157 @@ export function Customization({ values, onChange }){
     cur[keys[keys.length - 1]] = value;
     emitPartial(partial);
   };
+
+  const updateTagInput = (key, value) => {
+    setTagInputs((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const setCustomization = (updates) => {
+    emitPartial({
+      customization: {
+        ...(character.customization || {}),
+        ...updates
+      }
+    });
+  };
+
+  const addTag = (key, currentTags, setTags) => {
+    const incoming = String(tagInputs[key] || '').trim();
+    if (!incoming) return;
+
+    const alreadyExists = currentTags.some(
+      (tag) => String(tag).toLowerCase() === incoming.toLowerCase()
+    );
+    if (alreadyExists) {
+      updateTagInput(key, '');
+      return;
+    }
+
+    setTags([...currentTags, incoming]);
+    updateTagInput(key, '');
+  };
+
+  const addSuggestedTag = (tag, currentTags, setTags) => {
+    if (!tag) return;
+    const alreadyExists = currentTags.some(
+      (entry) => String(entry).toLowerCase() === String(tag).toLowerCase()
+    );
+    if (alreadyExists) return;
+    setTags([...currentTags, String(tag)]);
+  };
+
+  const removeTag = (tag, currentTags, setTags) => {
+    const filtered = currentTags.filter((entry) => entry !== tag);
+    setTags(filtered);
+  };
+
+  const getColorSelectionValue = (field, options) => {
+    const selected = String(character.customization?.[field] || '');
+    if (!selected) return '';
+    if (options.includes(selected)) return selected;
+    return 'other';
+  };
+
+  const getCustomColorValue = (field, customField) => {
+    const customValue = String(character.customization?.[customField] || '').trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(customValue)) return customValue;
+
+    const legacyValue = String(character.customization?.[field] || '').trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(legacyValue)) return legacyValue;
+
+    return '#808080';
+  };
+
+  const updateColorSelection = (field, customField, nextValue) => {
+    if (nextValue === 'other') {
+      const fallbackCustom = getCustomColorValue(field, customField);
+      setCustomization({
+        [field]: 'other',
+        [customField]: fallbackCustom
+      });
+      return;
+    }
+
+    setCustomization({
+      [field]: nextValue,
+      [customField]: ''
+    });
+  };
+
+  const renderTagEditor = ({
+    inputKey,
+    tags,
+    suggestions,
+    setTags,
+    placeholder
+  }) => (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {(suggestions || []).map((tag) => {
+          const selected = tags.some((entry) => String(entry).toLowerCase() === tag.toLowerCase());
+          return (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => addSuggestedTag(tag, tags, setTags)}
+              className={`px-2 py-1 rounded text-xs border transition-colors ${
+                selected
+                  ? 'bg-website-specials-900/40 border-website-specials-500 text-white'
+                  : 'bg-website-default-900 border-website-default-700 text-website-default-300 hover:border-website-default-500'
+              }`}
+            >
+              {tag}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap gap-2 min-h-10 rounded border border-website-default-700 bg-website-default-900 px-2 py-2">
+        {tags.length === 0 && (
+          <span className="text-xs text-website-default-400">No tags added yet.</span>
+        )}
+        {tags.map((tag) => (
+          <span
+            key={tag}
+            className="inline-flex items-center gap-2 rounded border border-website-specials-500 bg-website-specials-900/30 px-2 py-1 text-xs text-white"
+          >
+            {tag}
+            <button
+              type="button"
+              onClick={() => removeTag(tag, tags, setTags)}
+              className="text-website-default-300 hover:text-website-default-100"
+              aria-label={`Remove ${tag}`}
+            >
+              x
+            </button>
+          </span>
+        ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="text"
+          value={tagInputs[inputKey] || ''}
+          onChange={(e) => updateTagInput(inputKey, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addTag(inputKey, tags, setTags);
+            }
+          }}
+          placeholder={placeholder}
+          className="flex-1 rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400"
+        />
+        <button
+          type="button"
+          onClick={() => addTag(inputKey, tags, setTags)}
+          className="rounded border border-website-specials-500 bg-website-specials-900/40 px-3 py-2 text-sm text-white hover:bg-website-specials-900/60"
+        >
+          Add Tag
+        </button>
+      </div>
+    </div>
+  );
 
   const randomizeGender = () => {
     if (!genderOptionsList.length) return;
@@ -631,49 +803,75 @@ export function Customization({ values, onChange }){
                     <div className="flex flex-col">
                       <label className="text-sm text-website-default-300 mb-1">Hair Color</label>
                       <select className="rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400"
-                        value={character.customization?.hairColor || ''}
-                        onChange={(e) => setCharacter('customization.hairColor', e.target.value)}
+                        value={getColorSelectionValue('hairColor', COLOR_OPTIONS.hair)}
+                        onChange={(e) => updateColorSelection('hairColor', 'hairColorCustom', e.target.value)}
                       >
                         <option value="" disabled>Select hair color</option>
-                        <option value="black">Black</option>
-                        <option value="brown">Brown</option>
-                        <option value="blonde">Blonde</option>
-                        <option value="red">Red</option>
-                        <option value="gray">Gray</option>
-                        <option value="white">White</option>
-                        <option value="other">Other</option>
+                        {COLOR_OPTIONS.hair.map((option) => (
+                          <option key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
+                        ))}
+                        <option value="other">Other (pick color)</option>
                       </select>
+                      {getColorSelectionValue('hairColor', COLOR_OPTIONS.hair) === 'other' && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={getCustomColorValue('hairColor', 'hairColorCustom')}
+                            onChange={(e) => setCustomization({ hairColor: 'other', hairColorCustom: e.target.value })}
+                            className="h-9 w-14 rounded border border-website-specials-500 bg-transparent p-1"
+                          />
+                          <span className="text-xs text-website-default-300">{getCustomColorValue('hairColor', 'hairColorCustom')}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col">
                       <label className="text-sm text-website-default-300 mb-1">Skin Color</label>
                       <select className="rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400"
-                        value={character.customization?.skinColor || ''}
-                        onChange={(e) => setCharacter('customization.skinColor', e.target.value)}
+                        value={getColorSelectionValue('skinColor', COLOR_OPTIONS.skin)}
+                        onChange={(e) => updateColorSelection('skinColor', 'skinColorCustom', e.target.value)}
                       >
                         <option value="" disabled>Select skin color</option>
-                        <option value="light">Light</option>
-                        <option value="tan">Tan</option>
-                        <option value="brown">Brown</option>
-                        <option value="dark">Dark</option>
-                        <option value="olive">Olive</option>
-                        <option value="other">Other</option>
+                        {COLOR_OPTIONS.skin.map((option) => (
+                          <option key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
+                        ))}
+                        <option value="other">Other (pick color)</option>
                       </select>
+                      {getColorSelectionValue('skinColor', COLOR_OPTIONS.skin) === 'other' && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={getCustomColorValue('skinColor', 'skinColorCustom')}
+                            onChange={(e) => setCustomization({ skinColor: 'other', skinColorCustom: e.target.value })}
+                            className="h-9 w-14 rounded border border-website-specials-500 bg-transparent p-1"
+                          />
+                          <span className="text-xs text-website-default-300">{getCustomColorValue('skinColor', 'skinColorCustom')}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col">
                       <label className="text-sm text-website-default-300 mb-1">Eye Color</label>
                       <select className="rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400"
-                        value={character.customization?.eyeColor || ''}
-                        onChange={(e) => setCharacter('customization.eyeColor', e.target.value)}
+                        value={getColorSelectionValue('eyeColor', COLOR_OPTIONS.eye)}
+                        onChange={(e) => updateColorSelection('eyeColor', 'eyeColorCustom', e.target.value)}
                       >
                         <option value="" disabled>Select eye color</option>
-                        <option value="brown">Brown</option>
-                        <option value="blue">Blue</option>
-                        <option value="green">Green</option>
-                        <option value="gray">Gray</option>
-                        <option value="hazel">Hazel</option>
-                        <option value="other">Other</option>
+                        {COLOR_OPTIONS.eye.map((option) => (
+                          <option key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
+                        ))}
+                        <option value="other">Other (pick color)</option>
                       </select>
+                      {getColorSelectionValue('eyeColor', COLOR_OPTIONS.eye) === 'other' && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={getCustomColorValue('eyeColor', 'eyeColorCustom')}
+                            onChange={(e) => setCustomization({ eyeColor: 'other', eyeColorCustom: e.target.value })}
+                            className="h-9 w-14 rounded border border-website-specials-500 bg-transparent p-1"
+                          />
+                          <span className="text-xs text-website-default-300">{getCustomColorValue('eyeColor', 'eyeColorCustom')}</span>
+                        </div>
+                      )}
                     </div>
 
                   </div>
@@ -686,16 +884,17 @@ export function Customization({ values, onChange }){
                     Additional Traits
                   </Card.Title>
                   <Card.Description className='text-website-default-300'>
-                    Any other notable features or characteristics?
+                    Add selectable or custom trait tags.
                   </Card.Description>
                 </Card.Header>
                 <Card.Content>
-                  <textarea
-                    className="w-full h-32 rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400 resize-none"
-                    placeholder="Describe any additional traits..."
-                    value={character.customization?.additionalTraits || ''}
-                    onChange={(e) => setCharacter('customization.additionalTraits', e.target.value)}
-                  ></textarea>
+                  {renderTagEditor({
+                    inputKey: 'additionalTraits',
+                    tags: additionalTraitTags,
+                    suggestions: DEFAULT_TAGS.additionalTraits,
+                    setTags: (tags) => setCharacter('customization.additionalTraits', tags),
+                    placeholder: 'Add a custom trait tag...'
+                  })}
                 </Card.Content>
               </Card>
 
@@ -712,40 +911,17 @@ export function Customization({ values, onChange }){
                     Personality Traits
                   </Card.Title>
                   <Card.Description className='text-website-default-300'>
-                    Describe your character's personality traits.
+                    Default and custom personality tags in one editable bar.
                   </Card.Description>
                 </Card.Header>
                 <Card.Content>
-                  <div className="p-4 space-y-4 w-full">
-                    {personalityTraits.map((value, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <input
-                          type="text"
-                          value={value}
-                          onChange={(e) => {
-                            handleChange(index, e.target.value);
-                          }}
-                          placeholder={`Trait #${index + 1}`}
-                          className="flex-1 px-3 py-2 border border-website-specials-500 rounded bg-website-default-900 focus:outline-none focus:ring-2 focus:ring-website-highlights-400"
-                        />
-                        {personalityTraits.length > 1 && (
-                          <button
-                            onClick={() => removePersonalityTraits(index)}
-                            className="px-2 py-1 text-white bg-website-default-500 rounded hover:bg-website-specials-500 transition"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-                    ))}
-
-                    <button
-                      onClick={addPersonalityTraits}
-                      className="w-full py-2 px-4 bg-website-specials-500 text-white rounded hover:bg-website-specials-600 transition"
-                    >
-                      Add Input
-                    </button>
-                  </div>
+                  {renderTagEditor({
+                    inputKey: 'personality',
+                    tags: personalityTags,
+                    suggestions: DEFAULT_TAGS.personality,
+                    setTags: (tags) => setCharacter('stories.personality', tags),
+                    placeholder: 'Add a custom personality tag...'
+                  })}
                 </Card.Content>
               </Card>
 
@@ -755,16 +931,17 @@ export function Customization({ values, onChange }){
                     Ideals
                   </Card.Title>
                   <Card.Description className='text-website-default-300'>
-                    Describe your character's ideals.
+                    Add ideals as tags so they work like personality traits.
                   </Card.Description>
                 </Card.Header>
                 <Card.Content>
-                  <textarea
-                    className="w-full h-32 rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400 resize-none"
-                    placeholder="Describe your character's ideals..."
-                    value={character.stories?.ideals || ''}
-                    onChange={(e) => setCharacter('stories.ideals', e.target.value)}
-                  ></textarea>
+                  {renderTagEditor({
+                    inputKey: 'ideals',
+                    tags: idealTags,
+                    suggestions: DEFAULT_TAGS.ideals,
+                    setTags: (tags) => setCharacter('stories.ideals', tags),
+                    placeholder: 'Add a custom ideal tag...'
+                  })}
                 </Card.Content>
               </Card>
 
@@ -774,16 +951,17 @@ export function Customization({ values, onChange }){
                     Flaws
                   </Card.Title>
                   <Card.Description className='text-website-default-300'>
-                    Describe your character's flaws.
+                    Add flaws as tags so they work like personality traits.
                   </Card.Description>
                 </Card.Header>
                 <Card.Content>
-                  <textarea
-                    className="w-full h-32 rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-website-highlights-400 resize-none"
-                    placeholder="Describe your character's flaws..."
-                    value={character.stories?.flaws || ''}
-                    onChange={(e) => setCharacter('stories.flaws', e.target.value)}
-                  ></textarea>
+                  {renderTagEditor({
+                    inputKey: 'flaws',
+                    tags: flawTags,
+                    suggestions: DEFAULT_TAGS.flaws,
+                    setTags: (tags) => setCharacter('stories.flaws', tags),
+                    placeholder: 'Add a custom flaw tag...'
+                  })}
                 </Card.Content>
               </Card>
 

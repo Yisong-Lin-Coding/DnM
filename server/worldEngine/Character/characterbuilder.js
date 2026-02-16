@@ -19,6 +19,58 @@ const MODELS = {
     backgrounds: Background
 };
 
+const CORE_CHARACTER_ACTIONS = [
+    {
+        id: 'attack',
+        name: 'Attack',
+        actionType: 'action',
+        source: 'core',
+        description: 'Make a weapon or unarmed attack.'
+    },
+    {
+        id: 'cast',
+        name: 'Cast Spell',
+        actionType: 'action',
+        source: 'core',
+        description: 'Cast an available spell.'
+    },
+    {
+        id: 'move',
+        name: 'Move',
+        actionType: 'movement',
+        source: 'core',
+        description: 'Move up to your movement speed.'
+    },
+    {
+        id: 'use_item',
+        name: 'Use Item',
+        actionType: 'action',
+        source: 'core',
+        description: 'Use an item from inventory or equipment.'
+    },
+    {
+        id: 'dash',
+        name: 'Dash',
+        actionType: 'action',
+        source: 'core',
+        description: 'Double your movement for the turn.'
+    },
+    {
+        id: 'dodge',
+        name: 'Dodge',
+        actionType: 'action',
+        source: 'core',
+        description: 'Focus on defense until your next turn.'
+    },
+    {
+        id: 'help',
+        name: 'Help',
+        actionType: 'action',
+        source: 'core',
+        description: 'Grant support to an ally or assist with a task.'
+    }
+];
+
 /**
  * CharacterBuilder - MongoDB + Server File Hybrid System
  * 
@@ -183,6 +235,257 @@ class CharacterBuilder {
         };
     }
 
+    _toDisplayName(value) {
+        return String(value || '')
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+
+    _toActionId(value) {
+        return String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
+    }
+
+    _toStringArray(value) {
+        if (Array.isArray(value)) {
+            return value.map((entry) => String(entry).trim()).filter(Boolean);
+        }
+        if (typeof value === 'string') {
+            return value
+                .split(/[\n,]/g)
+                .map((entry) => entry.trim())
+                .filter(Boolean);
+        }
+        return [];
+    }
+
+    _normalizeActionType(rawType) {
+        const normalized = String(rawType || '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, '');
+
+        switch (normalized) {
+            case 'bonus':
+            case 'bonusaction':
+                return 'bonusAction';
+            case 'reaction':
+                return 'reaction';
+            case 'move':
+            case 'movement':
+                return 'movement';
+            case 'free':
+            case 'freeaction':
+                return 'free';
+            case 'passive':
+                return 'passive';
+            case 'special':
+                return 'special';
+            default:
+                return 'action';
+        }
+    }
+
+    _readProperty(properties, key) {
+        if (!properties) return undefined;
+        if (typeof properties.get === 'function') {
+            return properties.get(key);
+        }
+        return properties[key];
+    }
+
+    _inferActionTypeFromDescription(description) {
+        const text = String(description || '').toLowerCase();
+        if (!text) return 'action';
+        if (text.includes('bonus action')) return 'bonusAction';
+        if (text.includes('reaction')) return 'reaction';
+        if (text.includes('free action')) return 'free';
+        if (text.includes('move') || text.includes('movement')) return 'movement';
+        return 'action';
+    }
+
+    _isActionableFeature(feature) {
+        const text = String(feature?.description || '').toLowerCase();
+        if (!text) return false;
+        return /as an action|use an action|bonus action|reaction|on your turn|you can use/.test(text);
+    }
+
+    _normalizeAction(action, fallback = {}) {
+        const source = typeof action === 'string'
+            ? { name: action }
+            : (action && typeof action === 'object' ? action : null);
+        if (!source) return null;
+
+        const name = String(
+            source.name ||
+            source.label ||
+            source.title ||
+            fallback.name ||
+            ''
+        ).trim();
+        if (!name) return null;
+
+        return {
+            id: String(source.id || fallback.id || this._toActionId(name)),
+            name,
+            actionType: this._normalizeActionType(source.actionType || source.type || fallback.actionType),
+            source: String(source.source || source.sourceType || fallback.source || 'custom'),
+            sourceId: String(source.sourceId || source.sourceKey || fallback.sourceId || ''),
+            description: String(source.description || fallback.description || ''),
+            cost: String(source.cost || fallback.cost || ''),
+            requirements: this._toStringArray(source.requirements || fallback.requirements),
+            enabled: source.enabled !== false
+        };
+    }
+
+    _normalizeActionCollection(rawActions, fallback = {}) {
+        if (Array.isArray(rawActions)) {
+            return rawActions
+                .map((action) => this._normalizeAction(action, fallback))
+                .filter(Boolean);
+        }
+
+        if (typeof rawActions === 'string') {
+            const normalized = this._normalizeAction(rawActions, fallback);
+            return normalized ? [normalized] : [];
+        }
+
+        if (rawActions && typeof rawActions === 'object') {
+            return Object.entries(rawActions)
+                .map(([name, value]) => {
+                    if (value && typeof value === 'object' && !Array.isArray(value)) {
+                        return this._normalizeAction(
+                            { ...value, name: value.name || name },
+                            fallback
+                        );
+                    }
+                    if (typeof value === 'string') {
+                        return this._normalizeAction(
+                            { name, description: value },
+                            fallback
+                        );
+                    }
+                    return this._normalizeAction({ name }, fallback);
+                })
+                .filter(Boolean);
+        }
+
+        return [];
+    }
+
+    _extractSkillActions(activeSkills) {
+        if (!activeSkills || typeof activeSkills !== 'object') {
+            return [];
+        }
+
+        return Object.entries(activeSkills)
+            .map(([skillName, details]) => this._normalizeAction({
+                id: `skill_${this._toActionId(skillName)}`,
+                name: this._toDisplayName(skillName),
+                actionType: this._normalizeActionType(details?.actionType || details?.type || 'action'),
+                source: 'skill',
+                sourceId: String(skillName),
+                description: typeof details === 'string' ? details : String(details?.description || '')
+            }))
+            .filter(Boolean);
+    }
+
+    _extractFeatureActions(features, source) {
+        if (!Array.isArray(features)) {
+            return [];
+        }
+
+        return features
+            .filter((feature) => feature?.name && this._isActionableFeature(feature))
+            .map((feature) => this._normalizeAction({
+                id: feature.id || feature.featureId || this._toActionId(feature.name),
+                name: feature.name,
+                actionType: this._inferActionTypeFromDescription(feature.description),
+                source,
+                sourceId: String(feature.id || feature.featureId || ''),
+                description: feature.description || ''
+            }))
+            .filter(Boolean);
+    }
+
+    _extractItemActions(items) {
+        if (!Array.isArray(items) || items.length === 0) {
+            return [];
+        }
+
+        const actions = [];
+
+        items.forEach((item) => {
+            const rawUses = this._readProperty(item?.properties, 'uses');
+            const uses = Array.isArray(rawUses)
+                ? rawUses
+                : (typeof rawUses === 'string' ? [rawUses] : []);
+
+            uses.forEach((useEntry, index) => {
+                const useText = typeof useEntry === 'string'
+                    ? useEntry
+                    : String(useEntry?.name || useEntry?.description || '').trim();
+                if (!useText) return;
+
+                const normalized = this._normalizeAction({
+                    id: `item_${this._toActionId(item?.name || item?.itemId || item?._id)}_${index}`,
+                    name: useText,
+                    actionType: this._inferActionTypeFromDescription(useText),
+                    source: 'item',
+                    sourceId: String(item?.itemId || item?._id || item?.id || ''),
+                    description: `Item action from ${item?.name || 'equipped item'}`
+                });
+
+                if (normalized) {
+                    actions.push(normalized);
+                }
+            });
+        });
+
+        return actions;
+    }
+
+    _dedupeActions(actions) {
+        const out = [];
+        const dedupe = new Set();
+
+        (actions || []).forEach((action) => {
+            const normalized = this._normalizeAction(action);
+            if (!normalized) return;
+
+            const key = `${normalized.id}|${normalized.actionType}|${normalized.source}`.toLowerCase();
+            if (dedupe.has(key)) return;
+
+            dedupe.add(key);
+            out.push(normalized);
+        });
+
+        return out;
+    }
+
+    _buildAvailableActions() {
+        const customActions = this._normalizeActionCollection(this.data.actions, { source: 'custom' });
+        const skillActions = this._extractSkillActions(this.data.skillIds?.active);
+        const classFeatureActions = this._extractFeatureActions(this.data.classFeatures, 'classFeature');
+        const raceFeatureActions = this._extractFeatureActions(this.data.raceFeatures, 'raceFeature');
+        const itemActions = this._extractItemActions(this.data.equippedItems);
+
+        return this._dedupeActions([
+            ...CORE_CHARACTER_ACTIONS,
+            ...customActions,
+            ...skillActions,
+            ...classFeatureActions,
+            ...raceFeatureActions,
+            ...itemActions
+        ]);
+    }
+
     /**
      * Load and process traits from server files
      * @param {Array} traitIds - Array of trait IDs from MongoDB
@@ -329,6 +632,7 @@ class CharacterBuilder {
             statusEffects: [],
             classFeatures: [],
             raceFeatures: [],
+            actions: this._normalizeActionCollection(rawData.actions, { source: 'custom' }),
             
             // Skills from MongoDB
             skillIds: {

@@ -12,7 +12,7 @@ export const mapObjectsLayer = {
       c.x !== p.x ||
       c.y !== p.y ||
       c.zoom !== p.zoom ||
-      JSON.stringify(state.mapObjects) !== JSON.stringify(prevState.mapObjects)
+      state.mapObjects !== prevState.mapObjects
     );
   },
 

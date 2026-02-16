@@ -98,18 +98,53 @@ const deepMerge = (t, s) => {
     return out;
 };
 
+const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
+
+const getPathValue = (obj, path) => path.reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
+
+const hasPath = (obj, path) => {
+  let current = obj;
+  for (const key of path) {
+    if (!hasOwn(current, key)) return false;
+    current = current[key];
+  }
+  return true;
+};
+
+const setPathValue = (obj, path, value) => {
+  if (!path.length) return;
+  let current = obj;
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const key = path[i];
+    if (!current[key] || typeof current[key] !== 'object') {
+      current[key] = {};
+    }
+    current = current[key];
+  }
+  current[path[path.length - 1]] = value;
+};
+
+const REPLACE_PATHS = [
+  ['skills'],
+  ['abilityScoreChoices'],
+  ['proficiencyChoices'],
+  ['classEquipmentChoices'],
+  ['classAnyItemSelections'],
+  ['backgroundEquipmentChoices'],
+  ['backgroundAnyItemSelections'],
+  ['inv', 'items'],
+  ['inv', 'equipment']
+];
+
   // Update function passed to children to merge partial updates
 const updateDraft = React.useCallback((partial) => {
     setCharacterDraft(prev => {
-      // Special handling for skills - complete replacement to handle deletions
-      // but also merge in all other properties
-      if (partial.skills) {
-        const updated = deepMerge(prev, partial);
-        // Override skills with the complete replacement
-        updated.skills = partial.skills;
-        return updated;
-      }
-      return deepMerge(prev, partial);
+      const updated = deepMerge(prev, partial);
+      REPLACE_PATHS.forEach((path) => {
+        if (!hasPath(partial, path)) return;
+        setPathValue(updated, path, getPathValue(partial, path));
+      });
+      return updated;
     });
 }, []);
 
@@ -137,19 +172,24 @@ const updateDraft = React.useCallback((partial) => {
     // Calculate final stats (Luck excluded from pipeline, but kept if present)
     const STAT_KEYS = ['str','dex','con','int','wis','cha'];
     const finalStats = {};
+    const baseStatsWithChoice = {};
     for (const k of STAT_KEYS) {
       const base = parseInt(baseStats[k], 10) || 0;
+      const choiceBonus = getChoiceBonus(raceChoiceMap, k) + getChoiceBonus(subraceChoiceMap, k);
+      baseStatsWithChoice[k] = base + choiceBonus;
       finalStats[k] =
-        base +
+        baseStatsWithChoice[k] +
         getModifierValue(classMods, k) +
         getModifierValue(raceMods, k) +
-        getModifierValue(subraceMods, k) +
-        getChoiceBonus(raceChoiceMap, k) +
-        getChoiceBonus(subraceChoiceMap, k);
+        getModifierValue(subraceMods, k);
     }
     // Preserve any additional stats (e.g., luck) as-is
     Object.keys(baseStats || {}).forEach(k => {
-      if (!STAT_KEYS.includes(k)) finalStats[k] = parseInt(baseStats[k], 10) || 0;
+      if (!STAT_KEYS.includes(k)) {
+        const parsed = parseInt(baseStats[k], 10) || 0;
+        finalStats[k] = parsed;
+        baseStatsWithChoice[k] = parsed;
+      }
     });
 
     // Resource computation parameters (base and per-level increments may be provided by mods outside classes)
@@ -185,7 +225,9 @@ const updateDraft = React.useCallback((partial) => {
         race: raceChoiceMap,
         subrace: subraceChoiceMap
       },
-      // Note: keep base stats as entered by user
+      // Submit base stats with choice bonuses folded in.
+      stats: baseStatsWithChoice,
+      abilityScoreChoicesAppliedToBase: true,
       HP: { ...(characterDraft.HP || {}), max: maxHP, current: Math.max(0, Math.min(characterDraft.HP?.current ?? maxHP, maxHP)) },
       MP: { ...(characterDraft.MP || {}), max: maxMP, current: Math.max(0, Math.min(characterDraft.MP?.current ?? maxMP, maxMP)) },
       STA: { ...(characterDraft.STA || {}), max: maxSTA, current: Math.max(0, Math.min(characterDraft.STA?.current ?? maxSTA, maxSTA)) },

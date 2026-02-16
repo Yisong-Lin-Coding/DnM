@@ -1,5 +1,5 @@
-const CHARACTER = require('../Character/CHARACTER');
-const CharacterBuilder = require('../Character/characterbuilder');
+const CHARACTER = require('./Character/character');
+const CharacterBuilder = require('./Character/characterbuilder');
 const gameEvents = require('../handlers/gameEventEmitter');
 
 /**
@@ -211,23 +211,51 @@ class GameEngine {
             throw new Error('Not this character\'s turn');
         }
         
+        const normalizedActionData = {
+            ...(actionData || {}),
+            characters: this.characters,
+            combatEngine: this
+        };
+        const actionRef = normalizedActionData.actionPath || normalizedActionData.actionId || actionType;
+        const shouldUseCharacterActionEngine = Boolean(
+            normalizedActionData.actionPath ||
+            normalizedActionData.actionId ||
+            (typeof actionType === 'string' && actionType.includes('.'))
+        );
+
+        if (shouldUseCharacterActionEngine && typeof character.executeAction === 'function') {
+            const result = character.executeAction(actionRef, normalizedActionData);
+
+            // Check for victory conditions after dynamic actions as well.
+            this._checkVictoryConditions();
+
+            gameEvents.emitGameEvent('actionExecuted', {
+                gameId: this.gameId,
+                characterId: character.id,
+                actionType: actionRef,
+                result: result
+            });
+
+            return result;
+        }
+
         let result;
         
         switch (actionType) {
             case 'attack':
-                result = this._executeAttack(character, actionData);
+                result = this._executeAttack(character, normalizedActionData);
                 break;
             
             case 'cast':
-                result = this._executeCast(character, actionData);
+                result = this._executeCast(character, normalizedActionData);
                 break;
             
             case 'move':
-                result = this._executeMove(character, actionData);
+                result = this._executeMove(character, normalizedActionData);
                 break;
             
             case 'useItem':
-                result = this._executeUseItem(character, actionData);
+                result = this._executeUseItem(character, normalizedActionData);
                 break;
             
             case 'dash':
@@ -250,7 +278,7 @@ class GameEngine {
         gameEvents.emitGameEvent('actionExecuted', {
             gameId: this.gameId,
             characterId: character.id,
-            actionType: actionType,
+            actionType: actionRef,
             result: result
         });
         

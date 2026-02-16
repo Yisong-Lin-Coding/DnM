@@ -7,6 +7,8 @@ const SubRace = require('../data/mongooseDataStructure/subrace');
 const Player = require('../data/mongooseDataStructure/player');
 const Character = require('../data/mongooseDataStructure/character');
 const Background = require('../data/mongooseDataStructure/background');
+const Campaign = require('../data/mongooseDataStructure/campaign');
+const GameSave = require('../data/mongooseDataStructure/gameSave');
 
 // Define all available models here
 const MODELS = {
@@ -18,6 +20,8 @@ const MODELS = {
     players: Player,
     characters: Character,
     backgrounds: Background,
+    campaigns: Campaign,
+    gameSaves: GameSave,
     // Add new models here as needed
 };
 

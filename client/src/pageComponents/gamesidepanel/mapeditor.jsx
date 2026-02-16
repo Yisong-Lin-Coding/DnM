@@ -55,7 +55,10 @@ function MapEditor() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `map_${currentMapId}.json`;
+    document.body.appendChild(a);
     a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   const importMap = (event) => {

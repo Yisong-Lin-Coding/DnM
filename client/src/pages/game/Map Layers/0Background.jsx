@@ -16,8 +16,6 @@ export const backgroundLayer = {
   },
 
   draw(ctx, canvas, state) {
-
-    console.log("background")
     const { bgImage, camera } = state;
 
     // Skip if no image or canvas

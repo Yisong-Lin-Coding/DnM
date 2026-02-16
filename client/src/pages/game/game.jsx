@@ -152,10 +152,18 @@ const {
       canvas: layerRefs.current[config.name],
     }));
 
+    // Snapshot camera values to avoid sharing one mutable object across frames.
+    const cameraSnapshot = {
+      x: camera.current.x,
+      y: camera.current.y,
+      zoom: camera.current.zoom,
+      bgImage: camera.current.bgImage,
+    };
+
     // Current state
     const currentState = {
-      bgImage: camera.current.bgImage,
-      camera: camera.current,
+      bgImage: cameraSnapshot.bgImage,
+      camera: cameraSnapshot,
       mapObjects: mapObjects, // Objects from context
     };
 
