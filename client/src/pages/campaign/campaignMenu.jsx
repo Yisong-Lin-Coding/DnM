@@ -198,7 +198,9 @@ function LobbyMenu() {
 
     const refreshCampaignCharacterState = useCallback(
         async (campaignID) => {
-            if (!socket || !playerID || !campaignID) return false;
+            if (!socket || !playerID || !campaignID) {
+                return { success: false, state: null };
+            }
 
             const response = await emitWithAck(socket, "campaign_getCharacterChoices", {
                 playerID,
@@ -206,28 +208,34 @@ function LobbyMenu() {
             });
 
             if (!response?.success) {
-                return false;
+                return {
+                    success: false,
+                    state: null,
+                    message: response?.message || "Failed to load campaign character state",
+                };
             }
+
+            const nextState = {
+                assignments: Array.isArray(response.assignments)
+                    ? response.assignments
+                    : Array.isArray(response.campaign?.characterAssignments)
+                    ? response.campaign.characterAssignments
+                    : [],
+                availableCharacters: Array.isArray(response.availableCharacters)
+                    ? response.availableCharacters
+                    : [],
+                allCharactersByPlayer: Array.isArray(response.allCharactersByPlayer)
+                    ? response.allCharactersByPlayer
+                    : [],
+                canManageAllCharacters: Boolean(response.canManageAllCharacters),
+            };
 
             setCharacterStateByCampaign((prev) => ({
                 ...prev,
-                [campaignID]: {
-                    assignments: Array.isArray(response.assignments)
-                        ? response.assignments
-                        : Array.isArray(response.campaign?.characterAssignments)
-                        ? response.campaign.characterAssignments
-                        : [],
-                    availableCharacters: Array.isArray(response.availableCharacters)
-                        ? response.availableCharacters
-                        : [],
-                    allCharactersByPlayer: Array.isArray(response.allCharactersByPlayer)
-                        ? response.allCharactersByPlayer
-                        : [],
-                    canManageAllCharacters: Boolean(response.canManageAllCharacters),
-                },
+                [campaignID]: nextState,
             }));
 
-            return true;
+            return { success: true, state: nextState };
         },
         [socket, playerID]
     );
@@ -349,13 +357,61 @@ function LobbyMenu() {
     );
 
     const openCharacterPickerForCampaign = useCallback(
-        (campaign) => {
+        async (campaign) => {
             const campaignID = campaign?._id;
-            if (!campaignID) return;
+            if (!campaignID || !playerID) return;
 
-            const availableCharacters = getAvailableCharactersForCampaign(campaignID);
+            let availableCharacters = getAvailableCharactersForCampaign(campaignID);
+
             if (!availableCharacters.length) {
-                setError("Create a character before entering this lobby.");
+                const refreshResult = await refreshCampaignCharacterState(campaignID);
+                if (refreshResult?.success) {
+                    availableCharacters = Array.isArray(refreshResult.state?.availableCharacters)
+                        ? refreshResult.state.availableCharacters
+                        : [];
+                }
+            }
+
+            if (!availableCharacters.length) {
+                const fallbackResponse = await emitWithAck(socket, "playerData_getCharacter", {
+                    playerID,
+                });
+                if (fallbackResponse?.success && Array.isArray(fallbackResponse.characters)) {
+                    availableCharacters = fallbackResponse.characters
+                        .map((character) => {
+                            const characterID = toID(character?._id || character?.id);
+                            if (!characterID) return null;
+                            return {
+                                _id: characterID,
+                                name: character?.name || "Unnamed Character",
+                                level: Number(character?.level) || 1,
+                                playerId: toID(playerID),
+                            };
+                        })
+                        .filter(Boolean);
+
+                    if (availableCharacters.length) {
+                        setCharacterStateByCampaign((prev) => ({
+                            ...prev,
+                            [campaignID]: {
+                                assignments: Array.isArray(prev?.[campaignID]?.assignments)
+                                    ? prev[campaignID].assignments
+                                    : Array.isArray(campaign?.characterAssignments)
+                                    ? campaign.characterAssignments
+                                    : [],
+                                availableCharacters,
+                                allCharactersByPlayer: Array.isArray(prev?.[campaignID]?.allCharactersByPlayer)
+                                    ? prev[campaignID].allCharactersByPlayer
+                                    : [],
+                                canManageAllCharacters: Boolean(prev?.[campaignID]?.canManageAllCharacters),
+                            },
+                        }));
+                    }
+                }
+            }
+
+            if (!availableCharacters.length) {
+                setError("No characters found for your account. Create or re-save one, then try again.");
                 return;
             }
 
@@ -365,6 +421,7 @@ function LobbyMenu() {
                 return;
             }
 
+            setError("");
             setCharacterPickerState({
                 isOpen: true,
                 campaignID,
@@ -373,11 +430,16 @@ function LobbyMenu() {
                 submitting: false,
             });
         },
-        [getAvailableCharactersForCampaign]
+        [
+            playerID,
+            getAvailableCharactersForCampaign,
+            refreshCampaignCharacterState,
+            socket,
+        ]
     );
 
     const handleEnterLobbyRequest = useCallback(
-        (campaign) => {
+        async (campaign) => {
             const campaignID = campaign?._id;
             if (!campaignID || !playerID) return;
 
@@ -393,7 +455,7 @@ function LobbyMenu() {
             );
 
             if (!isCampaignDM(campaign) && !hasSelectedCharacter) {
-                openCharacterPickerForCampaign(campaign);
+                await openCharacterPickerForCampaign(campaign);
                 return;
             }
 

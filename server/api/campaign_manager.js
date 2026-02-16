@@ -613,9 +613,19 @@ module.exports = (socket) => {
                 });
             }
 
-            const availableCharacters = await Character.find({ playerId: playerID })
+            let availableCharacters = await Character.find({ playerId: playerID })
                 .select("_id name level playerId")
                 .sort({ updatedAt: -1, createdAt: -1 });
+
+            if (!availableCharacters.length) {
+                const playerWithCharacters = await Player.findById(playerID)
+                    .select("_id characters")
+                    .populate({ path: "characters", select: "_id name level playerId" });
+
+                if (playerWithCharacters && Array.isArray(playerWithCharacters.characters)) {
+                    availableCharacters = playerWithCharacters.characters;
+                }
+            }
             const formattedCampaign = formatCampaign(campaign);
 
             const isDM = isCampaignDM(campaign, playerID);
@@ -750,11 +760,24 @@ module.exports = (socket) => {
                 return respond({ success: false, message: "Character not found" });
             }
 
-            if (String(character.playerId) !== String(playerID)) {
+            let characterOwnedByPlayer = String(character.playerId) === String(playerID);
+            if (!characterOwnedByPlayer) {
+                const linkedToPlayer = await Player.exists({
+                    _id: playerID,
+                    characters: character._id,
+                });
+                characterOwnedByPlayer = Boolean(linkedToPlayer);
+            }
+
+            if (!characterOwnedByPlayer) {
                 return respond({
                     success: false,
                     message: "You can only assign your own character to this lobby",
                 });
+            }
+
+            if (String(character.playerId || "") !== String(playerID)) {
+                await Character.updateOne({ _id: character._id }, { $set: { playerId: playerID } });
             }
 
             const nextAssignments = Array.isArray(campaign.characterAssignments)
