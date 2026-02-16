@@ -1,11 +1,39 @@
-import { User, Settings, ShieldCheck, LogOut, TreasureChest, Star } from 'lucide-react';
+import { useContext } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { User, Settings, ShieldCheck, LogOut, Star } from 'lucide-react';
+import { SocketContext } from "../socket.io/context";
 
 export default function Header_PFP() {
+  const socket = useContext(SocketContext);
+  const navigate = useNavigate();
+  const sessionID = sessionStorage.getItem("session_ID");
+  const isAdmin = sessionStorage.getItem("adminPermission") === "true";
+  const displayName = localStorage.getItem("player_username") || "Adventurer";
+
   const user = {
-    name: "Eldrin the Wise",
-    role: "Dungeon Master",
-    level: 12,
-    avatarUrl: null, // Fallback to initials
+    name: displayName,
+    role: isAdmin ? "Administrator" : "Player",
+    level: isAdmin ? 99 : 1,
+    avatarUrl: null,
+  };
+
+  const sessionRoute = (path) => {
+    if (!sessionID) return "/login";
+    return `/ISK/${sessionID}${path}`;
+  };
+
+  const handleSignOut = () => {
+    const playerID = localStorage.getItem("player_ID");
+    if (playerID) {
+      socket.emit("playerData_logOff", { playerID });
+    }
+
+    localStorage.removeItem("player_ID");
+    localStorage.removeItem("player_username");
+    sessionStorage.removeItem("session_ID");
+    sessionStorage.removeItem("adminPermission");
+    sessionStorage.removeItem("lastLocation");
+    navigate("/login");
   };
 
   const actionLink = "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 hover:bg-website-default-800 group";
@@ -20,7 +48,7 @@ export default function Header_PFP() {
               {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt="avatar" className="rounded-full" />
               ) : (
-                user.name.charAt(0)
+                user.name.charAt(0).toUpperCase()
               )}
             </div>
           </div>
@@ -52,25 +80,34 @@ export default function Header_PFP() {
 
       {/* Action List */}
       <nav className="flex flex-col space-y-1 mb-6">
-        <a href="/profile" className={actionLink}>
+        <Link to={sessionRoute("/home")} className={actionLink}>
           <User size={18} className="text-website-neutral-500 group-hover:text-website-specials-500" />
           <span className="text-website-neutral-200 group-hover:text-website-neutral-50">Public Profile</span>
-        </a>
-        <a href="/security" className={actionLink}>
+        </Link>
+        <Link to={sessionRoute("/lobby")} className={actionLink}>
           <ShieldCheck size={18} className="text-website-neutral-500 group-hover:text-website-specials-500" />
           <span className="text-website-neutral-200 group-hover:text-website-neutral-50">Security</span>
-        </a>
-        <a href="/settings" className={actionLink}>
+        </Link>
+        <Link to={sessionRoute("/settings")} className={actionLink}>
           <Settings size={18} className="text-website-neutral-500 group-hover:text-website-specials-500" />
           <span className="text-website-neutral-200 group-hover:text-website-neutral-50">Settings</span>
-        </a>
+        </Link>
       </nav>
 
       {/* Footer Button */}
-      <button className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-website-specials-500 hover:bg-website-specials-600 text-white text-xs font-bold uppercase tracking-widest transition-colors shadow-lg shadow-website-specials-900/20">
+      <button
+        type="button"
+        onClick={handleSignOut}
+        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-website-specials-500 hover:bg-website-specials-600 text-white text-xs font-bold uppercase tracking-widest transition-colors shadow-lg shadow-website-specials-900/20"
+      >
         <LogOut size={14} />
         Sign Out
       </button>
+
+      <p className="mt-3 text-[10px] text-website-neutral-500 text-center uppercase tracking-widest flex items-center justify-center gap-1">
+        <Star className="size-3" />
+        Session Active
+      </p>
     </div>
   );
 }

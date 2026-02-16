@@ -1,10 +1,25 @@
 import { useNavigate } from 'react-router-dom';
 import getImage from '../handlers/getImage';
 
+const GITHUB_URL = "https://github.com/Yisong-Lin-Coding/DnM";
+
 function StartScreen() {
   const navigate = useNavigate();
   const handleStart = () => {
     navigate(`/login`);
+  };
+
+  const handleSettings = () => {
+    navigate(`/settings`);
+  };
+
+  const handleExit = () => {
+    localStorage.removeItem("player_ID");
+    localStorage.removeItem("player_username");
+    sessionStorage.removeItem("session_ID");
+    sessionStorage.removeItem("adminPermission");
+    sessionStorage.removeItem("lastLocation");
+    window.location.assign(GITHUB_URL);
   };
 
   return (
@@ -25,8 +40,8 @@ function StartScreen() {
 
         <div className="col-start-2 self-start w-[40%] mx-auto h-[55%] flex flex-col justify-between items-center p-5 space-y-4 rounded-lg bg-black/55 text-lg"> 
           <button onClick={handleStart}>Start</button> 
-          <button>Settings</button> 
-          <button>Exit</button>
+          <button onClick={handleSettings}>Settings</button> 
+          <button onClick={handleExit}>Exit</button>
         </div>
       </div>
     </div>

@@ -138,6 +138,13 @@ export default function CharacterMenu() {
         navigate(`/ISK/${sessionID}/character/view/${characterID}`);
     };
 
+    const handleEditCharacter = (characterID) => {
+        if (!characterID) return;
+        closeContextMenu();
+        const sessionID = sessionStorage.getItem("session_ID") || "default";
+        navigate(`/ISK/${sessionID}/character/edit/${characterID}`);
+    };
+
 useEffect(() => {
     if (!socket || !playerID) {
         setLoading(false);
@@ -255,7 +262,7 @@ useEffect(() => {
 
                         {/* Action: Edit */}
                         <button 
-                            onClick={() => console.log("Edit", contextMenu.character.id)}
+                            onClick={() => handleEditCharacter(contextMenu.character?.id)}
                             className="w-full flex items-center px-4 py-2.5 text-website-default-100 hover:bg-website-default-700 transition-all duration-150 group"
                         >
                             <Edit2 className="size-4 mr-3 text-website-default-400 group-hover:text-website-default-100" />

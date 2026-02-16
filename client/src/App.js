@@ -1,4 +1,3 @@
-import logo from './logo.svg';
 import './App.css';
 import { HashRouter  as Router, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './handlers/protectedRoutes';
@@ -10,6 +9,8 @@ import HomePage from './pages/homePage';
 import SignUp from './pages/signUp';
 import Test from './pages/test'
 import Test2 from './pages/test2'
+import Setting from './pages/setting';
+import LoreMenu from './pages/lore/loreMenu';
 import GameComponent from './pages/game/game'
 import LobbyLayout from './pages/campaign/lobbyLayout';
 import LobbyMenu from './pages/campaign/campaignMenu';
@@ -107,10 +108,14 @@ function App() {
           <Route path="/" element={<StartScreen />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
+          <Route path="/settings" element={<Setting />} />
           <Route path="/test" element={<Test />} />
           <Route path="/test2" element={<Test2 />} />
           <Route path="/ISK/:sessionID" element={<ProtectedRoute />}> 
             <Route path="home" element={<HomePage />} />
+            <Route path="settings" element={<Setting />} />
+            <Route path="lore" element={<LoreMenu />} />
+            <Route path="lore/:topic" element={<LoreMenu />} />
 
             <Route path="character">
               <Route index element={<CharacterMenu />}/>

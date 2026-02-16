@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { SocketContext } from '../socket.io/context';
 import getImage from "../handlers/getImage";
 
+const GITHUB_URL = "https://github.com/Yisong-Lin-Coding/DnM";
+const LINKEDIN_URL = "https://www.linkedin.com/in/yisong-lin-8605a3357/";
 
 function Login() {
     const socket = useContext(SocketContext);
@@ -34,36 +36,46 @@ function Login() {
     }, [socket]);
 
     function handleLogin() {
-        
-            socket.emit("login", { username, password }, (response) => {
-                if (response.success) {
-                    console.log("Login successful, user ID:", response.userID);
-                    localStorage.setItem("player_ID", response.userID.toString());
-                    console.log(localStorage.getItem("player_ID"));
-                    socket.emit("playerData_logOn", { playerID: localStorage.getItem("player_ID") });
+        const cleanUsername = username.trim();
+        if (!cleanUsername || !password) {
+            alert("Please provide both username and password.");
+            return;
+        }
 
-                    const playerID = response.userID.toString()
-                    const sessionID = sessionStorage.getItem("session_ID")
-                    socket.emit("login_tokenSave",{ playerID , sessionID}, (response) =>{
-                        console.log(response.message)
-                    })
+        socket.emit("login", { username: cleanUsername, password }, (response) => {
+            if (!response?.success) {
+                const errorMessage = response?.error || response?.message || "Login failed. Please try again.";
+                console.log(`Login failed: ${errorMessage}`);
+                alert(errorMessage);
+                return;
+            }
 
-                    waitForSessionID().then((resolvedSessionID) => {
-                        if (!resolvedSessionID) {
-                            alert("Unable to establish a session. Please try again.");
-                            return;
-                        }
-                        navigate(`/ISK/${resolvedSessionID}/home`);
-                    });
-                } 
-                else {
-                    console.log(`Login Failed: ${response.message}`)
-                    alert (`login failed\nPlease Try Again`)
+            const playerID = String(response.userID || response.userId || "").trim();
+            if (!playerID) {
+                alert("Login failed: missing user ID.");
+                return;
+            }
+
+            localStorage.setItem("player_ID", playerID);
+            localStorage.setItem("player_username", cleanUsername);
+
+            waitForSessionID().then((resolvedSessionID) => {
+                if (!resolvedSessionID) {
+                    alert("Unable to establish a session. Please try again.");
+                    return;
                 }
-            })
-        
 
-        
+                socket.emit("login_tokenSave", { playerID, sessionID: resolvedSessionID }, (tokenResponse) => {
+                    if (!tokenResponse?.success) {
+                        alert(tokenResponse?.error || "Unable to save login session.");
+                        return;
+                    }
+
+                    socket.emit("playerData_logOn", { playerID });
+                    navigate(`/ISK/${resolvedSessionID}/home`);
+                });
+            });
+        });
     }
 
 useEffect(() => {
@@ -93,8 +105,10 @@ useEffect(() => {
                     }
                 } 
                 else {
-                    console.log(response.error || response.message);
-                    console.log("Error with autologin")
+                    console.log(response?.error || response?.message || "Autologin failed");
+                    localStorage.removeItem("player_ID");
+                    localStorage.removeItem("player_username");
+                    sessionStorage.removeItem("lastLocation");
                 }
             });
         });
@@ -160,11 +174,11 @@ return(
                 </div>
                 <div>|</div>
                 <div>
-                    <Link>About</Link>
+                    <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer">About</a>
                 </div>
                 <div>|</div>
                 <div>
-                    <Link>Github</Link>
+                    <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">Github</a>
                 </div>
             </div>
         </div>

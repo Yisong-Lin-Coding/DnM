@@ -1,8 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState, useContext } from "react";
+import { useState, useContext, useCallback } from "react";
 import { SocketContext } from '../socket.io/context';
 import getImage from '../handlers/getImage';
 
+const GITHUB_URL = "https://github.com/Yisong-Lin-Coding/DnM";
+const LINKEDIN_URL = "https://www.linkedin.com/in/yisong-lin-8605a3357/";
 
   const SignupScreen = () =>{
 
@@ -12,22 +14,70 @@ import getImage from '../handlers/getImage';
     const socket = useContext(SocketContext);
     const navigate = useNavigate();
 
-     
-    const Signup = () => {
-    
-      console.log("Attempting to sign up with username:", username);
-      console.log("Attempting to sign up with password:", password);
+    const waitForSessionID = useCallback((timeoutMs = 5000, intervalMs = 50) => {
+      return new Promise((resolve) => {
+        const startedAt = Date.now();
 
-    socket.emit("signup", { username, password }, (response) => {
-      if (response.success == true) {
-        console.log("Signup successful, user ID:", response.userId);
-        navigate(`/ISK/${sessionStorage.getItem("session_ID")}/home`);
-      } else {
-        console.error("Signup failed:", response.error);
-        alert("Signup failed: " + response.error);
+        const poll = () => {
+          const sessionID = sessionStorage.getItem("session_ID") || socket?.id || null;
+          if (sessionID) {
+            resolve(sessionID);
+            return;
+          }
+
+          if (Date.now() - startedAt >= timeoutMs) {
+            resolve(null);
+            return;
+          }
+
+          setTimeout(poll, intervalMs);
+        };
+
+        poll();
+      });
+    }, [socket]);
+
+    const Signup = () => {
+      const cleanUsername = username.trim();
+      if (!cleanUsername || !password) {
+        alert("Please provide both username and password.");
+        return;
       }
-    });
-  }
+
+      waitForSessionID().then((resolvedSessionID) => {
+        if (!resolvedSessionID) {
+          alert("Unable to establish a session. Please refresh and try again.");
+          return;
+        }
+
+        socket.emit("signup", { username: cleanUsername, password, sessionID: resolvedSessionID }, (response) => {
+          if (!response?.success) {
+            console.error("Signup failed:", response?.error);
+            alert("Signup failed: " + (response?.error || "Unknown error"));
+            return;
+          }
+
+          const playerID = String(response.userID || response.userId || "").trim();
+          if (!playerID) {
+            alert("Signup failed: missing user ID.");
+            return;
+          }
+
+          localStorage.setItem("player_ID", playerID);
+          localStorage.setItem("player_username", cleanUsername);
+
+          socket.emit("login_tokenSave", { playerID, sessionID: resolvedSessionID }, (tokenResponse) => {
+            if (!tokenResponse?.success) {
+              alert(tokenResponse?.error || "Unable to save login session.");
+              return;
+            }
+
+            socket.emit("playerData_logOn", { playerID });
+            navigate(`/ISK/${resolvedSessionID}/home`);
+          });
+        });
+      });
+    }
 
 
   
@@ -85,11 +135,11 @@ import getImage from '../handlers/getImage';
                 </div>
                 <div>|</div>
                 <div>
-                    <Link>About</Link>
+                    <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer">About</a>
                 </div>
                 <div>|</div>
                 <div>
-                    <Link>Github</Link>
+                    <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">Github</a>
                 </div>
             </div>
         </div>
