@@ -130,6 +130,66 @@ const readCampaignForResponse = async (campaignID) =>
         .lean();
 
 module.exports = (socket) => {
+    socket.on("campaign_getGameContext", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID)
+                .populate({ path: "dmId", select: "_id username" })
+                .populate({ path: "players", select: "_id username" });
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can access this game",
+                });
+            }
+
+            let activeGameSave = null;
+            let snapshot = {};
+            if (campaign.activeGameSave && mongoose.isValidObjectId(campaign.activeGameSave)) {
+                const saveDoc = await GameSave.findOne({
+                    _id: campaign.activeGameSave,
+                    campaignId: campaign._id,
+                });
+                if (saveDoc) {
+                    activeGameSave = formatGameSave(saveDoc);
+                    snapshot = toPlainObject(saveDoc.snapshot);
+                }
+            }
+
+            const isDM = String(campaign.dmId?._id || campaign.dmId) === String(playerID);
+
+            respond({
+                success: true,
+                campaign: formatCampaign(campaign),
+                permissions: {
+                    isDM,
+                    canEditWorld: isDM,
+                },
+                activeGameSave,
+                snapshot,
+            });
+        } catch (error) {
+            console.error("[campaign_getGameContext] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to load game context",
+            });
+        }
+    });
+
     socket.on("campaign_list", async (data, callback) => {
         const respond = safeCallback(callback);
         const { playerID } = data || {};

@@ -4,15 +4,18 @@ export const gridlayer = {
   id: "grid",
 
   shouldRedraw(state, prevState) {
-    if (!prevState) return true;
-    const c = state.camera;
-    const p = prevState.camera;
+    const c = state?.camera;
+    const p = prevState?.camera;
+    if (!c || !p) return true;
 
     return c.x !== p.x || c.y !== p.y || c.zoom !== p.zoom;
   },
 
   draw(ctx, canvas, state) {
     const { camera } = state;
+    if (!camera || !canvas || canvas.width === 0 || canvas.height === 0) {
+      return;
+    }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = "#7F807E";

@@ -2,11 +2,10 @@ export const mapObjectsLayer = {
   id: "mapObjects",
 
   shouldRedraw(state, prevState) {
-    if (!prevState) return true;
-    
     // Redraw if camera moved or objects changed
-    const c = state.camera;
-    const p = prevState.camera;
+    const c = state?.camera;
+    const p = prevState?.camera;
+    if (!c || !p) return true;
     
     return (
       c.x !== p.x ||
@@ -18,6 +17,10 @@ export const mapObjectsLayer = {
 
   draw(ctx, canvas, state) {
     const { camera, mapObjects = [] } = state;
+
+    if (!camera || !canvas || canvas.width === 0 || canvas.height === 0) {
+      return;
+    }
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     

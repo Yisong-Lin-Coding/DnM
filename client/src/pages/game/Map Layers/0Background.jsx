@@ -2,9 +2,9 @@ export const backgroundLayer = {
   id: "background",
 
   shouldRedraw(state, prevState) {
-    if (!prevState) return true;
-    const c = state.camera;
-    const p = prevState.camera;
+    const c = state?.camera;
+    const p = prevState?.camera;
+    if (!c || !p) return true;
 
     // Redraw if image changes or camera moves/zooms
     return (
@@ -19,7 +19,7 @@ export const backgroundLayer = {
     const { bgImage, camera } = state;
 
     // Skip if no image or canvas
-    if (!bgImage || !canvas || canvas.width === 0 || canvas.height === 0) {
+    if (!bgImage || !camera || !canvas || canvas.width === 0 || canvas.height === 0) {
       return;
     }
 

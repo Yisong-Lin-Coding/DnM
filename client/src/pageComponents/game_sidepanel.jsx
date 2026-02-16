@@ -6,6 +6,8 @@ import Admin from "./gamesidepanel/admin";
 import MapEditor from "./gamesidepanel/mapeditor";
 
 export default function GameSidePanel() {
+  const { isDM } = useGame();
+
   return (
     <Tabs className="h-full grid grid-rows-[auto_1fr] border-l border-website-specials-500 bg-website-default-700 text-website-default-100">
       {/* Navigation - Fixed height, scrolls horizontally if needed */}
@@ -34,12 +36,16 @@ export default function GameSidePanel() {
         <Tabs.Tab label="Settings" index={7}>
           <Settings2 />
         </Tabs.Tab>
-        <Tabs.Tab label="Admin" index={8}>
-          <Wrench />
-        </Tabs.Tab>
-        <Tabs.Tab label="MapEditor" index={9}>
-          <Map />
-        </Tabs.Tab>
+        {isDM && (
+          <Tabs.Tab label="Admin" index={8}>
+            <Wrench />
+          </Tabs.Tab>
+        )}
+        {isDM && (
+          <Tabs.Tab label="MapEditor" index={9}>
+            <Map />
+          </Tabs.Tab>
+        )}
       </Tabs.Nav>
 
       {/* Panels - Takes remaining space, each panel scrolls independently */}
@@ -100,13 +106,17 @@ export default function GameSidePanel() {
           </div>
         </Tabs.Panel>
 
-        <Tabs.Panel label="Admin" index={8} className="h-full overflow-y-auto">
-          <Admin />
-        </Tabs.Panel>
+        {isDM && (
+          <Tabs.Panel label="Admin" index={8} className="h-full overflow-y-auto">
+            <Admin />
+          </Tabs.Panel>
+        )}
 
-        <Tabs.Panel label="MapEditor" index={9} className="h-full overflow-y-auto">
-          <MapEditor />
-        </Tabs.Panel>
+        {isDM && (
+          <Tabs.Panel label="MapEditor" index={9} className="h-full overflow-y-auto">
+            <MapEditor />
+          </Tabs.Panel>
+        )}
       </Tabs.Panels>
     </Tabs>
   );

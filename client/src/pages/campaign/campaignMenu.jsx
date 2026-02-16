@@ -263,7 +263,10 @@ function LobbyMenu() {
                             const activeSaveID = activeSaveMap[campaignID] || campaign.activeGameSave || "";
 
                             return (
-                                <IndexCardFolder.File key={campaignID} className="min-h-[480px]">
+                                <IndexCardFolder.File
+                                    key={campaignID}
+                                    className="!aspect-auto min-h-[520px] !grid-rows-[auto_auto_1fr] hover:!scale-100 hover:!translate-y-0"
+                                >
                                     <IndexCardFolder.File.Top>
                                         <div className="flex items-start justify-between gap-3">
                                             <IndexCardFolder.File.Title className="mb-0">
@@ -408,7 +411,10 @@ function LobbyMenu() {
                             );
                         })}
 
-                    <IndexCardFolder.File to={`/ISK/${safeSessionID}/lobby/create`}>
+                    <IndexCardFolder.File
+                        to={`/ISK/${safeSessionID}/lobby/create`}
+                        className="!aspect-auto min-h-[520px] !grid-rows-[auto_auto_1fr] hover:!scale-100 hover:!translate-y-0"
+                    >
                         <IndexCardFolder.File.Bottom className="justify-center">
                             <div className="text-3xl text-website-specials-400">+</div>
                             <IndexCardFolder.File.Detail className="mt-3 text-center text-sm">
