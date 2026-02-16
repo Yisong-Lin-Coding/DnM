@@ -412,11 +412,13 @@ function LobbyMenu() {
 
             setInviteUsernameByCampaign((prev) => ({ ...prev, [campaignID]: "" }));
             const invitedName = response?.invitedPlayer?.username || username;
-            setStatus(
-                response?.alreadyMember
-                    ? `${invitedName} is already in this campaign.`
-                    : `Invited ${invitedName}.`
-            );
+            if (response?.alreadyMember) {
+                setStatus(`${invitedName} is already in this campaign.`);
+            } else if (response?.alreadyInvited) {
+                setStatus(`${invitedName} already has a pending invite.`);
+            } else {
+                setStatus(`Invite sent to ${invitedName}.`);
+            }
             if (upsertCampaignFromResponse(response.campaign)) {
                 return;
             }

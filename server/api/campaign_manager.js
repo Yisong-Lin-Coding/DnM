@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Campaign = require("../data/mongooseDataStructure/campaign");
 const GameSave = require("../data/mongooseDataStructure/gameSave");
 const Player = require("../data/mongooseDataStructure/player");
+const Messages = require("../data/mongooseDataStructure/messages");
 
 const MIN_ALLOWED_PLAYERS = 2;
 const MAX_ALLOWED_PLAYERS = 12;
@@ -665,7 +666,7 @@ module.exports = (socket) => {
             }
 
             const campaign = await Campaign.findById(campaignID).select(
-                "_id dmId players bannedPlayers maxPlayers activeLobby"
+                "_id name description joinCode dmId players bannedPlayers maxPlayers"
             );
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
@@ -678,11 +679,20 @@ module.exports = (socket) => {
                 });
             }
 
-            const invitee = await Player.findOne({ username }).select("_id username");
+            const [invitee, sender] = await Promise.all([
+                Player.findOne({ username }).select("_id username"),
+                Player.findById(playerID).select("_id username"),
+            ]);
             if (!invitee) {
                 return respond({
                     success: false,
                     message: "Player not found for that username",
+                });
+            }
+            if (!sender) {
+                return respond({
+                    success: false,
+                    message: "Inviting player not found",
                 });
             }
 
@@ -714,31 +724,50 @@ module.exports = (socket) => {
                 });
             }
 
-            if ((campaign.players || []).length >= campaign.maxPlayers) {
+            const pendingInvite = await Messages.findOne({
+                kind: "campaign_invite",
+                to: invitee._id,
+                status: "pending",
+                "payload.campaignID": String(campaign._id),
+            }).select("_id");
+
+            if (pendingInvite) {
                 return respond({
-                    success: false,
-                    message: "This campaign is full",
+                    success: true,
+                    alreadyInvited: true,
+                    invitedPlayer: {
+                        _id: inviteeID,
+                        username: invitee.username || username,
+                    },
+                    messageID: String(pendingInvite._id),
                 });
             }
 
-            campaign.players.addToSet(invitee._id);
-            if (campaign.activeLobby?.isActive) {
-                campaign.activeLobby.members.addToSet(invitee._id);
-            }
-            await campaign.save();
-
-            await Player.findByIdAndUpdate(invitee._id, {
-                $addToSet: { campaigns: campaign._id },
+            const createdInvite = await Messages.create({
+                from: sender._id,
+                to: [invitee._id],
+                kind: "campaign_invite",
+                subject: `Campaign Invite: ${campaign.name || "Campaign"}`,
+                message: `${sender.username || "DM"} invited you to join "${campaign.name || "a campaign"}".`,
+                payload: {
+                    campaignID: String(campaign._id),
+                    campaignName: campaign.name || "Campaign",
+                    campaignJoinCode: campaign.joinCode || "",
+                    invitedByID: String(sender._id),
+                    invitedByName: sender.username || "",
+                },
+                status: "pending",
+                readBy: [],
             });
 
-            const campaignForClient = await readCampaignForResponse(campaign._id);
             respond({
                 success: true,
-                campaign: formatCampaign(campaignForClient),
+                inviteSent: true,
                 invitedPlayer: {
                     _id: inviteeID,
                     username: invitee.username || username,
                 },
+                messageID: String(createdInvite._id),
             });
         } catch (error) {
             console.error("[campaign_invitePlayer] failed", error);

@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import Header_Menu from "./header_menu";
 import Header_Mail from "./header_mail";
 import Header_PFP from "./header_pfp";
 import { Menu, Mail, CircleUserRound, X } from 'lucide-react';
+import { SocketContext } from "../socket.io/context";
+import { emitWithAck } from "../pages/campaign/socketEmit";
 
 export default function Header({ className = "", title }) {
+  const socket = useContext(SocketContext);
   const [openPanel, setOpenPanel] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const locate = useLocation();
   const headerRef = useRef(null);
 
@@ -17,6 +21,18 @@ export default function Header({ className = "", title }) {
   const togglePanel = (panel) => {
     setOpenPanel((prev) => (prev === panel ? null : panel));
   };
+
+  const refreshUnreadCount = useCallback(async () => {
+    const playerID = localStorage.getItem("player_ID");
+    if (!socket || !playerID) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const response = await emitWithAck(socket, "mail_call", { playerID });
+    if (!response?.success) return;
+    setUnreadCount(Number(response?.unreadCount) || 0);
+  }, [socket]);
 
   useEffect(() => {
     function onDocMouseDown(e) {
@@ -39,6 +55,23 @@ export default function Header({ className = "", title }) {
   useEffect(() => {
     setOpenPanel(null);
   }, [locate.key]);
+
+  useEffect(() => {
+    refreshUnreadCount();
+  }, [refreshUnreadCount, locate.key]);
+
+  useEffect(() => {
+    if (!isMailOpen) return;
+    refreshUnreadCount();
+  }, [isMailOpen, refreshUnreadCount]);
+
+  useEffect(() => {
+    const onMailboxUpdated = () => {
+      refreshUnreadCount();
+    };
+    window.addEventListener("mailbox:updated", onMailboxUpdated);
+    return () => window.removeEventListener("mailbox:updated", onMailboxUpdated);
+  }, [refreshUnreadCount]);
 
   const pageTitle = useMemo(() => {
     const path = locate?.pathname || "/";
@@ -103,12 +136,14 @@ export default function Header({ className = "", title }) {
           >
             <div className="relative">
               <Mail size={24} />
-              <span className="absolute -top-2 -right-2 flex h-4 w-4">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-website-specials-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-4 w-4 bg-website-specials-500 text-[10px] items-center justify-center font-bold">
-                  9
+              {unreadCount > 0 && (
+                <span className="absolute -top-2 -right-2 flex h-4 min-w-4 px-1">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-website-specials-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 min-w-4 px-1 bg-website-specials-500 text-[10px] items-center justify-center font-bold">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
                 </span>
-              </span>
+              )}
             </div>
           </button>
 
