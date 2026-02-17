@@ -14,20 +14,20 @@ const LIGHT_RANGE_MAX = 5000;
 
 const DEFAULT_LIGHTING = {
     enabled: true,
-    ambient: 0.3,
+    ambient: 0.24,
     shadowEnabled: true,
-    shadowStrength: 0.72,
+    shadowStrength: 0.62,
     shadowSoftness: 0.55,
-    shadowLength: 0.8,
-    shadowBlend: 0.6,
+    shadowLength: 0.9,
+    shadowBlend: 0.68,
     sources: [
         {
             id: "sun",
             name: "Sun",
             type: "directional",
             enabled: true,
-            x: 0.22,
-            y: -0.78,
+            x: 0,
+            y: 0,
             intensity: 0.8,
             blend: 0.7,
             color: "#ffffff",
@@ -45,6 +45,12 @@ const DEFAULT_FLOOR_TYPE_BY_TERRAIN = {
     floor: "stoneFloor",
     wall: "stoneWall",
     obstacle: "woodenCrate",
+};
+
+const DEFAULT_ELEVATION_HEIGHT_BY_TERRAIN = {
+    floor: 0,
+    wall: 150,
+    obstacle: 80,
 };
 
 const toNumber = (value, fallback = 0) => {
@@ -219,13 +225,16 @@ const normalizeFloorTypeCollection = (input = []) => {
 const getMaxObjectId = (objects = []) =>
     objects.reduce((max, obj) => Math.max(max, Math.round(toNumber(obj?.id, 0))), 0);
 
-const resolveElevationInput = (raw = {}, type = "circle") => {
+const resolveElevationInput = (raw = {}, type = "circle", terrainType = "obstacle") => {
     if (raw?.elevationHeight != null) return raw.elevationHeight;
     if (raw?.height3D != null) return raw.height3D;
     if (raw?.objectHeight != null) return raw.objectHeight;
     if (raw?.shadowHeight != null) return raw.shadowHeight;
     if (type !== "rect" && raw?.height != null) return raw.height;
-    return 0;
+    return (
+        DEFAULT_ELEVATION_HEIGHT_BY_TERRAIN[terrainType] ??
+        DEFAULT_ELEVATION_HEIGHT_BY_TERRAIN.obstacle
+    );
 };
 
 const normalizeMapObject = (raw = {}, fallbackId = 1) => {
@@ -259,7 +268,9 @@ const normalizeMapObject = (raw = {}, fallbackId = 1) => {
         y: Math.round(toNumber(raw.y, 0)),
         z: Math.round(toNumber(raw.z, 0)),
         color: normalizeHexColor(raw.color),
-        elevationHeight: Math.round(toNonNegativeNumber(resolveElevationInput(raw, type), 0)),
+        elevationHeight: Math.round(
+            toNonNegativeNumber(resolveElevationInput(raw, type, terrainType), 0)
+        ),
         maxHP,
         hp,
         hitbox: {

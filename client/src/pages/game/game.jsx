@@ -29,8 +29,8 @@ const LIGHT_CONTROL_OUTER_SIZE = 92;
 const LIGHT_CONTROL_INNER_MARGIN = 12;
 const LIGHT_CONTROL_KNOB_SIZE = 16;
 const LIGHT_CONTROL_CENTER_DEADZONE = 0.14;
-const RESIZE_HANDLE_HIT_RADIUS_PX = 11;
-const HEIGHT_HANDLE_OFFSET_PX = 28;
+const RESIZE_HANDLE_HIT_RADIUS_PX = 15;
+const HEIGHT_HANDLE_OFFSET_PX = 32;
 
 const DEFAULT_MAX_HP_BY_TERRAIN = {
     floor: 500,
@@ -672,7 +672,15 @@ function GameComponent() {
     );
 
     const lightingSource = useMemo(() => {
-        const source = lighting?.source;
+        const directionalFromSources = Array.isArray(lighting?.sources)
+            ? lighting.sources.find(
+                  (source) =>
+                      source &&
+                      String(source?.type || "").toLowerCase() === "directional" &&
+                      source.enabled !== false
+              )
+            : null;
+        const source = directionalFromSources || lighting?.source || lighting || {};
         const x = Number(source?.x) || 0;
         const y = Number(source?.y) || 0;
         const magnitude = Math.hypot(x, y);
@@ -1704,6 +1712,81 @@ function GameComponent() {
                                       Number(obj?.maxHP) || 0
                                   )}`}
                         </p>
+                        {isDM && (
+                            <div className="mt-2 pt-2 border-t border-slate-700 space-y-2">
+                                <div className="grid grid-cols-2 gap-2 items-center">
+                                    <label className="text-[11px] text-slate-300">Object Height</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={Math.round(Number(obj?.elevationHeight) || 0)}
+                                        onChange={(event) =>
+                                            updateMapObject(obj.id, {
+                                                elevationHeight: Math.max(
+                                                    0,
+                                                    Number(event.target.value) || 0
+                                                ),
+                                            })
+                                        }
+                                        className="w-full rounded bg-slate-800 border border-slate-600 px-2 py-1 text-xs text-slate-100"
+                                    />
+                                </div>
+                                {String(obj?.type || "").toLowerCase() === "rect" ? (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input
+                                            type="number"
+                                            min={MIN_RECT_WORLD_SIZE}
+                                            value={Math.round(Number(obj?.width) || 0)}
+                                            onChange={(event) =>
+                                                updateMapObject(obj.id, {
+                                                    width: Math.max(
+                                                        MIN_RECT_WORLD_SIZE,
+                                                        Number(event.target.value) || 0
+                                                    ),
+                                                })
+                                            }
+                                            className="w-full rounded bg-slate-800 border border-slate-600 px-2 py-1 text-xs text-slate-100"
+                                        />
+                                        <input
+                                            type="number"
+                                            min={MIN_RECT_WORLD_SIZE}
+                                            value={Math.round(Number(obj?.height) || 0)}
+                                            onChange={(event) =>
+                                                updateMapObject(obj.id, {
+                                                    height: Math.max(
+                                                        MIN_RECT_WORLD_SIZE,
+                                                        Number(event.target.value) || 0
+                                                    ),
+                                                })
+                                            }
+                                            className="w-full rounded bg-slate-800 border border-slate-600 px-2 py-1 text-xs text-slate-100"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-2 items-center">
+                                        <label className="text-[11px] text-slate-300">Footprint Size</label>
+                                        <input
+                                            type="number"
+                                            min={MIN_SHAPE_WORLD_SIZE}
+                                            value={Math.round(Number(obj?.size) || 0)}
+                                            onChange={(event) =>
+                                                updateMapObject(obj.id, {
+                                                    size: Math.max(
+                                                        MIN_SHAPE_WORLD_SIZE,
+                                                        Number(event.target.value) || 0
+                                                    ),
+                                                })
+                                            }
+                                            className="w-full rounded bg-slate-800 border border-slate-600 px-2 py-1 text-xs text-slate-100"
+                                        />
+                                    </div>
+                                )}
+                                <p className="text-[11px] text-slate-400">
+                                    Tip: drag corner handles to resize footprint, and drag the top square handle
+                                    to edit object height.
+                                </p>
+                            </div>
+                        )}
                         {floorType?.description && (
                             <p className="text-slate-300">Info: {floorType.description}</p>
                         )}

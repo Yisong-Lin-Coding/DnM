@@ -36,8 +36,8 @@ const FLOOR_EFFECT_STYLE = {
   labelColor: "#FCD34D",
 };
 
-const RESIZE_HANDLE_RADIUS_PX = 6;
-const HEIGHT_HANDLE_OFFSET_PX = 28;
+const RESIZE_HANDLE_RADIUS_PX = 8;
+const HEIGHT_HANDLE_OFFSET_PX = 32;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -133,12 +133,12 @@ const normalizeLighting = (lighting = {}) => {
 
   return {
     enabled: lighting?.enabled !== false,
-    ambient: clamp(Number(lighting?.ambient) || 0.3, 0, 0.95),
+    ambient: clamp(Number(lighting?.ambient) || 0.24, 0, 0.95),
     shadowEnabled: lighting?.shadowEnabled !== false,
-    shadowStrength: clamp(Number(lighting?.shadowStrength) || 0.72, 0, 1),
+    shadowStrength: clamp(Number(lighting?.shadowStrength) || 0.62, 0, 1),
     shadowSoftness: clamp(Number(lighting?.shadowSoftness) || 0.55, 0, 1),
-    shadowLength: clamp(Number(lighting?.shadowLength) || 0.8, 0, 2),
-    shadowBlend: clamp(Number(lighting?.shadowBlend) || 0.6, 0, 1),
+    shadowLength: clamp(Number(lighting?.shadowLength) || 0.9, 0, 2),
+    shadowBlend: clamp(Number(lighting?.shadowBlend) || 0.68, 0, 1),
     sources,
   };
 };
@@ -307,9 +307,9 @@ const drawObjectShadowFromDirectionalLight = (ctx, obj, camera, lightSource, lig
 
   // Contact shadow (directly under object)
   const contactAlpha = clamp(
-    (0.08 + (objectHeight / 320) * 0.18) * opacity * lighting.shadowStrength * blend,
-    0.05,
-    0.35
+    (objectHeight / 420) * 0.16 * opacity * lighting.shadowStrength * blend,
+    0.01,
+    0.18
   );
   ctx.save();
   ctx.fillStyle = "#000000";
@@ -319,17 +319,28 @@ const drawObjectShadowFromDirectionalLight = (ctx, obj, camera, lightSource, lig
   drawShape(ctx, obj, camera, { fill: true, stroke: false });
   ctx.restore();
 
-  if (lightTilt < 0.025) return;
+  // Overhead sun (center) should have almost no cast shadow.
+  if (lightTilt < 0.04) return;
 
   // Directional shadow (cast from light direction)
-  const shadowReach = objectHeight * zoom * (0.18 + lightTilt * 0.55) * lighting.shadowLength;
+  const shadowReach =
+    objectHeight *
+    zoom *
+    Math.pow(lightTilt, 1.25) *
+    (0.22 + intensity * 0.65) *
+    lighting.shadowLength;
   const offsetX = -sourceX * shadowReach;
   const offsetY = -sourceY * shadowReach;
-  const layers = Math.max(2, Math.round((2 + lightTilt * 4) * lighting.shadowSoftness));
+  const layers = Math.max(2, Math.round((2 + lightTilt * 5) * (0.6 + lighting.shadowSoftness)));
   const directionalAlpha = clamp(
-    (0.05 + (objectHeight / 220) * (0.32 + intensity * 0.38)) * opacity * lighting.shadowStrength * blend,
-    0.05,
-    0.58
+    (objectHeight / 240) *
+      (0.2 + intensity * 0.45) *
+      opacity *
+      lighting.shadowStrength *
+      blend *
+      lightTilt,
+    0.01,
+    0.5
   );
 
   for (let index = 1; index <= layers; index += 1) {
@@ -337,7 +348,7 @@ const drawObjectShadowFromDirectionalLight = (ctx, obj, camera, lightSource, lig
     ctx.save();
     ctx.translate(offsetX * t, offsetY * t);
     ctx.fillStyle = "#000000";
-    ctx.globalAlpha = directionalAlpha * (1 - t * 0.62) * lighting.shadowBlend;
+    ctx.globalAlpha = directionalAlpha * (1 - t * 0.58) * lighting.shadowBlend;
     drawShape(ctx, obj, camera, { fill: true, stroke: false });
     ctx.restore();
   }
@@ -377,9 +388,9 @@ const drawObjectShadowFromPointLight = (ctx, obj, camera, lightSource, lighting,
 
   // Contact shadow
   const contactAlpha = clamp(
-    (0.08 + (objectHeight / 320) * 0.18) * opacity * lighting.shadowStrength * blend * falloff,
-    0.05,
-    0.35
+    (objectHeight / 420) * 0.16 * opacity * lighting.shadowStrength * blend * falloff,
+    0.01,
+    0.18
   );
   ctx.save();
   ctx.fillStyle = "#000000";
@@ -390,14 +401,19 @@ const drawObjectShadowFromPointLight = (ctx, obj, camera, lightSource, lighting,
   ctx.restore();
 
   // Directional shadow (cast away from point light)
-  const shadowReach = objectHeight * zoom * (0.18 + 0.55) * lighting.shadowLength * falloff;
+  const shadowReach = objectHeight * zoom * (0.22 + intensity * 0.45) * lighting.shadowLength * falloff;
   const offsetX = dirX * shadowReach;
   const offsetY = dirY * shadowReach;
-  const layers = Math.max(2, Math.round((2 + 4) * lighting.shadowSoftness));
+  const layers = Math.max(2, Math.round((2 + 5) * (0.6 + lighting.shadowSoftness)));
   const directionalAlpha = clamp(
-    (0.05 + (objectHeight / 220) * (0.32 + intensity * 0.38)) * opacity * lighting.shadowStrength * blend * falloff,
-    0.05,
-    0.58
+    (objectHeight / 240) *
+      (0.2 + intensity * 0.45) *
+      opacity *
+      lighting.shadowStrength *
+      blend *
+      falloff,
+    0.01,
+    0.5
   );
 
   for (let index = 1; index <= layers; index += 1) {
@@ -476,8 +492,8 @@ const drawResizeGuides = (ctx, obj, camera) => {
   ctx.fillStyle = "#fbbf24";
   ctx.strokeStyle = "#92400e";
   ctx.lineWidth = 1.5;
-  ctx.fillRect(heightHandle.x - 5, heightHandle.y - 5, 10, 10);
-  ctx.strokeRect(heightHandle.x - 5, heightHandle.y - 5, 10, 10);
+  ctx.fillRect(heightHandle.x - 7, heightHandle.y - 7, 14, 14);
+  ctx.strokeRect(heightHandle.x - 7, heightHandle.y - 7, 14, 14);
   ctx.restore();
 };
 
