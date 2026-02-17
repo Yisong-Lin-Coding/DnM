@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { michelangeloEngine } from "./michelangeloEngine";
 import { backgroundLayer } from "./Map Layers/0Background";
 import { gridlayer } from "./Map Layers/4Grid";
+import { lightingLayer } from "./Map Layers/7lighting";
 import getImage from "../../handlers/getImage";
 import GameSidePanel from "../../pageComponents/game_sidepanel";
 import { useGame } from "../../data/gameContext";
@@ -24,6 +25,12 @@ const INFO_PANEL_WIDTH = 320;
 const INFO_PANEL_MIN_LEFT = 12;
 const INFO_PANEL_MIN_TOP = 12;
 const INFO_PANEL_MAX_BOTTOM_PADDING = 120;
+const LIGHT_CONTROL_OUTER_SIZE = 92;
+const LIGHT_CONTROL_INNER_MARGIN = 12;
+const LIGHT_CONTROL_KNOB_SIZE = 16;
+const LIGHT_CONTROL_CENTER_DEADZONE = 0.14;
+const RESIZE_HANDLE_HIT_RADIUS_PX = 11;
+const HEIGHT_HANDLE_OFFSET_PX = 28;
 
 const DEFAULT_MAX_HP_BY_TERRAIN = {
     floor: 500,
@@ -35,6 +42,7 @@ const LAYER_CONFIG = [
     { name: "background", component: backgroundLayer, zIndex: 0 },
     { name: "grid", component: gridlayer, zIndex: 1 },
     { name: "mapObjects", component: mapObjectsLayer, zIndex: 2 },
+    { name: "lighting", component: lightingLayer, zIndex: 3 },
 ];
 
 function isPointInsideTriangle(worldX, worldY, objX, objY, size) {
@@ -104,6 +112,104 @@ function isSameEntity(a, b) {
 
 function getObjectZLevel(obj) {
     return Math.round(Number(obj?.zLevel) || 0);
+}
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function getMapObjectBounds(obj) {
+    const objectType = String(obj?.type || "circle").toLowerCase();
+    const x = Number(obj?.x) || 0;
+    const y = Number(obj?.y) || 0;
+
+    if (objectType === "rect") {
+        const halfWidth = Math.max(1, Number(obj?.width) || 0) / 2;
+        const halfHeight = Math.max(1, Number(obj?.height) || 0) / 2;
+        return {
+            minX: x - halfWidth,
+            maxX: x + halfWidth,
+            minY: y - halfHeight,
+            maxY: y + halfHeight,
+        };
+    }
+
+    const radius = Math.max(1, Number(obj?.size) || 0);
+    return {
+        minX: x - radius,
+        maxX: x + radius,
+        minY: y - radius,
+        maxY: y + radius,
+    };
+}
+
+function doBoundsOverlap(a, b) {
+    return a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
+}
+
+function isWallObject(obj) {
+    return String(obj?.terrainType || "").trim().toLowerCase() === "wall";
+}
+
+function wouldWallOverlapAtPosition(candidate, objects = [], ignoreId = null) {
+    if (!isWallObject(candidate)) return false;
+
+    const candidateBounds = getMapObjectBounds(candidate);
+    const candidateLevel = getObjectZLevel(candidate);
+    const ignoreKey = ignoreId == null ? "" : toEntityID(ignoreId);
+
+    return (Array.isArray(objects) ? objects : []).some((obj) => {
+        if (!isWallObject(obj)) return false;
+        if (getObjectZLevel(obj) !== candidateLevel) return false;
+        if (ignoreKey && toEntityID(obj?.id) === ignoreKey) return false;
+        return doBoundsOverlap(candidateBounds, getMapObjectBounds(obj));
+    });
+}
+
+function worldToScreenWithCamera(cameraSnapshot, worldX, worldY) {
+    return {
+        x: worldX * cameraSnapshot.zoom - cameraSnapshot.x,
+        y: worldY * cameraSnapshot.zoom - cameraSnapshot.y,
+    };
+}
+
+function buildResizeHandlesForObject(obj, cameraSnapshot) {
+    if (!obj || !cameraSnapshot) return [];
+    const bounds = getMapObjectBounds(obj);
+    const topLeft = worldToScreenWithCamera(cameraSnapshot, bounds.minX, bounds.minY);
+    const topRight = worldToScreenWithCamera(cameraSnapshot, bounds.maxX, bounds.minY);
+    const bottomRight = worldToScreenWithCamera(cameraSnapshot, bounds.maxX, bounds.maxY);
+    const bottomLeft = worldToScreenWithCamera(cameraSnapshot, bounds.minX, bounds.maxY);
+    const topCenter = worldToScreenWithCamera(
+        cameraSnapshot,
+        (bounds.minX + bounds.maxX) / 2,
+        bounds.minY
+    );
+
+    return [
+        { id: "nw", x: topLeft.x, y: topLeft.y },
+        { id: "ne", x: topRight.x, y: topRight.y },
+        { id: "se", x: bottomRight.x, y: bottomRight.y },
+        { id: "sw", x: bottomLeft.x, y: bottomLeft.y },
+        { id: "height", x: topCenter.x, y: topCenter.y - HEIGHT_HANDLE_OFFSET_PX },
+    ];
+}
+
+function findResizeHandleAtScreenPoint(screenX, screenY, handles = []) {
+    return handles.find((handle) => {
+        const dx = screenX - handle.x;
+        const dy = screenY - handle.y;
+        return dx * dx + dy * dy <= RESIZE_HANDLE_HIT_RADIUS_PX * RESIZE_HANDLE_HIT_RADIUS_PX;
+    }) || null;
+}
+
+function getResizeAnchorForHandle(handleID, bounds) {
+    if (!bounds) return null;
+    if (handleID === "nw") return { x: bounds.maxX, y: bounds.maxY };
+    if (handleID === "ne") return { x: bounds.minX, y: bounds.maxY };
+    if (handleID === "se") return { x: bounds.minX, y: bounds.minY };
+    if (handleID === "sw") return { x: bounds.maxX, y: bounds.minY };
+    return null;
 }
 
 function isTypingTarget(target) {
@@ -181,6 +287,8 @@ function GameComponent() {
         backgroundKey,
         floorTypes,
         replaceFloorTypes,
+        lighting,
+        setLightingDirection,
         currentZLevel,
         stepZLevelUp,
         stepZLevelDown,
@@ -202,6 +310,9 @@ function GameComponent() {
     const [turnNumber, setTurnNumber] = useState(1);
     const [infoPanelPosition, setInfoPanelPosition] = useState(null);
     const [infoPanelDrag, setInfoPanelDrag] = useState(null);
+    const [blockedMovePreview, setBlockedMovePreview] = useState(null);
+    const [lightControlDragging, setLightControlDragging] = useState(false);
+    const [resizeTarget, setResizeTarget] = useState(null);
 
     const isPanning = useRef(false);
     const layerRefs = useRef({});
@@ -211,6 +322,7 @@ function GameComponent() {
     const syncingWorldRef = useRef(false);
     const autoSavingRef = useRef(false);
     const autoSaveTimerRef = useRef(null);
+    const lightControlRef = useRef(null);
     const hasAutoSaveBaselineRef = useRef(false);
     const latestSnapshotRef = useRef({
         mapObjects: [],
@@ -218,6 +330,7 @@ function GameComponent() {
         characters: [],
         floorTypes: [],
         currentZLevel: 0,
+        lighting: null,
     });
     const keysPressed = useRef({
         KeyW: false,
@@ -255,6 +368,10 @@ function GameComponent() {
                     floorTypes: Array.isArray(snapshotSource.floorTypes)
                         ? snapshotSource.floorTypes
                         : [],
+                    lighting:
+                        snapshotSource.lighting && typeof snapshotSource.lighting === "object"
+                            ? snapshotSource.lighting
+                            : undefined,
                 },
                 metadata: {
                     source: "autosave",
@@ -424,6 +541,7 @@ function GameComponent() {
                     backgroundKey,
                     characters,
                     floorTypes,
+                    lighting,
                 },
             });
             syncingWorldRef.current = false;
@@ -462,6 +580,7 @@ function GameComponent() {
         backgroundKey,
         characters,
         floorTypes,
+        lighting,
         loadGameSnapshot,
         replaceFloorTypes,
     ]);
@@ -491,6 +610,7 @@ function GameComponent() {
         backgroundKey,
         characters,
         floorTypes,
+        lighting,
         currentZLevel,
         scheduleAutoSave,
     ]);
@@ -535,6 +655,94 @@ function GameComponent() {
         const screenY = event.clientY - rect.top;
         return screenToWorld(screenX, screenY);
     };
+
+    const getScreenFromMouseEvent = (event) => {
+        const canvas = layerRefs.current.background;
+        if (!canvas) return null;
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top,
+        };
+    };
+
+    const lightControlRadius = useMemo(
+        () => LIGHT_CONTROL_OUTER_SIZE / 2 - LIGHT_CONTROL_INNER_MARGIN,
+        []
+    );
+
+    const lightingSource = useMemo(() => {
+        const source = lighting?.source;
+        const x = Number(source?.x) || 0;
+        const y = Number(source?.y) || 0;
+        const magnitude = Math.hypot(x, y);
+        if (magnitude <= 1 || magnitude === 0) {
+            return { x, y };
+        }
+        return {
+            x: x / magnitude,
+            y: y / magnitude,
+        };
+    }, [lighting]);
+
+    const lightKnobOffset = useMemo(
+        () => ({
+            x: lightingSource.x * lightControlRadius,
+            y: lightingSource.y * lightControlRadius,
+        }),
+        [lightingSource, lightControlRadius]
+    );
+
+    const updateLightingFromClientPoint = useCallback(
+        (clientX, clientY) => {
+            if (!isDM || !lightControlRef.current) return;
+            const rect = lightControlRef.current.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const maxDistance = Math.max(1, rect.width / 2 - LIGHT_CONTROL_INNER_MARGIN);
+            let dx = clientX - centerX;
+            let dy = clientY - centerY;
+            const distance = Math.hypot(dx, dy);
+            if (distance <= maxDistance * LIGHT_CONTROL_CENTER_DEADZONE) {
+                setLightingDirection(0, 0);
+                return;
+            }
+            if (distance > maxDistance && distance > 0) {
+                const ratio = maxDistance / distance;
+                dx *= ratio;
+                dy *= ratio;
+            }
+            setLightingDirection(dx / maxDistance, dy / maxDistance);
+        },
+        [isDM, setLightingDirection]
+    );
+
+    const handleLightControlMouseDown = useCallback(
+        (event) => {
+            if (!isDM || event.button !== 0) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setLightControlDragging(true);
+            updateLightingFromClientPoint(event.clientX, event.clientY);
+        },
+        [isDM, updateLightingFromClientPoint]
+    );
+
+    useEffect(() => {
+        if (!lightControlDragging) return undefined;
+
+        const onMouseMove = (event) => {
+            updateLightingFromClientPoint(event.clientX, event.clientY);
+        };
+        const onMouseUp = () => setLightControlDragging(false);
+
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+        return () => {
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+        };
+    }, [lightControlDragging, updateLightingFromClientPoint]);
 
     const isVisible = (x, y) => {
         if (!fogEnabled) return true;
@@ -650,8 +858,9 @@ function GameComponent() {
             characters,
             floorTypes,
             currentZLevel,
+            lighting,
         };
-    }, [mapObjects, backgroundKey, characters, floorTypes, currentZLevel]);
+    }, [mapObjects, backgroundKey, characters, floorTypes, currentZLevel, lighting]);
 
     useEffect(() => {
         if (!selectedEntity) return;
@@ -770,6 +979,9 @@ function GameComponent() {
                 floorTypes,
                 currentZLevel,
                 selectedMapObjectID,
+                blockedMovePreview,
+                lighting,
+                showResizeHandles: isDM,
             };
 
             michelangeloEngine({
@@ -784,7 +996,7 @@ function GameComponent() {
 
         loop();
         return () => cancelAnimationFrame(raf);
-    }, [camera, mapObjects, floorTypes, currentZLevel, selectedEntity]);
+    }, [camera, mapObjects, floorTypes, currentZLevel, selectedEntity, blockedMovePreview, lighting, isDM]);
 
     useEffect(() => {
         const onMouseMove = (event) => {
@@ -880,7 +1092,10 @@ function GameComponent() {
             if (event.key !== "Escape") return;
             setContextMenu(null);
             setDragTarget(null);
+            setResizeTarget(null);
             setPlacementDrag(null);
+            setBlockedMovePreview(null);
+            setLightControlDragging(false);
             setSelectedEntity(null);
             selectCharacter(null);
             clearMapObjectPlacement();
@@ -918,6 +1133,7 @@ function GameComponent() {
     const handleMouseDown = (event) => {
         const world = getWorldFromMouseEvent(event);
         if (!world) return;
+        setBlockedMovePreview(null);
 
         if (event.button === 2) {
             event.preventDefault();
@@ -961,6 +1177,48 @@ function GameComponent() {
             return;
         }
 
+        if (isDM && selectedEntityData?.type === "mapObject") {
+            const selectedObject = selectedEntityData.entity;
+            if (selectedObject && getObjectZLevel(selectedObject) === currentZLevel) {
+                const screen = getScreenFromMouseEvent(event);
+                const cameraSnapshot = {
+                    x: Number(camera.current?.x) || 0,
+                    y: Number(camera.current?.y) || 0,
+                    zoom: Number(camera.current?.zoom) || 1,
+                };
+                const handles = buildResizeHandlesForObject(selectedObject, cameraSnapshot);
+                const hitHandle = screen
+                    ? findResizeHandleAtScreenPoint(screen.x, screen.y, handles)
+                    : null;
+                if (hitHandle) {
+                    setDragTarget(null);
+                    setBlockedMovePreview(null);
+                    if (hitHandle.id === "height") {
+                        setResizeTarget({
+                            type: "height",
+                            id: selectedObject.id,
+                            startClientY: event.clientY,
+                            startHeight: Math.round(Number(selectedObject?.elevationHeight) || 0),
+                        });
+                        return;
+                    }
+
+                    const bounds = getMapObjectBounds(selectedObject);
+                    const anchor = getResizeAnchorForHandle(hitHandle.id, bounds);
+                    if (anchor) {
+                        setResizeTarget({
+                            type: "shape",
+                            id: selectedObject.id,
+                            handle: hitHandle.id,
+                            anchorX: anchor.x,
+                            anchorY: anchor.y,
+                        });
+                        return;
+                    }
+                }
+            }
+        }
+
         const target = findInteractionTargetAt(world.x, world.y, isDM);
         if (!target) {
             selectEntity(null);
@@ -1002,6 +1260,61 @@ function GameComponent() {
     const handleMouseMove = (event) => {
         setLastMouse({ x: event.clientX, y: event.clientY });
 
+        if (resizeTarget && isDM) {
+            const objectTarget = mapObjects.find(
+                (obj) => toEntityID(obj?.id) === toEntityID(resizeTarget.id)
+            );
+            if (!objectTarget) return;
+
+            setBlockedMovePreview(null);
+
+            if (resizeTarget.type === "height") {
+                const zoom = Number(camera.current?.zoom) || 1;
+                const deltaHeight = (resizeTarget.startClientY - event.clientY) / Math.max(0.1, zoom);
+                const nextHeight = Math.max(
+                    0,
+                    Math.round((Number(resizeTarget.startHeight) || 0) + deltaHeight)
+                );
+                updateMapObject(resizeTarget.id, {
+                    elevationHeight: nextHeight,
+                });
+                return;
+            }
+
+            const world = getWorldFromMouseEvent(event);
+            if (!world) return;
+
+            const anchorX = Number(resizeTarget.anchorX);
+            const anchorY = Number(resizeTarget.anchorY);
+            const minX = Math.min(anchorX, world.x);
+            const maxX = Math.max(anchorX, world.x);
+            const minY = Math.min(anchorY, world.y);
+            const maxY = Math.max(anchorY, world.y);
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            const objectType = String(objectTarget?.type || "circle").toLowerCase();
+
+            if (objectType === "rect") {
+                updateMapObject(resizeTarget.id, {
+                    x: Math.round(centerX),
+                    y: Math.round(centerY),
+                    width: Math.max(MIN_RECT_WORLD_SIZE, Math.round(maxX - minX)),
+                    height: Math.max(MIN_RECT_WORLD_SIZE, Math.round(maxY - minY)),
+                });
+                return;
+            }
+
+            updateMapObject(resizeTarget.id, {
+                x: Math.round(centerX),
+                y: Math.round(centerY),
+                size: Math.max(
+                    MIN_SHAPE_WORLD_SIZE,
+                    Math.round(Math.max(maxX - minX, maxY - minY) / 2)
+                ),
+            });
+            return;
+        }
+
         if (placementDrag && isDM && mapObjectPlacement) {
             const world = getWorldFromMouseEvent(event);
             if (!world) return;
@@ -1024,14 +1337,32 @@ function GameComponent() {
             const targetY = world.y - dragTarget.offsetY;
 
             if (dragTarget.type === "mapObject") {
-                updateMapObject(dragTarget.id, {
+                const objectTarget = mapObjects.find(
+                    (obj) => toEntityID(obj?.id) === toEntityID(dragTarget.id)
+                );
+                if (!objectTarget) {
+                    setBlockedMovePreview(null);
+                    return;
+                }
+                const candidate = {
+                    ...objectTarget,
                     x: Math.round(targetX),
                     y: Math.round(targetY),
+                };
+                if (wouldWallOverlapAtPosition(candidate, mapObjects, objectTarget.id)) {
+                    setBlockedMovePreview(candidate);
+                    return;
+                }
+                setBlockedMovePreview(null);
+                updateMapObject(dragTarget.id, {
+                    x: candidate.x,
+                    y: candidate.y,
                 });
                 return;
             }
 
             if (dragTarget.type === "character") {
+                setBlockedMovePreview(null);
                 moveCharacter(dragTarget.id, Math.round(targetX), Math.round(targetY));
                 return;
             }
@@ -1083,6 +1414,8 @@ function GameComponent() {
 
         isPanning.current = false;
         setDragTarget(null);
+        setResizeTarget(null);
+        setBlockedMovePreview(null);
     };
 
     const handleResizerMouseDown = (event) => {
@@ -1353,6 +1686,15 @@ function GameComponent() {
                         <p>Terrain: {String(obj?.terrainType || "obstacle")}</p>
                         <p>Z Level: {Math.round(Number(obj?.zLevel) || 0)}</p>
                         <p>Z Index: {Math.round(Number(obj?.z) || 0)}</p>
+                        <p>Elevation Height: {Math.round(Number(obj?.elevationHeight) || 0)}</p>
+                        {String(obj?.type || "").toLowerCase() === "rect" ? (
+                            <p>
+                                Footprint: {Math.round(Number(obj?.width) || 0)} x{" "}
+                                {Math.round(Number(obj?.height) || 0)}
+                            </p>
+                        ) : (
+                            <p>Footprint Size: {Math.round(Number(obj?.size) || 0)}</p>
+                        )}
                         <p>Floor Type: {floorType?.name || String(obj?.floorTypeId || "none")}</p>
                         <p>
                             HP:{" "}
@@ -1490,6 +1832,77 @@ function GameComponent() {
                         </span>
                     )}
                 </div>
+
+                {isDM && (
+                    <div
+                        className="absolute left-3 z-[131] rounded border border-slate-600 bg-slate-900/90 px-3 py-2 select-none"
+                        style={{ top: 56 }}
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <p className="mb-2 text-[10px] uppercase tracking-[0.08em] text-slate-300">
+                            Light Source
+                        </p>
+                        <div
+                            ref={lightControlRef}
+                            aria-label="Light direction"
+                            tabIndex={0}
+                            onMouseDown={handleLightControlMouseDown}
+                            onKeyDown={(event) => {
+                                const step = 0.08;
+                                let nextX = lightingSource.x;
+                                let nextY = lightingSource.y;
+                                if (event.key === "ArrowLeft") nextX -= step;
+                                if (event.key === "ArrowRight") nextX += step;
+                                if (event.key === "ArrowUp") nextY -= step;
+                                if (event.key === "ArrowDown") nextY += step;
+                                if (
+                                    event.key === "ArrowLeft" ||
+                                    event.key === "ArrowRight" ||
+                                    event.key === "ArrowUp" ||
+                                    event.key === "ArrowDown"
+                                ) {
+                                    event.preventDefault();
+                                    setLightingDirection(clamp(nextX, -1, 1), clamp(nextY, -1, 1));
+                                }
+                            }}
+                            className={`relative rounded-full border border-amber-200/60 bg-slate-950/85 ${
+                                lightControlDragging ? "cursor-grabbing" : "cursor-grab"
+                            }`}
+                            style={{
+                                width: LIGHT_CONTROL_OUTER_SIZE,
+                                height: LIGHT_CONTROL_OUTER_SIZE,
+                            }}
+                        >
+                            <div
+                                className="absolute rounded-full border border-slate-600/80"
+                                style={{
+                                    left: LIGHT_CONTROL_INNER_MARGIN,
+                                    top: LIGHT_CONTROL_INNER_MARGIN,
+                                    width: LIGHT_CONTROL_OUTER_SIZE - LIGHT_CONTROL_INNER_MARGIN * 2,
+                                    height: LIGHT_CONTROL_OUTER_SIZE - LIGHT_CONTROL_INNER_MARGIN * 2,
+                                }}
+                            />
+                            <div
+                                className="absolute rounded-full border border-amber-100 bg-amber-300 shadow"
+                                style={{
+                                    width: LIGHT_CONTROL_KNOB_SIZE,
+                                    height: LIGHT_CONTROL_KNOB_SIZE,
+                                    left:
+                                        LIGHT_CONTROL_OUTER_SIZE / 2 +
+                                        lightKnobOffset.x -
+                                        LIGHT_CONTROL_KNOB_SIZE / 2,
+                                    top:
+                                        LIGHT_CONTROL_OUTER_SIZE / 2 +
+                                        lightKnobOffset.y -
+                                        LIGHT_CONTROL_KNOB_SIZE / 2,
+                                }}
+                            />
+                        </div>
+                        <p className="mt-2 text-[10px] text-slate-400">
+                            Center = overhead sun (short, softer shadows)
+                        </p>
+                    </div>
+                )}
 
                 {LAYER_CONFIG.map((layer) => (
                     <canvas

@@ -7,6 +7,15 @@ const MIN_Z_LEVEL = -20;
 const MAX_Z_LEVEL = 20;
 const MIN_HITBOX_SCALE = 0.1;
 const MAX_HITBOX_SCALE = 5;
+const LIGHT_AXIS_MIN = -1;
+const LIGHT_AXIS_MAX = 1;
+
+const DEFAULT_LIGHTING = {
+    enabled: true,
+    source: { x: 0.22, y: -0.78 },
+    ambient: 0.3,
+    intensity: 0.5,
+};
 
 const DEFAULT_MAX_HP_BY_TERRAIN = {
     floor: 500,
@@ -25,6 +34,7 @@ const DEFAULT_FLOOR_TYPES = [
         id: "stoneFloor",
         name: "Stone Floor",
         terrainType: "floor",
+        floorVisualType: "base",
         description: "Solid stone tiles with stable footing.",
         movementCost: 1,
         blocksMovement: false,
@@ -34,6 +44,7 @@ const DEFAULT_FLOOR_TYPES = [
         id: "mudFloor",
         name: "Mud Floor",
         terrainType: "floor",
+        floorVisualType: "effect",
         description: "Heavy mud that slows movement.",
         movementCost: 2,
         blocksMovement: false,
@@ -43,6 +54,7 @@ const DEFAULT_FLOOR_TYPES = [
         id: "spikeTrapFloor",
         name: "Spike Trap",
         terrainType: "floor",
+        floorVisualType: "effect",
         description: "Hidden spikes can damage units that move across it.",
         movementCost: 1,
         blocksMovement: false,
@@ -145,6 +157,7 @@ const DEFAULT_MAP_OBJECTS = [
         type: "rect",
         terrainType: "floor",
         floorTypeId: "stoneFloor",
+        elevationHeight: 0,
         zLevel: 0,
         x: 100,
         y: 100,
@@ -166,6 +179,7 @@ const DEFAULT_MAP_OBJECTS = [
         type: "rect",
         terrainType: "wall",
         floorTypeId: "stoneWall",
+        elevationHeight: 150,
         zLevel: 0,
         x: 200,
         y: 150,
@@ -187,6 +201,7 @@ const DEFAULT_MAP_OBJECTS = [
         type: "circle",
         terrainType: "obstacle",
         floorTypeId: "woodenCrate",
+        elevationHeight: 80,
         zLevel: 1,
         x: 300,
         y: 200,
@@ -211,6 +226,8 @@ const toNumber = (value, fallback = 0) => {
 
 const toPositiveNumber = (value, fallback = 1) => Math.max(1, toNumber(value, fallback));
 
+const toNonNegativeNumber = (value, fallback = 0) => Math.max(0, toNumber(value, fallback));
+
 const normalizeObjectType = (value) => {
     const type = String(value || "").trim().toLowerCase();
     if (type === "circle" || type === "rect" || type === "triangle") return type;
@@ -234,6 +251,38 @@ const clampZLevel = (value) =>
 const clampHitboxScale = (value) =>
     Math.max(MIN_HITBOX_SCALE, Math.min(MAX_HITBOX_SCALE, toNumber(value, 1)));
 
+const clampLightAxis = (value) =>
+    Math.max(LIGHT_AXIS_MIN, Math.min(LIGHT_AXIS_MAX, toNumber(value, 0)));
+
+const normalizeFloorVisualType = (value) =>
+    String(value || "").trim().toLowerCase() === "effect" ? "effect" : "base";
+
+const normalizeLightingSource = (value = {}) => {
+    const x = clampLightAxis(value?.x);
+    const y = clampLightAxis(value?.y);
+    const magnitude = Math.hypot(x, y);
+    if (magnitude <= 1 || magnitude === 0) {
+        return { x, y };
+    }
+    return {
+        x: x / magnitude,
+        y: y / magnitude,
+    };
+};
+
+const normalizeLightingConfig = (value = {}) => {
+    const sourceInput =
+        value?.source && typeof value.source === "object" && !Array.isArray(value.source)
+            ? value.source
+            : value;
+    return {
+        enabled: value?.enabled !== false,
+        source: normalizeLightingSource(sourceInput),
+        ambient: Math.max(0, Math.min(0.9, toNumber(value?.ambient, DEFAULT_LIGHTING.ambient))),
+        intensity: Math.max(0, Math.min(1, toNumber(value?.intensity, DEFAULT_LIGHTING.intensity))),
+    };
+};
+
 const normalizeFloorTypeID = (value, terrainType = "obstacle") => {
     const candidate = String(value || "").trim();
     if (candidate) return candidate;
@@ -247,6 +296,10 @@ const normalizeFloorTypeDefinition = (raw = {}, fallbackIndex = 0) => {
         id,
         name: String(raw.name || id).trim() || id,
         terrainType,
+        floorVisualType:
+            terrainType === "floor"
+                ? normalizeFloorVisualType(raw.floorVisualType || raw.visualType)
+                : "base",
         description: String(raw.description || "").trim(),
         movementCost: Math.max(0, toNumber(raw.movementCost, terrainType === "floor" ? 1 : 0)),
         blocksMovement:
@@ -271,6 +324,15 @@ const normalizeFloorTypeCollection = (list = []) => {
 
 const getMaxObjectId = (objects = []) =>
     objects.reduce((max, obj) => Math.max(max, toNumber(obj?.id, 0)), 0);
+
+const resolveElevationInput = (raw = {}, type = "circle") => {
+    if (raw?.elevationHeight != null) return raw.elevationHeight;
+    if (raw?.height3D != null) return raw.height3D;
+    if (raw?.objectHeight != null) return raw.objectHeight;
+    if (raw?.shadowHeight != null) return raw.shadowHeight;
+    if (type !== "rect" && raw?.height != null) return raw.height;
+    return 0;
+};
 
 const normalizeMapObject = (raw = {}, fallbackId = 1) => {
     const type = normalizeObjectType(raw.type);
@@ -303,6 +365,7 @@ const normalizeMapObject = (raw = {}, fallbackId = 1) => {
         terrainType,
         floorTypeId,
         color: normalizeHexColor(raw.color),
+        elevationHeight: Math.round(toNonNegativeNumber(resolveElevationInput(raw, type), 0)),
         maxHP,
         hp,
         hitbox: {
@@ -410,6 +473,7 @@ export const GameProvider = ({ children }) => {
     const [mapObjectPlacement, setMapObjectPlacement] = useState(null);
     const [currentZLevel, setCurrentZLevel] = useState(0);
     const [floorTypes, setFloorTypes] = useState(DEFAULT_FLOOR_TYPES);
+    const [lighting, setLighting] = useState(DEFAULT_LIGHTING);
 
     const nextMapObjectIdRef = useRef(getMaxObjectId(DEFAULT_MAP_OBJECTS) + 1);
     const mapObjectsRef = useRef(DEFAULT_MAP_OBJECTS);
@@ -504,7 +568,21 @@ export const GameProvider = ({ children }) => {
                 };
             }
             const normalized = normalizeMapObject(merged, currentObject.id);
-            if (wouldWallOverlap(normalized, prev, currentObject.id)) {
+            const layoutSensitiveKeys = new Set([
+                "type",
+                "terrainType",
+                "x",
+                "y",
+                "zLevel",
+                "size",
+                "width",
+                "height",
+                "hitbox",
+            ]);
+            const affectsWallLayout = Object.keys(safeUpdates).some((key) =>
+                layoutSensitiveKeys.has(key)
+            );
+            if (affectsWallLayout && wouldWallOverlap(normalized, prev, currentObject.id)) {
                 return prev;
             }
 
@@ -562,6 +640,15 @@ export const GameProvider = ({ children }) => {
             size: toPositiveNumber(config.size, type === "triangle" ? 40 : 30),
             width: toPositiveNumber(config.width, 50),
             height: toPositiveNumber(config.height, 40),
+            elevationHeight: Math.round(
+                toNonNegativeNumber(
+                    config.elevationHeight ??
+                        config.height3D ??
+                        config.objectHeight ??
+                        config.shadowHeight,
+                    0
+                )
+            ),
             maxHP,
             hp,
             hitbox: {
@@ -581,6 +668,17 @@ export const GameProvider = ({ children }) => {
         const normalized = normalizeFloorTypeCollection(newFloorTypes);
         if (!normalized.length) return;
         setFloorTypes(normalized);
+    }, []);
+
+    const setLightingDirection = useCallback((x, y) => {
+        setLighting((prev) => ({
+            ...normalizeLightingConfig(prev),
+            source: normalizeLightingSource({ x, y }),
+        }));
+    }, []);
+
+    const replaceLighting = useCallback((lightingConfig) => {
+        setLighting(normalizeLightingConfig(lightingConfig));
     }, []);
 
     const placePendingMapObjectAt = useCallback(
@@ -626,6 +724,10 @@ export const GameProvider = ({ children }) => {
                 replaceFloorTypes(snapshot.floorTypes);
             }
 
+            if (snapshot.lighting && typeof snapshot.lighting === "object") {
+                replaceLighting(snapshot.lighting);
+            }
+
             if (Array.isArray(snapshot.characters) && snapshot.characters.length > 0) {
                 setCharacters(
                     snapshot.characters.map((character, index) =>
@@ -634,7 +736,7 @@ export const GameProvider = ({ children }) => {
                 );
             }
         },
-        [replaceAllMapObjects, replaceFloorTypes]
+        [replaceAllMapObjects, replaceFloorTypes, replaceLighting]
     );
 
     const saveMapToDatabase = useCallback(async () => {
@@ -712,6 +814,9 @@ export const GameProvider = ({ children }) => {
         backgroundOptions: BACKGROUND_OPTIONS,
         floorTypes,
         replaceFloorTypes,
+        lighting,
+        replaceLighting,
+        setLightingDirection,
         mapObjectPlacement,
         currentZLevel,
         setCurrentZLevel,

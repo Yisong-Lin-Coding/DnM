@@ -3,6 +3,15 @@ const MIN_Z_LEVEL = -20;
 const MAX_Z_LEVEL = 20;
 const MIN_HITBOX_SCALE = 0.1;
 const MAX_HITBOX_SCALE = 5;
+const LIGHT_AXIS_MIN = -1;
+const LIGHT_AXIS_MAX = 1;
+
+const DEFAULT_LIGHTING = {
+    enabled: true,
+    source: { x: 0.22, y: -0.78 },
+    ambient: 0.3,
+    intensity: 0.5,
+};
 
 const DEFAULT_MAX_HP_BY_TERRAIN = {
     floor: 500,
@@ -20,6 +29,9 @@ const toNumber = (value, fallback = 0) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
 };
+
+const toNonNegativeNumber = (value, fallback = 0) =>
+    Math.max(0, toNumber(value, fallback));
 
 const toPlainObject = (value) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -46,6 +58,38 @@ const clampZLevel = (value) =>
 const clampHitboxScale = (value) =>
     Math.max(MIN_HITBOX_SCALE, Math.min(MAX_HITBOX_SCALE, toNumber(value, 1)));
 
+const clampLightAxis = (value) =>
+    Math.max(LIGHT_AXIS_MIN, Math.min(LIGHT_AXIS_MAX, toNumber(value, 0)));
+
+const normalizeFloorVisualType = (value) =>
+    String(value || "").trim().toLowerCase() === "effect" ? "effect" : "base";
+
+const normalizeLightingSource = (value = {}) => {
+    const x = clampLightAxis(value?.x);
+    const y = clampLightAxis(value?.y);
+    const magnitude = Math.hypot(x, y);
+    if (magnitude <= 1 || magnitude === 0) {
+        return { x, y };
+    }
+    return {
+        x: x / magnitude,
+        y: y / magnitude,
+    };
+};
+
+const normalizeLightingConfig = (value = {}) => {
+    const sourceInput =
+        value?.source && typeof value.source === "object" && !Array.isArray(value.source)
+            ? value.source
+            : value;
+    return {
+        enabled: value?.enabled !== false,
+        source: normalizeLightingSource(sourceInput),
+        ambient: Math.max(0, Math.min(0.9, toNumber(value?.ambient, DEFAULT_LIGHTING.ambient))),
+        intensity: Math.max(0, Math.min(1, toNumber(value?.intensity, DEFAULT_LIGHTING.intensity))),
+    };
+};
+
 const normalizeHexColor = (value, fallback = "#3B82F6") => {
     const raw = String(value || "").trim();
     return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : fallback;
@@ -64,6 +108,10 @@ const normalizeFloorTypeDefinition = (raw = {}, fallbackIndex = 0) => {
         id,
         name: String(raw.name || id).trim() || id,
         terrainType,
+        floorVisualType:
+            terrainType === "floor"
+                ? normalizeFloorVisualType(raw.floorVisualType || raw.visualType)
+                : "base",
         description: String(raw.description || "").trim(),
         movementCost: Math.max(0, toNumber(raw.movementCost, terrainType === "floor" ? 1 : 0)),
         blocksMovement:
@@ -85,6 +133,15 @@ const normalizeFloorTypeCollection = (input = []) => {
 
 const getMaxObjectId = (objects = []) =>
     objects.reduce((max, obj) => Math.max(max, Math.round(toNumber(obj?.id, 0))), 0);
+
+const resolveElevationInput = (raw = {}, type = "circle") => {
+    if (raw?.elevationHeight != null) return raw.elevationHeight;
+    if (raw?.height3D != null) return raw.height3D;
+    if (raw?.objectHeight != null) return raw.objectHeight;
+    if (raw?.shadowHeight != null) return raw.shadowHeight;
+    if (type !== "rect" && raw?.height != null) return raw.height;
+    return 0;
+};
 
 const normalizeMapObject = (raw = {}, fallbackId = 1) => {
     const type = normalizeObjectType(raw.type);
@@ -117,6 +174,7 @@ const normalizeMapObject = (raw = {}, fallbackId = 1) => {
         y: Math.round(toNumber(raw.y, 0)),
         z: Math.round(toNumber(raw.z, 0)),
         color: normalizeHexColor(raw.color),
+        elevationHeight: Math.round(toNonNegativeNumber(resolveElevationInput(raw, type), 0)),
         maxHP,
         hp,
         hitbox: {
@@ -207,6 +265,7 @@ const normalizeSnapshot = (snapshot = {}) => {
         mapObjects: normalizeMapObjects(safeSnapshot.mapObjects || []),
         characters: Array.isArray(safeSnapshot.characters) ? safeSnapshot.characters : [],
         currentZLevel: clampZLevel(safeSnapshot.currentZLevel),
+        lighting: normalizeLightingConfig(safeSnapshot.lighting || DEFAULT_LIGHTING),
     };
 
     if (normalized.mapObjects.length === 0) {
@@ -216,6 +275,7 @@ const normalizeSnapshot = (snapshot = {}) => {
                 type: "rect",
                 terrainType: "floor",
                 floorTypeId: "stoneFloor",
+                elevationHeight: 0,
                 x: 100,
                 y: 100,
                 width: 100,
@@ -255,6 +315,10 @@ const updateEngineState = (state, statePatch = {}) => {
 
     if (Number.isFinite(Number(patch.currentZLevel))) {
         nextSnapshot.currentZLevel = clampZLevel(patch.currentZLevel);
+    }
+
+    if (patch.lighting && typeof patch.lighting === "object") {
+        nextSnapshot.lighting = normalizeLightingConfig(patch.lighting);
     }
 
     state.snapshot = nextSnapshot;

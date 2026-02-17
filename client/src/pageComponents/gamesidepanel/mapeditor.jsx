@@ -10,6 +10,12 @@ const DEFAULT_MAX_HP_BY_TERRAIN = {
     obstacle: 700,
 };
 
+const DEFAULT_ELEVATION_HEIGHT_BY_TERRAIN = {
+    floor: 0,
+    wall: 150,
+    obstacle: 80,
+};
+
 function MapEditor() {
     const socket = useContext(SocketContext);
     const { gameID } = useParams();
@@ -27,6 +33,7 @@ function MapEditor() {
         setBackgroundKey,
         backgroundOptions,
         floorTypes,
+        lighting,
         mapObjectPlacement,
         armMapObjectPlacement,
         clearMapObjectPlacement,
@@ -48,6 +55,7 @@ function MapEditor() {
         size: 30,
         width: 50,
         height: 40,
+        elevationHeight: 80,
         maxHP: 700,
         hp: 700,
         hitboxScale: 1,
@@ -203,6 +211,7 @@ function MapEditor() {
                 characters,
                 currentZLevel,
                 floorTypes,
+                lighting,
             },
             metadata: {
                 source: "map_editor",
@@ -328,6 +337,9 @@ function MapEditor() {
                                             return {
                                                 ...prev,
                                                 terrainType,
+                                                elevationHeight:
+                                                    DEFAULT_ELEVATION_HEIGHT_BY_TERRAIN[terrainType] ??
+                                                    DEFAULT_ELEVATION_HEIGHT_BY_TERRAIN.obstacle,
                                                 maxHP: prev.maxHP ?? defaultHP,
                                                 hp: prev.hp ?? defaultHP,
                                             };
@@ -357,6 +369,7 @@ function MapEditor() {
                             {creationFloorTypeOptions.map((entry) => (
                                 <option key={entry.id} value={entry.id}>
                                     {entry.name}
+                                    {entry.floorVisualType === "effect" ? " (Effect)" : ""}
                                 </option>
                             ))}
                         </select>
@@ -371,6 +384,22 @@ function MapEditor() {
                                 setCreationDraft((prev) => ({
                                     ...prev,
                                     zLevel: Number(e.target.value),
+                                }))
+                            }
+                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 items-center">
+                        <label className="text-xs">Elevation Height</label>
+                        <input
+                            type="number"
+                            min="0"
+                            value={creationDraft.elevationHeight}
+                            onChange={(e) =>
+                                setCreationDraft((prev) => ({
+                                    ...prev,
+                                    elevationHeight: Number(e.target.value),
                                 }))
                             }
                             className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
@@ -467,7 +496,7 @@ function MapEditor() {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs">Height</label>
+                                <label className="text-xs">Footprint Height</label>
                                 <input
                                     type="number"
                                     value={creationDraft.height}
@@ -585,7 +614,7 @@ function MapEditor() {
                                         {obj.type} #{obj.id}
                                     </span>
                                     <p className="text-xs text-gray-400">
-                                        Pos: ({obj.x}, {obj.y}) L:{obj.zLevel ?? 0} Z:{obj.z} {obj.terrainType ? `| ${obj.terrainType}` : ""} {obj.floorTypeId ? `| ${obj.floorTypeId}` : ""} {obj.maxHP != null ? `| HP ${obj.hp ?? 0}/${obj.maxHP}` : "| Indestructible"}
+                                        Pos: ({obj.x}, {obj.y}) L:{obj.zLevel ?? 0} Z:{obj.z} H:{Math.round(Number(obj.elevationHeight) || 0)} {obj.terrainType ? `| ${obj.terrainType}` : ""} {obj.floorTypeId ? `| ${obj.floorTypeId}` : ""} {obj.maxHP != null ? `| HP ${obj.hp ?? 0}/${obj.maxHP}` : "| Indestructible"}
                                     </p>
                                 </div>
                                 <button
@@ -661,6 +690,7 @@ function MapEditor() {
                                             {(floorTypesByTerrain[obj.terrainType || "obstacle"] || floorTypes).map((entry) => (
                                                 <option key={entry.id} value={entry.id}>
                                                     {entry.name}
+                                                    {entry.floorVisualType === "effect" ? " (Effect)" : ""}
                                                 </option>
                                             ))}
                                         </select>
@@ -674,6 +704,21 @@ function MapEditor() {
                                             onChange={(e) =>
                                                 updateMapObject(obj.id, {
                                                     zLevel: Number(e.target.value),
+                                                })
+                                            }
+                                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs">Elevation Height</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={Math.round(Number(obj.elevationHeight) || 0)}
+                                            onChange={(e) =>
+                                                updateMapObject(obj.id, {
+                                                    elevationHeight: Number(e.target.value),
                                                 })
                                             }
                                             className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
@@ -778,7 +823,7 @@ function MapEditor() {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-xs">Height</label>
+                                                <label className="text-xs">Footprint Height</label>
                                                 <input
                                                     type="number"
                                                     value={obj.height}
