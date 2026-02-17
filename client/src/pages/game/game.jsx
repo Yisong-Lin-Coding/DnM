@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { michelangeloEngine } from "./michelangeloEngine";
 import { backgroundLayer } from "./Map Layers/0Background";
@@ -67,8 +67,28 @@ function isPointInsideMapObject(worldX, worldY, obj) {
 }
 
 function findTopMapObjectAt(worldX, worldY, mapObjects = []) {
-    const sorted = [...mapObjects].sort((a, b) => (Number(b.z) || 0) - (Number(a.z) || 0));
+    const terrainPriority = (terrainType) => {
+        const terrain = String(terrainType || "").toLowerCase();
+        if (terrain === "obstacle") return 3;
+        if (terrain === "wall") return 2;
+        if (terrain === "floor") return 1;
+        return 0;
+    };
+    const sorted = [...mapObjects].sort((a, b) => {
+        const zDiff = (Number(b?.z) || 0) - (Number(a?.z) || 0);
+        if (zDiff !== 0) return zDiff;
+        return terrainPriority(b?.terrainType) - terrainPriority(a?.terrainType);
+    });
     return sorted.find((obj) => isPointInsideMapObject(worldX, worldY, obj)) || null;
+}
+
+function toEntityID(value) {
+    return String(value ?? "").trim();
+}
+
+function isSameEntity(a, b) {
+    if (!a || !b) return false;
+    return String(a.type || "") === String(b.type || "") && toEntityID(a.id) === toEntityID(b.id);
 }
 
 function getObjectZLevel(obj) {
@@ -141,6 +161,7 @@ function GameComponent() {
         handleCharacterAction,
         mapObjects,
         updateMapObject,
+        deleteMapObject,
         moveCharacter,
         isDM,
         setIsDM,
@@ -159,16 +180,26 @@ function GameComponent() {
     const [sideWidth, setSideWidth] = useState(320);
     const [dragging, setDragging] = useState(false);
     const [contextMenu, setContextMenu] = useState(null);
+    const [selectedEntity, setSelectedEntity] = useState(null);
     const [dragTarget, setDragTarget] = useState(null);
     const [gameContextError, setGameContextError] = useState("");
     const [loadingGameContext, setLoadingGameContext] = useState(true);
     const [placementDrag, setPlacementDrag] = useState(null);
+    const [autoSaveStatus, setAutoSaveStatus] = useState("");
 
     const isPanning = useRef(false);
     const layerRefs = useRef({});
     const prevStateRef = useRef(null);
     const applyingServerStateRef = useRef(false);
     const syncingWorldRef = useRef(false);
+    const autoSavingRef = useRef(false);
+    const latestSnapshotRef = useRef({
+        mapObjects: [],
+        backgroundKey: "",
+        characters: [],
+        floorTypes: [],
+        currentZLevel: 0,
+    });
     const keysPressed = useRef({
         KeyW: false,
         KeyA: false,
@@ -327,6 +358,55 @@ function GameComponent() {
         replaceFloorTypes,
     ]);
 
+    useEffect(() => {
+        if (!socket || !playerID || !gameID || !isDM || loadingGameContext) return undefined;
+
+        const autoSave = async () => {
+            if (autoSavingRef.current) return;
+            autoSavingRef.current = true;
+
+            const now = new Date();
+            const snapshotSource = latestSnapshotRef.current || {};
+            const response = await emitWithAck(socket, "campaign_saveGame", {
+                playerID,
+                campaignID: gameID,
+                name: `Auto Save ${now.toLocaleString()}`,
+                description: "Automatic save from active game session",
+                snapshot: {
+                    mapObjects: Array.isArray(snapshotSource.mapObjects)
+                        ? snapshotSource.mapObjects
+                        : [],
+                    backgroundKey: String(snapshotSource.backgroundKey || ""),
+                    characters: Array.isArray(snapshotSource.characters)
+                        ? snapshotSource.characters
+                        : [],
+                    currentZLevel: Number(snapshotSource.currentZLevel) || 0,
+                    floorTypes: Array.isArray(snapshotSource.floorTypes)
+                        ? snapshotSource.floorTypes
+                        : [],
+                },
+                metadata: {
+                    source: "autosave",
+                    trigger: "interval_10s",
+                },
+                makeActive: true,
+                isAutoSave: true,
+            });
+
+            autoSavingRef.current = false;
+
+            if (!response?.success) {
+                setAutoSaveStatus(`Autosave failed: ${response?.message || "Unknown error"}`);
+                return;
+            }
+
+            setAutoSaveStatus(`Autosaved ${now.toLocaleTimeString()}`);
+        };
+
+        const timer = setInterval(autoSave, 10000);
+        return () => clearInterval(timer);
+    }, [socket, playerID, gameID, isDM, loadingGameContext]);
+
     const formatCanvas = (canvas) => {
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
@@ -412,6 +492,93 @@ function GameComponent() {
         () => mapObjects.filter((obj) => getObjectZLevel(obj) === currentZLevel),
         [mapObjects, currentZLevel]
     );
+
+    const floorTypesByID = useMemo(() => {
+        const byID = new Map();
+        (Array.isArray(floorTypes) ? floorTypes : []).forEach((entry) => {
+            const id = String(entry?.id || "").trim();
+            if (!id || byID.has(id)) return;
+            byID.set(id, entry);
+        });
+        return byID;
+    }, [floorTypes]);
+
+    const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false) => {
+        const characterTarget = findCharacterAt(worldX, worldY, includeHiddenCharacters);
+        if (characterTarget) {
+            return {
+                type: "character",
+                id: characterTarget.id,
+            };
+        }
+
+        const mapObjectTarget = findTopMapObjectAt(worldX, worldY, activeMapObjects);
+        if (mapObjectTarget) {
+            return {
+                type: "mapObject",
+                id: mapObjectTarget.id,
+            };
+        }
+
+        return null;
+    };
+
+    const selectedEntityData = useMemo(() => {
+        if (!selectedEntity?.type) return null;
+
+        if (selectedEntity.type === "character") {
+            const character = characters.find(
+                (char) => toEntityID(char?.id) === toEntityID(selectedEntity.id)
+            );
+            if (!character) return null;
+            return {
+                type: "character",
+                id: character.id,
+                entity: character,
+            };
+        }
+
+        if (selectedEntity.type === "mapObject") {
+            const object = mapObjects.find(
+                (obj) => toEntityID(obj?.id) === toEntityID(selectedEntity.id)
+            );
+            if (!object) return null;
+            const floorType = floorTypesByID.get(String(object?.floorTypeId || "").trim()) || null;
+            return {
+                type: "mapObject",
+                id: object.id,
+                entity: object,
+                floorType,
+            };
+        }
+
+        return null;
+    }, [selectedEntity, characters, mapObjects, floorTypesByID]);
+
+    useEffect(() => {
+        latestSnapshotRef.current = {
+            mapObjects,
+            backgroundKey,
+            characters,
+            floorTypes,
+            currentZLevel,
+        };
+    }, [mapObjects, backgroundKey, characters, floorTypes, currentZLevel]);
+
+    useEffect(() => {
+        if (!selectedEntity) return;
+        if (selectedEntityData) return;
+        setSelectedEntity(null);
+    }, [selectedEntity, selectedEntityData]);
+
+    useEffect(() => {
+        if (!selectedChar) return;
+        setSelectedEntity((prev) => {
+            const next = { type: "character", id: selectedChar };
+            if (isSameEntity(prev, next)) return prev;
+            return next;
+        });
+    }, [selectedChar]);
 
     useEffect(() => {
         let raf;
@@ -557,12 +724,14 @@ function GameComponent() {
             setContextMenu(null);
             setDragTarget(null);
             setPlacementDrag(null);
+            setSelectedEntity(null);
+            selectCharacter(null);
             clearMapObjectPlacement();
         };
 
         window.addEventListener("keydown", onEscape);
         return () => window.removeEventListener("keydown", onEscape);
-    }, [clearMapObjectPlacement]);
+    }, [clearMapObjectPlacement, selectCharacter]);
 
     useEffect(() => {
         if (!mapObjectPlacement) {
@@ -570,17 +739,46 @@ function GameComponent() {
         }
     }, [mapObjectPlacement]);
 
+    const selectEntity = useCallback(
+        (target) => {
+            if (!target?.type) {
+                setSelectedEntity(null);
+                selectCharacter(null);
+                return;
+            }
+
+            const next = { type: target.type, id: target.id };
+            setSelectedEntity(next);
+            if (next.type === "character") {
+                selectCharacter(next.id);
+            } else {
+                selectCharacter(null);
+            }
+        },
+        [selectCharacter]
+    );
+
     const handleMouseDown = (event) => {
         const world = getWorldFromMouseEvent(event);
         if (!world) return;
 
         if (event.button === 2) {
             event.preventDefault();
-            const targetChar = findCharacterAt(world.x, world.y, isDM);
-            const contextCharId = targetChar?.id || selectedChar;
-            if (contextCharId) {
-                selectCharacter(contextCharId);
-                setContextMenu({ x: event.clientX, y: event.clientY, charId: contextCharId });
+            const target =
+                findInteractionTargetAt(world.x, world.y, isDM) ||
+                (selectedEntity?.type ? selectedEntity : null);
+            if (target) {
+                selectEntity(target);
+                setContextMenu({
+                    x: event.clientX,
+                    y: event.clientY,
+                    target: {
+                        type: target.type,
+                        id: target.id,
+                    },
+                });
+            } else {
+                setContextMenu(null);
             }
             return;
         }
@@ -606,33 +804,42 @@ function GameComponent() {
             return;
         }
 
-        if (isDM) {
-            const objectTarget = findTopMapObjectAt(world.x, world.y, activeMapObjects);
-            if (objectTarget) {
-                setDragTarget({
-                    type: "mapObject",
-                    id: objectTarget.id,
-                    offsetX: world.x - objectTarget.x,
-                    offsetY: world.y - objectTarget.y,
-                });
-                return;
-            }
-
-            const characterTarget = findCharacterAt(world.x, world.y, true);
-            if (characterTarget) {
-                selectCharacter(characterTarget.id);
-                setDragTarget({
-                    type: "character",
-                    id: characterTarget.id,
-                    offsetX: world.x - characterTarget.position.x,
-                    offsetY: world.y - characterTarget.position.y,
-                });
-                return;
-            }
+        const target = findInteractionTargetAt(world.x, world.y, isDM);
+        if (!target) {
+            selectEntity(null);
+            return;
         }
 
-        const visibleCharacter = findCharacterAt(world.x, world.y, false);
-        selectCharacter(visibleCharacter?.id || null);
+        selectEntity(target);
+
+        if (!isDM) return;
+
+        if (target.type === "mapObject") {
+            const objectTarget = activeMapObjects.find(
+                (obj) => toEntityID(obj?.id) === toEntityID(target.id)
+            );
+            if (!objectTarget) return;
+            setDragTarget({
+                type: "mapObject",
+                id: objectTarget.id,
+                offsetX: world.x - (Number(objectTarget.x) || 0),
+                offsetY: world.y - (Number(objectTarget.y) || 0),
+            });
+            return;
+        }
+
+        if (target.type === "character") {
+            const characterTarget = characters.find(
+                (char) => toEntityID(char?.id) === toEntityID(target.id)
+            );
+            if (!characterTarget) return;
+            setDragTarget({
+                type: "character",
+                id: characterTarget.id,
+                offsetX: world.x - (Number(characterTarget?.position?.x) || 0),
+                offsetY: world.y - (Number(characterTarget?.position?.y) || 0),
+            });
+        }
     };
 
     const handleMouseMove = (event) => {
@@ -740,30 +947,168 @@ function GameComponent() {
         camera.current.y = worldY * camera.current.zoom - event.clientY;
     };
 
-    const handleAction = (action) => {
-        if (!contextMenu?.charId) return;
-        handleCharacterAction(contextMenu.charId, action);
+    const applyObjectHPDelta = async (objectID, amount) => {
+        if (!socket || !playerID || !gameID) return;
+
+        const response = await emitWithAck(socket, "campaign_gameDamageObject", {
+            playerID,
+            campaignID: gameID,
+            objectID,
+            amount,
+        });
+
+        if (!response?.success) {
+            if (response?.message) {
+                setGameContextError((prev) => prev || response.message);
+            }
+            return;
+        }
+
+        const snapshot =
+            response?.engineState?.snapshot && typeof response.engineState.snapshot === "object"
+                ? response.engineState.snapshot
+                : null;
+        if (!snapshot) return;
+        applyingServerStateRef.current = true;
+        loadGameSnapshot(snapshot);
+        setGameContextError("");
+    };
+
+    const handleContextAction = async (action) => {
+        const target = contextMenu?.target;
+        if (!target?.type) return;
         setContextMenu(null);
+
+        if (target.type === "character") {
+            selectEntity(target);
+            const character = characters.find(
+                (char) => toEntityID(char?.id) === toEntityID(target.id)
+            );
+            if (!character) return;
+
+            if (action === "center") {
+                const zoom = Number(camera.current?.zoom) || 1;
+                camera.current.x = (Number(character?.position?.x) || 0) * zoom - window.innerWidth / 2;
+                camera.current.y = (Number(character?.position?.y) || 0) * zoom - window.innerHeight / 2;
+                return;
+            }
+
+            if (action === "info") return;
+            handleCharacterAction(character.id, action);
+            return;
+        }
+
+        if (target.type === "mapObject") {
+            selectEntity(target);
+            const object = mapObjects.find((obj) => toEntityID(obj?.id) === toEntityID(target.id));
+            if (!object) return;
+
+            if (action === "center") {
+                const zoom = Number(camera.current?.zoom) || 1;
+                camera.current.x = (Number(object?.x) || 0) * zoom - window.innerWidth / 2;
+                camera.current.y = (Number(object?.y) || 0) * zoom - window.innerHeight / 2;
+                return;
+            }
+
+            if (action === "inspect") return;
+            if (action === "damage10") {
+                await applyObjectHPDelta(object.id, 10);
+                return;
+            }
+            if (action === "heal10") {
+                await applyObjectHPDelta(object.id, -10);
+                return;
+            }
+            if (action === "delete" && isDM) {
+                deleteMapObject(object.id);
+                setSelectedEntity((prev) => (isSameEntity(prev, target) ? null : prev));
+            }
+        }
     };
 
     const renderSelectedInfo = () => {
-        if (!selectedChar) return null;
-        const char = characters.find((c) => c.id === selectedChar);
-        if (!char) return null;
+        if (!selectedEntityData?.type) return null;
 
-        const screen = worldToScreen(char.position.x, char.position.y);
-        const isLeft = screen.x < window.innerWidth / 2;
+        if (selectedEntityData.type === "character") {
+            const char = selectedEntityData.entity;
+            return (
+                <div
+                    className="absolute top-3 rounded border border-slate-600 bg-slate-900/95 text-white shadow-lg z-[132] w-[280px]"
+                    style={{ right: Math.max(12, sideWidth + 12) }}
+                >
+                    <div className="px-3 py-2 border-b border-slate-700 flex items-center justify-between">
+                        <p className="text-sm font-semibold">Selected Character</p>
+                        <button
+                            type="button"
+                            onClick={() => selectEntity(null)}
+                            className="text-xs text-slate-300 hover:text-white"
+                        >
+                            Close
+                        </button>
+                    </div>
+                    <div className="px-3 py-2 text-xs space-y-1">
+                        <p className="text-sm font-semibold">{char.name || "Unnamed Character"}</p>
+                        <p>ID: {char.id}</p>
+                        <p>Team: {char.team || "unknown"}</p>
+                        <p>
+                            Position: ({Math.round(Number(char?.position?.x) || 0)},{" "}
+                            {Math.round(Number(char?.position?.y) || 0)})
+                        </p>
+                        <p>Size: {Math.round(Number(char?.size) || 0)}</p>
+                        <p>Vision: {Math.round(Number(char?.visionDistance) || 0)}</p>
+                        <p>Arc: {Math.round(Number(char?.visionArc) || 0)} deg</p>
+                    </div>
+                </div>
+            );
+        }
 
-        return (
-            <div
-                className={`absolute top-16 bg-gray-800 text-white px-4 py-2 rounded shadow-lg z-50 ${
-                    isLeft ? "left-4" : "right-4"
-                }`}
-                style={{ maxWidth: "220px" }}
-            >
-                Selected: {char.name}
-            </div>
-        );
+        if (selectedEntityData.type === "mapObject") {
+            const obj = selectedEntityData.entity;
+            const floorType = selectedEntityData.floorType;
+            return (
+                <div
+                    className="absolute top-3 rounded border border-slate-600 bg-slate-900/95 text-white shadow-lg z-[132] w-[300px]"
+                    style={{ right: Math.max(12, sideWidth + 12) }}
+                >
+                    <div className="px-3 py-2 border-b border-slate-700 flex items-center justify-between">
+                        <p className="text-sm font-semibold">Selected Object</p>
+                        <button
+                            type="button"
+                            onClick={() => selectEntity(null)}
+                            className="text-xs text-slate-300 hover:text-white"
+                        >
+                            Close
+                        </button>
+                    </div>
+                    <div className="px-3 py-2 text-xs space-y-1">
+                        <p className="text-sm font-semibold">
+                            {String(obj?.type || "object")} #{obj?.id}
+                        </p>
+                        <p>
+                            Position: ({Math.round(Number(obj?.x) || 0)},{" "}
+                            {Math.round(Number(obj?.y) || 0)})
+                        </p>
+                        <p>Terrain: {String(obj?.terrainType || "obstacle")}</p>
+                        <p>Z Level: {Math.round(Number(obj?.zLevel) || 0)}</p>
+                        <p>Z Index: {Math.round(Number(obj?.z) || 0)}</p>
+                        <p>Floor Type: {floorType?.name || String(obj?.floorTypeId || "none")}</p>
+                        <p>
+                            HP:{" "}
+                            {obj?.maxHP == null
+                                ? "Indestructible"
+                                : `${Math.round(Number(obj?.hp) || 0)} / ${Math.round(
+                                      Number(obj?.maxHP) || 0
+                                  )}`}
+                        </p>
+                        {floorType?.description && (
+                            <p className="text-slate-300">Info: {floorType.description}</p>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        return null;
     };
 
     const placementPreview = (() => {
@@ -863,6 +1208,11 @@ function GameComponent() {
                             {gameContextError}
                         </span>
                     )}
+                    {isDM && autoSaveStatus && (
+                        <span className="text-xs px-3 py-2 rounded border bg-indigo-900/70 border-indigo-500 text-indigo-200">
+                            {autoSaveStatus}
+                        </span>
+                    )}
                 </div>
 
                 {LAYER_CONFIG.map((layer) => (
@@ -950,28 +1300,72 @@ function GameComponent() {
                         onContextMenu={(event) => event.preventDefault()}
                     >
                         <div className="py-1">
-                            {["move", "attack", "defend", "skills"].map((action) => (
-                                <button
-                                    key={action}
-                                    onClick={() => handleAction(action)}
-                                    className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 flex items-center gap-2"
-                                >
-                                    <span>
-                                        {action === "move" && "🚶"}
-                                        {action === "attack" && "⚔️"}
-                                        {action === "defend" && "🛡️"}
-                                        {action === "skills" && "✨"}
-                                    </span>
-                                    {action.charAt(0).toUpperCase() + action.slice(1)}
-                                </button>
-                            ))}
-                            <div className="border-t border-gray-600 my-1" />
-                            <button
-                                onClick={() => handleAction("info")}
-                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 flex items-center gap-2"
-                            >
-                                <span>ℹ️</span> Info
-                            </button>
+                            {contextMenu?.target?.type === "character" && (
+                                <>
+                                    {["move", "attack", "defend", "skills"].map((action) => (
+                                        <button
+                                            key={action}
+                                            onClick={() => handleContextAction(action)}
+                                            className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                        >
+                                            {action.charAt(0).toUpperCase() + action.slice(1)}
+                                        </button>
+                                    ))}
+                                    <div className="border-t border-gray-600 my-1" />
+                                    <button
+                                        onClick={() => handleContextAction("center")}
+                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                    >
+                                        Center Camera
+                                    </button>
+                                    <button
+                                        onClick={() => handleContextAction("info")}
+                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                    >
+                                        Inspect
+                                    </button>
+                                </>
+                            )}
+
+                            {contextMenu?.target?.type === "mapObject" && (
+                                <>
+                                    <button
+                                        onClick={() => handleContextAction("inspect")}
+                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                    >
+                                        Inspect
+                                    </button>
+                                    <button
+                                        onClick={() => handleContextAction("center")}
+                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                    >
+                                        Center Camera
+                                    </button>
+                                    {isDM && (
+                                        <>
+                                            <div className="border-t border-gray-600 my-1" />
+                                            <button
+                                                onClick={() => handleContextAction("damage10")}
+                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                            >
+                                                Damage 10
+                                            </button>
+                                            <button
+                                                onClick={() => handleContextAction("heal10")}
+                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                            >
+                                                Heal 10
+                                            </button>
+                                            <button
+                                                onClick={() => handleContextAction("delete")}
+                                                className="w-full px-4 py-2 text-left text-red-300 hover:bg-gray-700 text-sm"
+                                            >
+                                                Delete Object
+                                            </button>
+                                        </>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </div>
                 )}
@@ -994,3 +1388,4 @@ function GameComponent() {
 }
 
 export default GameComponent;
+

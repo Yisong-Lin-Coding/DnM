@@ -22,6 +22,7 @@ const {
 const MIN_ALLOWED_PLAYERS = 2;
 const MAX_ALLOWED_PLAYERS = 12;
 const DEFAULT_MAX_PLAYERS = 6;
+const MAX_AUTO_SAVE_HISTORY = 5;
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const JOIN_CODE_LENGTH = 6;
 const GAME_ROOM_PREFIX = "campaign_game_room";
@@ -1700,7 +1701,7 @@ module.exports = (socket) => {
                     : toPlainObject(runtimeState?.snapshot);
             const metadata = toPlainObject(data?.metadata);
             const isAutoSave = Boolean(data?.isAutoSave);
-            const makeActive = Boolean(data?.makeActive);
+            const makeActive = Boolean(data?.makeActive) || isAutoSave;
 
             const gameSave = await GameSave.create({
                 campaignId: campaign._id,
@@ -1716,6 +1717,38 @@ module.exports = (socket) => {
             if (makeActive || !campaign.activeGameSave) {
                 campaign.activeGameSave = gameSave._id;
             }
+
+            let prunedAutoSaveIDs = [];
+            if (isAutoSave) {
+                const autoSaves = await GameSave.find({
+                    campaignId: campaign._id,
+                    isAutoSave: true,
+                })
+                    .sort({ updatedAt: -1, _id: -1 })
+                    .select("_id");
+
+                const overflowAutoSaves = autoSaves.slice(MAX_AUTO_SAVE_HISTORY);
+                if (overflowAutoSaves.length > 0) {
+                    const pruneIDSet = new Set(
+                        overflowAutoSaves.map((saveDoc) => toObjectIdString(saveDoc?._id)).filter(Boolean)
+                    );
+                    prunedAutoSaveIDs = Array.from(pruneIDSet.values());
+
+                    campaign.gameSaves = (Array.isArray(campaign.gameSaves) ? campaign.gameSaves : []).filter(
+                        (saveRef) => !pruneIDSet.has(toObjectIdString(saveRef))
+                    );
+
+                    const activeSaveID = toObjectIdString(campaign.activeGameSave);
+                    if (activeSaveID && pruneIDSet.has(activeSaveID)) {
+                        campaign.activeGameSave = gameSave._id;
+                    }
+
+                    await GameSave.deleteMany({
+                        _id: { $in: overflowAutoSaves.map((saveDoc) => saveDoc._id) },
+                    });
+                }
+            }
+
             await campaign.save();
             const nextRuntimeState = replaceRuntimeState(campaign._id, snapshot);
 
@@ -1724,6 +1757,7 @@ module.exports = (socket) => {
                 gameSave: formatGameSave(gameSave),
                 campaignID: String(campaign._id),
                 activeGameSave: toObjectIdString(campaign.activeGameSave),
+                prunedAutoSaveIDs,
                 floorTypes: FLOOR_TYPES,
                 engineState: cloneEngineState(nextRuntimeState),
             });
@@ -1754,13 +1788,33 @@ module.exports = (socket) => {
                 });
             }
 
-            const gameSaves = await GameSave.find({ campaignId: campaign._id })
-                .sort({ updatedAt: -1 })
-                .limit(100);
+            const [manualSaves, autoSaves] = await Promise.all([
+                GameSave.find({
+                    campaignId: campaign._id,
+                    isAutoSave: false,
+                }).sort({ updatedAt: -1, _id: -1 }),
+                GameSave.find({
+                    campaignId: campaign._id,
+                    isAutoSave: true,
+                })
+                    .sort({ updatedAt: -1, _id: -1 })
+                    .limit(MAX_AUTO_SAVE_HISTORY),
+            ]);
+
+            const formattedManualSaves = manualSaves.map((save) => formatGameSave(save)).filter(Boolean);
+            const formattedAutoSaves = autoSaves.map((save) => formatGameSave(save)).filter(Boolean);
+            const gameSaves = [...formattedManualSaves, ...formattedAutoSaves].sort((a, b) => {
+                const aTime = new Date(a?.updatedAt || a?.createdAt || 0).getTime();
+                const bTime = new Date(b?.updatedAt || b?.createdAt || 0).getTime();
+                return bTime - aTime;
+            });
 
             respond({
                 success: true,
-                gameSaves: gameSaves.map((save) => formatGameSave(save)).filter(Boolean),
+                gameSaves,
+                manualSaves: formattedManualSaves,
+                autoSaves: formattedAutoSaves,
+                autoSaveLimit: MAX_AUTO_SAVE_HISTORY,
                 activeGameSave: toObjectIdString(campaign.activeGameSave),
                 campaignID: String(campaign._id),
             });

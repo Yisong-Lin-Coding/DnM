@@ -175,6 +175,10 @@ module.exports = {
     addUtilities({
       '.scrollbar-transparent': {
         'scrollbar-width': 'thin',       // Firefox
+        'scrollbar-color': 'transparent transparent',
+      },
+      '.scrollbar-transparent:hover': {
+        'scrollbar-color': 'rgba(148,163,184,0.55) transparent',
       },
       '.scrollbar-transparent::-webkit-scrollbar': {
         width: '6px',                   // Chrome/Edge
@@ -184,7 +188,11 @@ module.exports = {
         background: 'transparent',      // transparent track
       },
       '.scrollbar-transparent::-webkit-scrollbar-thumb': {
-        background: 'rgba(255,255,255,0.2)', // semi-transparent thumb
+        background: 'transparent',
+        'border-radius': '9999px',
+      },
+      '.scrollbar-transparent:hover::-webkit-scrollbar-thumb': {
+        background: 'rgba(148,163,184,0.55)',
         'border-radius': '9999px',
       },
     });

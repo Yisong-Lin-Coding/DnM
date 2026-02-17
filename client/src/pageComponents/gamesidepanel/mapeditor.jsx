@@ -243,8 +243,10 @@ function MapEditor() {
     });
 
     return (
-        <div className="h-full flex flex-col bg-gray-900 text-white">
-            <div className="p-4 border-b border-gray-700 space-y-4">
+        <div className="h-full min-h-0 bg-gray-900 text-white p-4">
+            <div className="h-full min-h-0 rounded-xl border border-gray-700/80 bg-gray-900/80 p-3">
+                <div className="h-full min-h-0 overflow-y-auto scrollbar-transparent pr-1">
+                    <div className="space-y-4">
                 <h2 className="text-xl font-bold">Map Editor</h2>
 
                 <div className="text-sm bg-gray-800 p-3 rounded space-y-1">
@@ -561,13 +563,12 @@ function MapEditor() {
                     </div>
                 </div>
 
-                {error && <div className="text-sm text-red-300 bg-red-900/40 rounded p-2">{error}</div>}
-                {status && <div className="text-sm text-emerald-300 bg-emerald-900/30 rounded p-2">{status}</div>}
-            </div>
+                        {error && <div className="text-sm text-red-300 bg-red-900/40 rounded p-2">{error}</div>}
+                        {status && <div className="text-sm text-emerald-300 bg-emerald-900/30 rounded p-2">{status}</div>}
 
-            <div className="flex-1 overflow-y-auto p-4">
-                <p className="font-semibold mb-2">Objects ({mapObjects.length})</p>
-                <div className="space-y-2">
+                        <div className="bg-gray-800 p-3 rounded space-y-2">
+                            <p className="font-semibold mb-1">Objects ({mapObjects.length})</p>
+                            <div className="max-h-[42vh] min-h-[220px] overflow-y-auto scrollbar-transparent pr-1 space-y-2">
                     {sortedObjects.map((obj) => (
                         <div
                             key={obj.id}
@@ -598,7 +599,7 @@ function MapEditor() {
                                     }}
                                     className="text-red-400 hover:text-red-300 text-xl"
                                 >
-                                    ×
+                                    x
                                 </button>
                             </div>
 
@@ -817,6 +818,9 @@ function MapEditor() {
                             )}
                         </div>
                     ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -824,3 +828,4 @@ function MapEditor() {
 }
 
 export default MapEditor;
+
