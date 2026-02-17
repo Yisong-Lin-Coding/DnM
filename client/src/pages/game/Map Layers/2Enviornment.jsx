@@ -52,27 +52,100 @@ const normalizeTerrainType = (value) => {
 const normalizeFloorVisualType = (value) =>
   String(value || "").trim().toLowerCase() === "effect" ? "effect" : "base";
 
+// ============================================================================
+// LIGHTING NORMALIZATION FUNCTIONS
+// ============================================================================
+
+const normalizeLightingDirection = (value = {}) => {
+  const x = clamp(Number(value?.x) || 0, -1, 1);
+  const y = clamp(Number(value?.y) || 0, -1, 1);
+  const magnitude = Math.hypot(x, y);
+  if (magnitude <= 1 || magnitude === 0) return { x, y };
+  return {
+    x: x / magnitude,
+    y: y / magnitude,
+  };
+};
+
+const normalizeLightSourceType = (value) =>
+  String(value || "").trim().toLowerCase() === "point" ? "point" : "directional";
+
+const normalizeLightingSource = (raw = {}, fallbackIndex = 0) => {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const type = normalizeLightSourceType(source.type);
+  const sourceInput =
+    source?.source && typeof source.source === "object" && !Array.isArray(source.source)
+      ? source.source
+      : source;
+
+  const normalized = {
+    id: String(source.id || `light_${fallbackIndex + 1}`).trim() || `light_${fallbackIndex + 1}`,
+    name:
+      String(source.name || (type === "point" ? `Lamp ${fallbackIndex + 1}` : `Light ${fallbackIndex + 1}`))
+        .trim() || (type === "point" ? `Lamp ${fallbackIndex + 1}` : `Light ${fallbackIndex + 1}`),
+    type,
+    enabled: source.enabled !== false,
+    intensity: clamp(Number(source.intensity) || 0.8, 0, 2),
+    blend: clamp(Number(source.blend) || 0.7, 0, 1),
+    color: String(source.color || "#ffffff").trim(),
+  };
+
+  if (type === "point") {
+    normalized.worldX = Number(source.worldX ?? source.position?.x) || 0;
+    normalized.worldY = Number(source.worldY ?? source.position?.y) || 0;
+    normalized.range = Math.max(10, Number(source.range) || 420);
+  } else {
+    const direction = normalizeLightingDirection({
+      x: sourceInput?.x,
+      y: sourceInput?.y,
+    });
+    normalized.x = direction.x;
+    normalized.y = direction.y;
+  }
+
+  return normalized;
+};
+
 const normalizeLighting = (lighting = {}) => {
   const sourceInput =
     lighting?.source && typeof lighting.source === "object" && !Array.isArray(lighting.source)
       ? lighting.source
       : lighting;
-  const x = clamp(Number(sourceInput?.x) || 0, -1, 1);
-  const y = clamp(Number(sourceInput?.y) || 0, -1, 1);
-  const magnitude = Math.hypot(x, y);
-  const source =
-    magnitude <= 1 || magnitude === 0
-      ? { x, y }
-      : {
-          x: x / magnitude,
-          y: y / magnitude,
-        };
+  
+  const rawSources = Array.isArray(lighting?.sources) ? lighting.sources : [];
+  let sources = rawSources.map((entry, index) => normalizeLightingSource(entry, index));
+  
+  // Backward compatibility: if no sources array, create one from legacy format
+  if (sources.length === 0) {
+    sources = [
+      normalizeLightingSource(
+        {
+          type: "directional",
+          x: sourceInput?.x,
+          y: sourceInput?.y,
+          intensity: lighting?.intensity,
+          blend: lighting?.blend,
+        },
+        0
+      ),
+    ];
+  }
+
   return {
     enabled: lighting?.enabled !== false,
-    source,
-    intensity: clamp(Number(lighting?.intensity) || 0.5, 0, 1),
+    ambient: clamp(Number(lighting?.ambient) || 0.3, 0, 0.95),
+    shadowEnabled: lighting?.shadowEnabled !== false,
+    shadowStrength: clamp(Number(lighting?.shadowStrength) || 0.72, 0, 1),
+    shadowSoftness: clamp(Number(lighting?.shadowSoftness) || 0.55, 0, 1),
+    shadowLength: clamp(Number(lighting?.shadowLength) || 0.8, 0, 2),
+    shadowBlend: clamp(Number(lighting?.shadowBlend) || 0.6, 0, 1),
+    sources,
   };
 };
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
 const getObjectZLevel = (obj) => Math.round(Number(obj?.zLevel) || 0);
 
@@ -215,34 +288,46 @@ const drawShape = (ctx, obj, camera, style = {}) => {
   return { screenX, screenY };
 };
 
-const drawObjectDirectionalShadow = (ctx, obj, camera, lighting, opacity = 1) => {
-  if (!lighting?.enabled) return;
+// ============================================================================
+// MULTI-SOURCE SHADOW RENDERING
+// ============================================================================
+
+const drawObjectShadowFromDirectionalLight = (ctx, obj, camera, lightSource, lighting, opacity = 1) => {
+  if (!lightSource.enabled) return;
+  
   const objectHeight = getObjectElevationHeight(obj);
   if (objectHeight <= 0) return;
 
   const zoom = Number(camera?.zoom) || 1;
-  const sourceX = Number(lighting?.source?.x) || 0;
-  const sourceY = Number(lighting?.source?.y) || 0;
+  const sourceX = Number(lightSource?.x) || 0;
+  const sourceY = Number(lightSource?.y) || 0;
   const lightTilt = clamp(Math.hypot(sourceX, sourceY), 0, 1);
-  const intensity = clamp(Number(lighting?.intensity) || 0.5, 0, 1);
+  const intensity = clamp(Number(lightSource?.intensity) || 0.8, 0, 2);
+  const blend = clamp(Number(lightSource?.blend) || 0.7, 0, 1);
 
-  const contactAlpha = clamp((0.08 + (objectHeight / 320) * 0.18) * opacity, 0.05, 0.35);
+  // Contact shadow (directly under object)
+  const contactAlpha = clamp(
+    (0.08 + (objectHeight / 320) * 0.18) * opacity * lighting.shadowStrength * blend,
+    0.05,
+    0.35
+  );
   ctx.save();
   ctx.fillStyle = "#000000";
   ctx.globalAlpha = contactAlpha;
   ctx.shadowColor = "rgba(0,0,0,0.5)";
-  ctx.shadowBlur = Math.max(1, Math.round(2 + zoom * 1.5));
+  ctx.shadowBlur = Math.max(1, Math.round((2 + zoom * 1.5) * lighting.shadowSoftness));
   drawShape(ctx, obj, camera, { fill: true, stroke: false });
   ctx.restore();
 
   if (lightTilt < 0.025) return;
 
-  const shadowReach = objectHeight * zoom * (0.18 + lightTilt * 0.55);
+  // Directional shadow (cast from light direction)
+  const shadowReach = objectHeight * zoom * (0.18 + lightTilt * 0.55) * lighting.shadowLength;
   const offsetX = -sourceX * shadowReach;
   const offsetY = -sourceY * shadowReach;
-  const layers = Math.max(2, Math.round(2 + lightTilt * 4));
+  const layers = Math.max(2, Math.round((2 + lightTilt * 4) * lighting.shadowSoftness));
   const directionalAlpha = clamp(
-    (0.05 + (objectHeight / 220) * (0.32 + intensity * 0.38)) * opacity,
+    (0.05 + (objectHeight / 220) * (0.32 + intensity * 0.38)) * opacity * lighting.shadowStrength * blend,
     0.05,
     0.58
   );
@@ -252,11 +337,99 @@ const drawObjectDirectionalShadow = (ctx, obj, camera, lighting, opacity = 1) =>
     ctx.save();
     ctx.translate(offsetX * t, offsetY * t);
     ctx.fillStyle = "#000000";
-    ctx.globalAlpha = directionalAlpha * (1 - t * 0.62);
+    ctx.globalAlpha = directionalAlpha * (1 - t * 0.62) * lighting.shadowBlend;
     drawShape(ctx, obj, camera, { fill: true, stroke: false });
     ctx.restore();
   }
 };
+
+const drawObjectShadowFromPointLight = (ctx, obj, camera, lightSource, lighting, opacity = 1) => {
+  if (!lightSource.enabled) return;
+  
+  const objectHeight = getObjectElevationHeight(obj);
+  if (objectHeight <= 0) return;
+
+  const zoom = Number(camera?.zoom) || 1;
+  const objX = Number(obj?.x) || 0;
+  const objY = Number(obj?.y) || 0;
+  const lightX = Number(lightSource?.worldX) || 0;
+  const lightY = Number(lightSource?.worldY) || 0;
+  const range = Math.max(10, Number(lightSource?.range) || 420);
+
+  // Calculate distance from light to object
+  const dx = objX - lightX;
+  const dy = objY - lightY;
+  const distance = Math.hypot(dx, dy);
+
+  // Skip if object is out of range
+  if (distance > range) return;
+
+  // Calculate light falloff
+  const falloff = Math.max(0, 1 - (distance / range));
+  if (falloff < 0.05) return;
+
+  const intensity = clamp(Number(lightSource?.intensity) || 0.8, 0, 2);
+  const blend = clamp(Number(lightSource?.blend) || 0.7, 0, 1);
+
+  // Calculate shadow direction (away from light)
+  const dirX = distance > 0 ? dx / distance : 0;
+  const dirY = distance > 0 ? dy / distance : 0;
+
+  // Contact shadow
+  const contactAlpha = clamp(
+    (0.08 + (objectHeight / 320) * 0.18) * opacity * lighting.shadowStrength * blend * falloff,
+    0.05,
+    0.35
+  );
+  ctx.save();
+  ctx.fillStyle = "#000000";
+  ctx.globalAlpha = contactAlpha;
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = Math.max(1, Math.round((2 + zoom * 1.5) * lighting.shadowSoftness));
+  drawShape(ctx, obj, camera, { fill: true, stroke: false });
+  ctx.restore();
+
+  // Directional shadow (cast away from point light)
+  const shadowReach = objectHeight * zoom * (0.18 + 0.55) * lighting.shadowLength * falloff;
+  const offsetX = dirX * shadowReach;
+  const offsetY = dirY * shadowReach;
+  const layers = Math.max(2, Math.round((2 + 4) * lighting.shadowSoftness));
+  const directionalAlpha = clamp(
+    (0.05 + (objectHeight / 220) * (0.32 + intensity * 0.38)) * opacity * lighting.shadowStrength * blend * falloff,
+    0.05,
+    0.58
+  );
+
+  for (let index = 1; index <= layers; index += 1) {
+    const t = index / layers;
+    ctx.save();
+    ctx.translate(offsetX * t, offsetY * t);
+    ctx.fillStyle = "#000000";
+    ctx.globalAlpha = directionalAlpha * (1 - t * 0.62) * lighting.shadowBlend;
+    drawShape(ctx, obj, camera, { fill: true, stroke: false });
+    ctx.restore();
+  }
+};
+
+const drawObjectMultiSourceShadows = (ctx, obj, camera, lighting, opacity = 1) => {
+  if (!lighting?.enabled || !lighting?.shadowEnabled) return;
+  if (!Array.isArray(lighting?.sources) || lighting.sources.length === 0) return;
+
+  // Draw shadows from each enabled light source
+  lighting.sources.forEach((lightSource) => {
+    if (!lightSource || !lightSource.enabled) return;
+
+    if (lightSource.type === "directional") {
+      drawObjectShadowFromDirectionalLight(ctx, obj, camera, lightSource, lighting, opacity);
+    } else if (lightSource.type === "point") {
+      drawObjectShadowFromPointLight(ctx, obj, camera, lightSource, lighting, opacity);
+    }
+  });
+};
+
+// ============================================================================
+// OBJECT DRAWING
+// ============================================================================
 
 const drawResizeGuides = (ctx, obj, camera) => {
   const bounds = getObjectBoundsWorld(obj);
@@ -327,9 +500,12 @@ const drawMapObject = (ctx, obj, camera, options = {}) => {
   const objectHeight = Math.round(getObjectElevationHeight(obj));
 
   ctx.save();
-  if (!isGhost) {
-    drawObjectDirectionalShadow(ctx, obj, camera, lighting, opacity);
+  
+  // Draw multi-source shadows
+  if (!isGhost && lighting) {
+    drawObjectMultiSourceShadows(ctx, obj, camera, lighting, opacity);
   }
+  
   ctx.strokeStyle = terrainStyle.strokeColor;
   ctx.lineWidth = terrainStyle.lineWidth;
   ctx.setLineDash(terrainStyle.lineDash);
@@ -395,6 +571,10 @@ const drawBlockedMovePreview = (ctx, obj, camera) => {
   );
   ctx.restore();
 };
+
+// ============================================================================
+// LAYER EXPORT
+// ============================================================================
 
 export const mapObjectsLayer = {
   id: "mapObjects",

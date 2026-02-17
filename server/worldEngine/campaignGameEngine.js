@@ -5,12 +5,34 @@ const MIN_HITBOX_SCALE = 0.1;
 const MAX_HITBOX_SCALE = 5;
 const LIGHT_AXIS_MIN = -1;
 const LIGHT_AXIS_MAX = 1;
+const LIGHT_INTENSITY_MIN = 0;
+const LIGHT_INTENSITY_MAX = 2;
+const LIGHT_BLEND_MIN = 0;
+const LIGHT_BLEND_MAX = 1;
+const LIGHT_RANGE_MIN = 10;
+const LIGHT_RANGE_MAX = 5000;
 
 const DEFAULT_LIGHTING = {
     enabled: true,
-    source: { x: 0.22, y: -0.78 },
     ambient: 0.3,
-    intensity: 0.5,
+    shadowEnabled: true,
+    shadowStrength: 0.72,
+    shadowSoftness: 0.55,
+    shadowLength: 0.8,
+    shadowBlend: 0.6,
+    sources: [
+        {
+            id: "sun",
+            name: "Sun",
+            type: "directional",
+            enabled: true,
+            x: 0.22,
+            y: -0.78,
+            intensity: 0.8,
+            blend: 0.7,
+            color: "#ffffff",
+        }
+    ]
 };
 
 const DEFAULT_MAX_HP_BY_TERRAIN = {
@@ -64,7 +86,12 @@ const clampLightAxis = (value) =>
 const normalizeFloorVisualType = (value) =>
     String(value || "").trim().toLowerCase() === "effect" ? "effect" : "base";
 
-const normalizeLightingSource = (value = {}) => {
+const normalizeHexColor = (value, fallback = "#3B82F6") => {
+    const raw = String(value || "").trim();
+    return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : fallback;
+};
+
+const normalizeLightingDirection = (value = {}) => {
     const x = clampLightAxis(value?.x);
     const y = clampLightAxis(value?.y);
     const magnitude = Math.hypot(x, y);
@@ -77,22 +104,80 @@ const normalizeLightingSource = (value = {}) => {
     };
 };
 
+const normalizeLightSourceType = (value) =>
+    String(value || "").trim().toLowerCase() === "point" ? "point" : "directional";
+
+const normalizeLightingSource = (raw = {}, fallbackIndex = 0) => {
+    const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    const type = normalizeLightSourceType(source.type);
+    const sourceInput =
+        source?.source && typeof source.source === "object" && !Array.isArray(source.source)
+            ? source.source
+            : source;
+
+    const normalized = {
+        id: String(source.id || `light_${fallbackIndex + 1}`).trim() || `light_${fallbackIndex + 1}`,
+        name:
+            String(source.name || (type === "point" ? `Lamp ${fallbackIndex + 1}` : `Light ${fallbackIndex + 1}`))
+                .trim() || (type === "point" ? `Lamp ${fallbackIndex + 1}` : `Light ${fallbackIndex + 1}`),
+        type,
+        enabled: source.enabled !== false,
+        intensity: Math.max(LIGHT_INTENSITY_MIN, Math.min(LIGHT_INTENSITY_MAX, toNumber(source.intensity, 0.8))),
+        blend: Math.max(LIGHT_BLEND_MIN, Math.min(LIGHT_BLEND_MAX, toNumber(source.blend, 0.7))),
+        color: normalizeHexColor(source.color, "#ffffff"),
+    };
+
+    if (type === "point") {
+        normalized.worldX = toNumber(source.worldX ?? source.position?.x, 0);
+        normalized.worldY = toNumber(source.worldY ?? source.position?.y, 0);
+        normalized.range = Math.max(LIGHT_RANGE_MIN, Math.min(LIGHT_RANGE_MAX, toNumber(source.range, 420)));
+    } else {
+        const direction = normalizeLightingDirection({
+            x: sourceInput?.x,
+            y: sourceInput?.y,
+        });
+        normalized.x = direction.x;
+        normalized.y = direction.y;
+    }
+
+    return normalized;
+};
+
 const normalizeLightingConfig = (value = {}) => {
     const sourceInput =
         value?.source && typeof value.source === "object" && !Array.isArray(value.source)
             ? value.source
             : value;
+    
+    const rawSources = Array.isArray(value?.sources) ? value.sources : [];
+    let sources = rawSources.map((entry, index) => normalizeLightingSource(entry, index));
+    
+    // Backward compatibility: if no sources array, create one from legacy format
+    if (sources.length === 0) {
+        sources = [
+            normalizeLightingSource(
+                {
+                    type: "directional",
+                    x: sourceInput?.x,
+                    y: sourceInput?.y,
+                    intensity: value?.intensity,
+                    blend: value?.blend,
+                },
+                0
+            ),
+        ];
+    }
+
     return {
         enabled: value?.enabled !== false,
-        source: normalizeLightingSource(sourceInput),
-        ambient: Math.max(0, Math.min(0.9, toNumber(value?.ambient, DEFAULT_LIGHTING.ambient))),
-        intensity: Math.max(0, Math.min(1, toNumber(value?.intensity, DEFAULT_LIGHTING.intensity))),
+        ambient: Math.max(0, Math.min(0.95, toNumber(value?.ambient, DEFAULT_LIGHTING.ambient))),
+        shadowEnabled: value?.shadowEnabled !== false,
+        shadowStrength: Math.max(0, Math.min(1, toNumber(value?.shadowStrength, DEFAULT_LIGHTING.shadowStrength))),
+        shadowSoftness: Math.max(0, Math.min(1, toNumber(value?.shadowSoftness, DEFAULT_LIGHTING.shadowSoftness))),
+        shadowLength: Math.max(0, Math.min(2, toNumber(value?.shadowLength, DEFAULT_LIGHTING.shadowLength))),
+        shadowBlend: Math.max(0, Math.min(1, toNumber(value?.shadowBlend, DEFAULT_LIGHTING.shadowBlend))),
+        sources,
     };
-};
-
-const normalizeHexColor = (value, fallback = "#3B82F6") => {
-    const raw = String(value || "").trim();
-    return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : fallback;
 };
 
 const normalizeFloorTypeID = (value, terrainType = "obstacle") => {
@@ -361,6 +446,8 @@ const applyObjectHPDelta = (state, objectID, amount) => {
 
 module.exports = {
     normalizeFloorTypeCollection,
+    normalizeLightingConfig,
+    normalizeLightingSource,
     createEngineState,
     updateEngineState,
     applyObjectHPDelta,
