@@ -19,6 +19,17 @@ const PAN_SPEED = 13;
 const CLICK_DRAG_THRESHOLD_PX = 6;
 const MIN_RECT_WORLD_SIZE = 8;
 const MIN_SHAPE_WORLD_SIZE = 4;
+const AUTO_SAVE_DEBOUNCE_MS = 900;
+const INFO_PANEL_WIDTH = 320;
+const INFO_PANEL_MIN_LEFT = 12;
+const INFO_PANEL_MIN_TOP = 12;
+const INFO_PANEL_MAX_BOTTOM_PADDING = 120;
+
+const DEFAULT_MAX_HP_BY_TERRAIN = {
+    floor: 500,
+    wall: 1200,
+    obstacle: 700,
+};
 
 const LAYER_CONFIG = [
     { name: "background", component: backgroundLayer, zIndex: 0 },
@@ -160,8 +171,10 @@ function GameComponent() {
         camera,
         handleCharacterAction,
         mapObjects,
+        addMapObject,
         updateMapObject,
         deleteMapObject,
+        updateCharacter,
         moveCharacter,
         isDM,
         setIsDM,
@@ -186,13 +199,19 @@ function GameComponent() {
     const [loadingGameContext, setLoadingGameContext] = useState(true);
     const [placementDrag, setPlacementDrag] = useState(null);
     const [autoSaveStatus, setAutoSaveStatus] = useState("");
+    const [turnNumber, setTurnNumber] = useState(1);
+    const [infoPanelPosition, setInfoPanelPosition] = useState(null);
+    const [infoPanelDrag, setInfoPanelDrag] = useState(null);
 
     const isPanning = useRef(false);
     const layerRefs = useRef({});
     const prevStateRef = useRef(null);
     const applyingServerStateRef = useRef(false);
+    const skipNextAutoSaveRef = useRef(false);
     const syncingWorldRef = useRef(false);
     const autoSavingRef = useRef(false);
+    const autoSaveTimerRef = useRef(null);
+    const hasAutoSaveBaselineRef = useRef(false);
     const latestSnapshotRef = useRef({
         mapObjects: [],
         backgroundKey: "",
@@ -208,6 +227,92 @@ function GameComponent() {
         KeyQ: false,
         KeyE: false,
     });
+
+    const runAutoSave = useCallback(
+        async (trigger = "map_change") => {
+            if (!socket || !playerID || !gameID || !isDM || loadingGameContext) return;
+            if (autoSavingRef.current) return;
+
+            autoSavingRef.current = true;
+            const now = new Date();
+            const snapshotSource = latestSnapshotRef.current || {};
+            const triggerLabel = trigger === "turn_done" ? "turn end" : "map change";
+
+            const response = await emitWithAck(socket, "campaign_saveGame", {
+                playerID,
+                campaignID: gameID,
+                name: `Auto Save ${now.toLocaleString()}`,
+                description: "Automatic save from active game session",
+                snapshot: {
+                    mapObjects: Array.isArray(snapshotSource.mapObjects)
+                        ? snapshotSource.mapObjects
+                        : [],
+                    backgroundKey: String(snapshotSource.backgroundKey || ""),
+                    characters: Array.isArray(snapshotSource.characters)
+                        ? snapshotSource.characters
+                        : [],
+                    currentZLevel: Number(snapshotSource.currentZLevel) || 0,
+                    floorTypes: Array.isArray(snapshotSource.floorTypes)
+                        ? snapshotSource.floorTypes
+                        : [],
+                },
+                metadata: {
+                    source: "autosave",
+                    trigger,
+                },
+                makeActive: true,
+                isAutoSave: true,
+            });
+
+            autoSavingRef.current = false;
+
+            if (!response?.success) {
+                setAutoSaveStatus(`Autosave failed: ${response?.message || "Unknown error"}`);
+                return;
+            }
+
+            setAutoSaveStatus(`Autosaved (${triggerLabel}) ${now.toLocaleTimeString()}`);
+        },
+        [socket, playerID, gameID, isDM, loadingGameContext]
+    );
+
+    const scheduleAutoSave = useCallback(
+        (trigger = "map_change", options = {}) => {
+            const immediate = Boolean(options?.immediate);
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+
+            if (immediate) {
+                runAutoSave(trigger);
+                return;
+            }
+
+            setAutoSaveStatus("Autosave queued...");
+            autoSaveTimerRef.current = setTimeout(() => {
+                autoSaveTimerRef.current = null;
+                runAutoSave(trigger);
+            }, AUTO_SAVE_DEBOUNCE_MS);
+        },
+        [runAutoSave]
+    );
+
+    const handleTurnDone = useCallback(() => {
+        if (!isDM) return;
+        setTurnNumber((prev) => prev + 1);
+        scheduleAutoSave("turn_done", { immediate: true });
+    }, [isDM, scheduleAutoSave]);
+
+    useEffect(
+        () => () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+        },
+        []
+    );
 
     useEffect(() => {
         const selectedBackgroundKey = String(backgroundKey || "calm1").toLowerCase();
@@ -264,6 +369,7 @@ function GameComponent() {
                     ? response.engineState.snapshot
                     : response?.snapshot || {};
             applyingServerStateRef.current = true;
+            skipNextAutoSaveRef.current = true;
             loadGameSnapshot(initialSnapshot);
         }
 
@@ -289,6 +395,7 @@ function GameComponent() {
                 replaceFloorTypes(payload.floorTypes);
             }
             applyingServerStateRef.current = true;
+            skipNextAutoSaveRef.current = true;
             loadGameSnapshot(snapshot);
         };
 
@@ -340,6 +447,7 @@ function GameComponent() {
                 replaceFloorTypes(response.floorTypes);
             }
             applyingServerStateRef.current = true;
+            skipNextAutoSaveRef.current = true;
             loadGameSnapshot(snapshot);
         }, 160);
 
@@ -359,53 +467,33 @@ function GameComponent() {
     ]);
 
     useEffect(() => {
-        if (!socket || !playerID || !gameID || !isDM || loadingGameContext) return undefined;
+        if (!socket || !playerID || !gameID || !isDM || loadingGameContext) return;
 
-        const autoSave = async () => {
-            if (autoSavingRef.current) return;
-            autoSavingRef.current = true;
+        if (skipNextAutoSaveRef.current) {
+            skipNextAutoSaveRef.current = false;
+            hasAutoSaveBaselineRef.current = true;
+            return;
+        }
 
-            const now = new Date();
-            const snapshotSource = latestSnapshotRef.current || {};
-            const response = await emitWithAck(socket, "campaign_saveGame", {
-                playerID,
-                campaignID: gameID,
-                name: `Auto Save ${now.toLocaleString()}`,
-                description: "Automatic save from active game session",
-                snapshot: {
-                    mapObjects: Array.isArray(snapshotSource.mapObjects)
-                        ? snapshotSource.mapObjects
-                        : [],
-                    backgroundKey: String(snapshotSource.backgroundKey || ""),
-                    characters: Array.isArray(snapshotSource.characters)
-                        ? snapshotSource.characters
-                        : [],
-                    currentZLevel: Number(snapshotSource.currentZLevel) || 0,
-                    floorTypes: Array.isArray(snapshotSource.floorTypes)
-                        ? snapshotSource.floorTypes
-                        : [],
-                },
-                metadata: {
-                    source: "autosave",
-                    trigger: "interval_10s",
-                },
-                makeActive: true,
-                isAutoSave: true,
-            });
+        if (!hasAutoSaveBaselineRef.current) {
+            hasAutoSaveBaselineRef.current = true;
+            return;
+        }
 
-            autoSavingRef.current = false;
-
-            if (!response?.success) {
-                setAutoSaveStatus(`Autosave failed: ${response?.message || "Unknown error"}`);
-                return;
-            }
-
-            setAutoSaveStatus(`Autosaved ${now.toLocaleTimeString()}`);
-        };
-
-        const timer = setInterval(autoSave, 10000);
-        return () => clearInterval(timer);
-    }, [socket, playerID, gameID, isDM, loadingGameContext]);
+        scheduleAutoSave("map_change");
+    }, [
+        socket,
+        playerID,
+        gameID,
+        isDM,
+        loadingGameContext,
+        mapObjects,
+        backgroundKey,
+        characters,
+        floorTypes,
+        currentZLevel,
+        scheduleAutoSave,
+    ]);
 
     const formatCanvas = (canvas) => {
         const dpr = window.devicePixelRatio || 1;
@@ -571,6 +659,72 @@ function GameComponent() {
         setSelectedEntity(null);
     }, [selectedEntity, selectedEntityData]);
 
+    const clampInfoPanelPosition = useCallback(
+        (x, y) => {
+            const maxX = Math.max(
+                INFO_PANEL_MIN_LEFT,
+                window.innerWidth - sideWidth - INFO_PANEL_WIDTH - INFO_PANEL_MIN_LEFT
+            );
+            const maxY = Math.max(
+                INFO_PANEL_MIN_TOP,
+                window.innerHeight - INFO_PANEL_MAX_BOTTOM_PADDING
+            );
+            return {
+                x: Math.max(INFO_PANEL_MIN_LEFT, Math.min(Math.round(x), Math.round(maxX))),
+                y: Math.max(INFO_PANEL_MIN_TOP, Math.min(Math.round(y), Math.round(maxY))),
+            };
+        },
+        [sideWidth]
+    );
+
+    useEffect(() => {
+        if (!selectedEntityData?.type) {
+            setInfoPanelDrag(null);
+            return;
+        }
+        setInfoPanelPosition((prev) => {
+            if (prev && Number.isFinite(prev.x) && Number.isFinite(prev.y)) {
+                return clampInfoPanelPosition(prev.x, prev.y);
+            }
+            return clampInfoPanelPosition(
+                window.innerWidth - sideWidth - INFO_PANEL_WIDTH - INFO_PANEL_MIN_LEFT,
+                INFO_PANEL_MIN_TOP
+            );
+        });
+    }, [selectedEntityData, sideWidth, clampInfoPanelPosition]);
+
+    useEffect(() => {
+        const onResize = () => {
+            setInfoPanelPosition((prev) =>
+                prev ? clampInfoPanelPosition(prev.x, prev.y) : prev
+            );
+        };
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
+    }, [clampInfoPanelPosition]);
+
+    useEffect(() => {
+        if (!infoPanelDrag) return undefined;
+
+        const onMouseMove = (event) => {
+            const next = clampInfoPanelPosition(
+                event.clientX - infoPanelDrag.offsetX,
+                event.clientY - infoPanelDrag.offsetY
+            );
+            setInfoPanelPosition(next);
+        };
+
+        const onMouseUp = () => setInfoPanelDrag(null);
+
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+
+        return () => {
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+        };
+    }, [infoPanelDrag, clampInfoPanelPosition]);
+
     useEffect(() => {
         if (!selectedChar) return;
         setSelectedEntity((prev) => {
@@ -606,6 +760,8 @@ function GameComponent() {
                 zoom: Number(camera.current.zoom) || 1,
                 bgImage: camera.current.bgImage || null,
             };
+            const selectedMapObjectID =
+                selectedEntity?.type === "mapObject" ? toEntityID(selectedEntity.id) : "";
 
             const currentState = {
                 bgImage: cameraSnapshot.bgImage,
@@ -613,6 +769,7 @@ function GameComponent() {
                 mapObjects,
                 floorTypes,
                 currentZLevel,
+                selectedMapObjectID,
             };
 
             michelangeloEngine({
@@ -627,7 +784,7 @@ function GameComponent() {
 
         loop();
         return () => cancelAnimationFrame(raf);
-    }, [camera, mapObjects, floorTypes, currentZLevel]);
+    }, [camera, mapObjects, floorTypes, currentZLevel, selectedEntity]);
 
     useEffect(() => {
         const onMouseMove = (event) => {
@@ -768,10 +925,10 @@ function GameComponent() {
                 findInteractionTargetAt(world.x, world.y, isDM) ||
                 (selectedEntity?.type ? selectedEntity : null);
             if (target) {
-                selectEntity(target);
                 setContextMenu({
                     x: event.clientX,
                     y: event.clientY,
+                    world: { x: world.x, y: world.y },
                     target: {
                         type: target.type,
                         id: target.id,
@@ -970,21 +1127,35 @@ function GameComponent() {
                 : null;
         if (!snapshot) return;
         applyingServerStateRef.current = true;
+        skipNextAutoSaveRef.current = true;
         loadGameSnapshot(snapshot);
         setGameContextError("");
     };
 
     const handleContextAction = async (action) => {
         const target = contextMenu?.target;
+        const contextWorld =
+            contextMenu?.world &&
+            Number.isFinite(Number(contextMenu.world.x)) &&
+            Number.isFinite(Number(contextMenu.world.y))
+                ? {
+                      x: Number(contextMenu.world.x),
+                      y: Number(contextMenu.world.y),
+                  }
+                : null;
         if (!target?.type) return;
         setContextMenu(null);
 
         if (target.type === "character") {
-            selectEntity(target);
             const character = characters.find(
                 (char) => toEntityID(char?.id) === toEntityID(target.id)
             );
             if (!character) return;
+
+            if (action === "info") {
+                selectEntity(target);
+                return;
+            }
 
             if (action === "center") {
                 const zoom = Number(camera.current?.zoom) || 1;
@@ -993,15 +1164,38 @@ function GameComponent() {
                 return;
             }
 
-            if (action === "info") return;
+            if (action === "placeHere" && isDM && contextWorld) {
+                moveCharacter(character.id, Math.round(contextWorld.x), Math.round(contextWorld.y));
+                selectEntity({ type: "character", id: character.id });
+                return;
+            }
+
+            if (action === "toggleTeam" && isDM) {
+                const nextTeam = String(character?.team || "player").toLowerCase() === "enemy"
+                    ? "player"
+                    : "enemy";
+                updateCharacter(character.id, { team: nextTeam });
+                selectEntity({ type: "character", id: character.id });
+                return;
+            }
+
+            if (action === "endTurn" && isDM) {
+                handleTurnDone();
+                return;
+            }
+
             handleCharacterAction(character.id, action);
             return;
         }
 
         if (target.type === "mapObject") {
-            selectEntity(target);
             const object = mapObjects.find((obj) => toEntityID(obj?.id) === toEntityID(target.id));
             if (!object) return;
+
+            if (action === "inspect") {
+                selectEntity(target);
+                return;
+            }
 
             if (action === "center") {
                 const zoom = Number(camera.current?.zoom) || 1;
@@ -1010,7 +1204,6 @@ function GameComponent() {
                 return;
             }
 
-            if (action === "inspect") return;
             if (action === "damage10") {
                 await applyObjectHPDelta(object.id, 10);
                 return;
@@ -1022,24 +1215,88 @@ function GameComponent() {
             if (action === "delete" && isDM) {
                 deleteMapObject(object.id);
                 setSelectedEntity((prev) => (isSameEntity(prev, target) ? null : prev));
+                return;
+            }
+            if (action === "duplicate" && isDM) {
+                const clone = { ...object };
+                delete clone.id;
+                addMapObject({
+                    ...clone,
+                    x: Math.round(Number(object?.x) || 0) + 24,
+                    y: Math.round(Number(object?.y) || 0) + 24,
+                });
+                return;
+            }
+            if (action === "bringForward" && isDM) {
+                updateMapObject(object.id, {
+                    z: Math.round(Number(object?.z) || 0) + 1,
+                });
+                return;
+            }
+            if (action === "sendBackward" && isDM) {
+                updateMapObject(object.id, {
+                    z: Math.round(Number(object?.z) || 0) - 1,
+                });
+                return;
+            }
+            if (action === "toggleIndestructible" && isDM) {
+                if (object?.maxHP == null) {
+                    const terrain = String(object?.terrainType || "obstacle").toLowerCase();
+                    const restoredHP =
+                        DEFAULT_MAX_HP_BY_TERRAIN[terrain] || DEFAULT_MAX_HP_BY_TERRAIN.obstacle;
+                    updateMapObject(object.id, {
+                        maxHP: restoredHP,
+                        hp: restoredHP,
+                    });
+                } else {
+                    updateMapObject(object.id, {
+                        maxHP: null,
+                        hp: null,
+                    });
+                }
             }
         }
     };
 
+    const handleInfoPanelMouseDown = useCallback(
+        (event) => {
+            if (event.button !== 0) return;
+            if (!infoPanelPosition) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setInfoPanelDrag({
+                offsetX: event.clientX - infoPanelPosition.x,
+                offsetY: event.clientY - infoPanelPosition.y,
+            });
+        },
+        [infoPanelPosition]
+    );
+
     const renderSelectedInfo = () => {
         if (!selectedEntityData?.type) return null;
+        const panelPos =
+            infoPanelPosition ||
+            clampInfoPanelPosition(
+                window.innerWidth - sideWidth - INFO_PANEL_WIDTH - INFO_PANEL_MIN_LEFT,
+                INFO_PANEL_MIN_TOP
+            );
 
         if (selectedEntityData.type === "character") {
             const char = selectedEntityData.entity;
             return (
                 <div
-                    className="absolute top-3 rounded border border-slate-600 bg-slate-900/95 text-white shadow-lg z-[132] w-[280px]"
-                    style={{ right: Math.max(12, sideWidth + 12) }}
+                    className="absolute rounded border border-slate-600 bg-slate-900/95 text-white shadow-lg z-[132] w-[320px]"
+                    style={{ left: panelPos.x, top: panelPos.y }}
+                    onMouseDown={(event) => event.stopPropagation()}
                 >
-                    <div className="px-3 py-2 border-b border-slate-700 flex items-center justify-between">
+                    <div
+                        className="px-3 py-2 border-b border-slate-700 flex items-center justify-between cursor-move select-none"
+                        onMouseDown={handleInfoPanelMouseDown}
+                    >
                         <p className="text-sm font-semibold">Selected Character</p>
                         <button
                             type="button"
+                            onMouseDown={(event) => event.stopPropagation()}
                             onClick={() => selectEntity(null)}
                             className="text-xs text-slate-300 hover:text-white"
                         >
@@ -1067,13 +1324,18 @@ function GameComponent() {
             const floorType = selectedEntityData.floorType;
             return (
                 <div
-                    className="absolute top-3 rounded border border-slate-600 bg-slate-900/95 text-white shadow-lg z-[132] w-[300px]"
-                    style={{ right: Math.max(12, sideWidth + 12) }}
+                    className="absolute rounded border border-slate-600 bg-slate-900/95 text-white shadow-lg z-[132] w-[320px]"
+                    style={{ left: panelPos.x, top: panelPos.y }}
+                    onMouseDown={(event) => event.stopPropagation()}
                 >
-                    <div className="px-3 py-2 border-b border-slate-700 flex items-center justify-between">
+                    <div
+                        className="px-3 py-2 border-b border-slate-700 flex items-center justify-between cursor-move select-none"
+                        onMouseDown={handleInfoPanelMouseDown}
+                    >
                         <p className="text-sm font-semibold">Selected Object</p>
                         <button
                             type="button"
+                            onMouseDown={(event) => event.stopPropagation()}
                             onClick={() => selectEntity(null)}
                             className="text-xs text-slate-300 hover:text-white"
                         >
@@ -1193,6 +1455,20 @@ function GameComponent() {
                     <span className="text-xs px-3 py-2 rounded border bg-slate-900/70 border-slate-500 text-slate-200">
                         Level {currentZLevel} (Space up, Shift down)
                     </span>
+                    {isDM && (
+                        <button
+                            type="button"
+                            onClick={handleTurnDone}
+                            className="text-xs px-3 py-2 rounded border bg-amber-900/70 border-amber-500 text-amber-200 hover:bg-amber-800/80"
+                        >
+                            End Turn (Auto Save)
+                        </button>
+                    )}
+                    {isDM && (
+                        <span className="text-xs px-3 py-2 rounded border bg-slate-900/70 border-slate-500 text-slate-200">
+                            Turn {turnNumber}
+                        </span>
+                    )}
                     {mapObjectPlacement && (
                         <span className="text-xs px-3 py-2 rounded border bg-blue-900/70 border-blue-500 text-blue-200">
                             Placement: {mapObjectPlacement.type} (click or drag on map)
@@ -1324,6 +1600,29 @@ function GameComponent() {
                                     >
                                         Inspect
                                     </button>
+                                    {isDM && (
+                                        <>
+                                            <div className="border-t border-gray-600 my-1" />
+                                            <button
+                                                onClick={() => handleContextAction("placeHere")}
+                                                className="w-full px-4 py-2 text-left text-emerald-200 hover:bg-gray-700 text-sm"
+                                            >
+                                                Place Character Here
+                                            </button>
+                                            <button
+                                                onClick={() => handleContextAction("toggleTeam")}
+                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                            >
+                                                Toggle Team
+                                            </button>
+                                            <button
+                                                onClick={() => handleContextAction("endTurn")}
+                                                className="w-full px-4 py-2 text-left text-amber-200 hover:bg-gray-700 text-sm"
+                                            >
+                                                End Turn + Autosave
+                                            </button>
+                                        </>
+                                    )}
                                 </>
                             )}
 
@@ -1361,6 +1660,30 @@ function GameComponent() {
                                                 className="w-full px-4 py-2 text-left text-red-300 hover:bg-gray-700 text-sm"
                                             >
                                                 Delete Object
+                                            </button>
+                                            <button
+                                                onClick={() => handleContextAction("duplicate")}
+                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                            >
+                                                Duplicate
+                                            </button>
+                                            <button
+                                                onClick={() => handleContextAction("bringForward")}
+                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                            >
+                                                Bring Forward (Z+)
+                                            </button>
+                                            <button
+                                                onClick={() => handleContextAction("sendBackward")}
+                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                            >
+                                                Send Backward (Z-)
+                                            </button>
+                                            <button
+                                                onClick={() => handleContextAction("toggleIndestructible")}
+                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
+                                            >
+                                                Toggle Indestructible
                                             </button>
                                         </>
                                     )}

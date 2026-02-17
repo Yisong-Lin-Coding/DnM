@@ -6,14 +6,14 @@ const TERRAIN_ORDER = {
 
 const TERRAIN_STYLE = {
   floor: {
-    fillAlpha: 0.2,
+    fillAlpha: 1,
     strokeColor: "#7DD3FC",
     lineWidth: 1.5,
     lineDash: [6, 6],
     labelColor: "#7DD3FC",
   },
   wall: {
-    fillAlpha: 0.7,
+    fillAlpha: 1,
     strokeColor: "#FCA5A5",
     lineWidth: 3,
     lineDash: [],
@@ -78,6 +78,7 @@ const drawMapObject = (ctx, obj, camera, options = {}) => {
     isGhost = false,
     showLabel = true,
     baseOpacity = 1,
+    isSelected = false,
   } = options;
   const opacity = Math.max(0.05, Math.min(1, baseOpacity));
   const screenX = (Number(obj?.x) || 0) * camera.zoom - camera.x;
@@ -101,6 +102,12 @@ const drawMapObject = (ctx, obj, camera, options = {}) => {
     ctx.fill();
     ctx.globalAlpha = opacity;
     ctx.stroke();
+    if (isSelected) {
+      ctx.setLineDash([]);
+      ctx.lineWidth = Math.max(4, terrainStyle.lineWidth + 2);
+      ctx.strokeStyle = "#FDE047";
+      ctx.stroke();
+    }
   } else if (objectType === "rect") {
     const width = Math.max(1, (Number(obj?.width) || 0) * camera.zoom);
     const height = Math.max(1, (Number(obj?.height) || 0) * camera.zoom);
@@ -108,6 +115,12 @@ const drawMapObject = (ctx, obj, camera, options = {}) => {
     ctx.fillRect(screenX - width / 2, screenY - height / 2, width, height);
     ctx.globalAlpha = opacity;
     ctx.strokeRect(screenX - width / 2, screenY - height / 2, width, height);
+    if (isSelected) {
+      ctx.setLineDash([]);
+      ctx.lineWidth = Math.max(4, terrainStyle.lineWidth + 2);
+      ctx.strokeStyle = "#FDE047";
+      ctx.strokeRect(screenX - width / 2, screenY - height / 2, width, height);
+    }
   } else {
     const size = Math.max(1, (Number(obj?.size) || 0) * camera.zoom);
     ctx.beginPath();
@@ -119,6 +132,12 @@ const drawMapObject = (ctx, obj, camera, options = {}) => {
     ctx.fill();
     ctx.globalAlpha = opacity;
     ctx.stroke();
+    if (isSelected) {
+      ctx.setLineDash([]);
+      ctx.lineWidth = Math.max(4, terrainStyle.lineWidth + 2);
+      ctx.strokeStyle = "#FDE047";
+      ctx.stroke();
+    }
   }
 
   if (showLabel) {
@@ -155,12 +174,13 @@ export const mapObjectsLayer = {
       c.y !== p.y ||
       c.zoom !== p.zoom ||
       state.mapObjects !== prevState.mapObjects ||
-      state.currentZLevel !== prevState.currentZLevel
+      state.currentZLevel !== prevState.currentZLevel ||
+      state.selectedMapObjectID !== prevState.selectedMapObjectID
     );
   },
 
   draw(ctx, canvas, state) {
-    const { camera, mapObjects = [], currentZLevel = 0 } = state;
+    const { camera, mapObjects = [], currentZLevel = 0, selectedMapObjectID = "" } = state;
 
     if (!camera || !canvas || canvas.width === 0 || canvas.height === 0) {
       return;
@@ -197,6 +217,7 @@ export const mapObjectsLayer = {
         isGhost: false,
         showLabel: true,
         baseOpacity: 1,
+        isSelected: String(obj?.id ?? "") === String(selectedMapObjectID ?? ""),
       });
     });
   },

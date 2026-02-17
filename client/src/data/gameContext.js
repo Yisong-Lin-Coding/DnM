@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 const GameContext = createContext();
 
@@ -323,6 +323,61 @@ const normalizeMapObject = (raw = {}, fallbackId = 1) => {
     return normalized;
 };
 
+const getObjectBounds = (obj = {}) => {
+    const type = normalizeObjectType(obj.type);
+    const x = toNumber(obj.x, 0);
+    const y = toNumber(obj.y, 0);
+
+    if (type === "rect") {
+        const halfWidth = toPositiveNumber(obj.width, 50) / 2;
+        const halfHeight = toPositiveNumber(obj.height, 40) / 2;
+        return {
+            minX: x - halfWidth,
+            maxX: x + halfWidth,
+            minY: y - halfHeight,
+            maxY: y + halfHeight,
+        };
+    }
+
+    const radius = toPositiveNumber(obj.size, type === "triangle" ? 40 : 30);
+    return {
+        minX: x - radius,
+        maxX: x + radius,
+        minY: y - radius,
+        maxY: y + radius,
+    };
+};
+
+const doBoundsOverlap = (a, b) =>
+    a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
+
+const isWallObject = (obj = {}) => normalizeTerrainType(obj.terrainType) === "wall";
+
+const wouldWallOverlap = (candidate = {}, objects = [], ignoreId = null) => {
+    if (!isWallObject(candidate)) return false;
+    const candidateBounds = getObjectBounds(candidate);
+    const candidateLevel = clampZLevel(candidate.zLevel);
+    const ignored = ignoreId == null ? null : toNumber(ignoreId, -1);
+
+    return (Array.isArray(objects) ? objects : []).some((obj) => {
+        if (!isWallObject(obj)) return false;
+        if (clampZLevel(obj.zLevel) !== candidateLevel) return false;
+        if (ignored != null && toNumber(obj.id, -1) === ignored) return false;
+        return doBoundsOverlap(candidateBounds, getObjectBounds(obj));
+    });
+};
+
+const enforceWallOverlapRules = (objects = []) => {
+    const accepted = [];
+    (Array.isArray(objects) ? objects : []).forEach((obj) => {
+        if (wouldWallOverlap(obj, accepted)) {
+            return;
+        }
+        accepted.push(obj);
+    });
+    return accepted;
+};
+
 const normalizeCharacter = (raw = {}, fallback = {}) => {
     const source = { ...fallback, ...raw };
     return {
@@ -357,6 +412,11 @@ export const GameProvider = ({ children }) => {
     const [floorTypes, setFloorTypes] = useState(DEFAULT_FLOOR_TYPES);
 
     const nextMapObjectIdRef = useRef(getMaxObjectId(DEFAULT_MAP_OBJECTS) + 1);
+    const mapObjectsRef = useRef(DEFAULT_MAP_OBJECTS);
+
+    useEffect(() => {
+        mapObjectsRef.current = mapObjects;
+    }, [mapObjects]);
 
     const ensureNextObjectId = useCallback((objects) => {
         const nextId = getMaxObjectId(objects) + 1;
@@ -368,9 +428,16 @@ export const GameProvider = ({ children }) => {
             const candidateId = toNumber(draft?.id, 0);
             const id = candidateId > 0 ? candidateId : nextMapObjectIdRef.current++;
             const newObject = normalizeMapObject(draft, id);
+            if (wouldWallOverlap(newObject, mapObjectsRef.current)) {
+                return null;
+            }
             setMapObjects((prev) => {
+                if (wouldWallOverlap(newObject, prev)) {
+                    return prev;
+                }
                 const updated = [...prev, newObject];
                 ensureNextObjectId(updated);
+                mapObjectsRef.current = updated;
                 return updated;
             });
             return newObject;
@@ -422,34 +489,50 @@ export const GameProvider = ({ children }) => {
     const updateMapObject = useCallback((id, updates) => {
         const numericId = toNumber(id, -1);
         if (numericId < 0) return;
-        setMapObjects((prev) =>
-            prev.map((obj) => {
-                if (toNumber(obj.id, -1) !== numericId) return obj;
-                const safeUpdates =
-                    updates && typeof updates === "object" && !Array.isArray(updates) ? updates : {};
-                const merged = { ...obj, ...safeUpdates };
-                if (safeUpdates.hitbox && typeof safeUpdates.hitbox === "object") {
-                    merged.hitbox = {
-                        ...(obj.hitbox || {}),
-                        ...safeUpdates.hitbox,
-                    };
-                }
-                return normalizeMapObject(merged, obj.id);
-            })
-        );
+        setMapObjects((prev) => {
+            const targetIndex = prev.findIndex((obj) => toNumber(obj.id, -1) === numericId);
+            if (targetIndex < 0) return prev;
+
+            const currentObject = prev[targetIndex];
+            const safeUpdates =
+                updates && typeof updates === "object" && !Array.isArray(updates) ? updates : {};
+            const merged = { ...currentObject, ...safeUpdates };
+            if (safeUpdates.hitbox && typeof safeUpdates.hitbox === "object") {
+                merged.hitbox = {
+                    ...(currentObject.hitbox || {}),
+                    ...safeUpdates.hitbox,
+                };
+            }
+            const normalized = normalizeMapObject(merged, currentObject.id);
+            if (wouldWallOverlap(normalized, prev, currentObject.id)) {
+                return prev;
+            }
+
+            const next = [...prev];
+            next[targetIndex] = normalized;
+            mapObjectsRef.current = next;
+            return next;
+        });
     }, []);
 
     const deleteMapObject = useCallback((id) => {
         const numericId = toNumber(id, -1);
         if (numericId < 0) return;
-        setMapObjects((prev) => prev.filter((obj) => toNumber(obj.id, -1) !== numericId));
+        setMapObjects((prev) => {
+            const next = prev.filter((obj) => toNumber(obj.id, -1) !== numericId);
+            mapObjectsRef.current = next;
+            return next;
+        });
     }, []);
 
     const replaceAllMapObjects = useCallback(
         (newObjects) => {
             const safeObjects = Array.isArray(newObjects) ? newObjects : [];
-            const normalized = safeObjects.map((obj, index) => normalizeMapObject(obj, index + 1));
+            const normalized = enforceWallOverlapRules(
+                safeObjects.map((obj, index) => normalizeMapObject(obj, index + 1))
+            );
             setMapObjects(normalized);
+            mapObjectsRef.current = normalized;
             ensureNextObjectId(normalized);
         },
         [ensureNextObjectId]

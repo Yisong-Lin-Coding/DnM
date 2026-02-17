@@ -137,9 +137,67 @@ const normalizeMapObject = (raw = {}, fallbackId = 1) => {
     return normalized;
 };
 
+const getObjectBounds = (obj = {}) => {
+    const type = normalizeObjectType(obj.type);
+    const x = toNumber(obj.x, 0);
+    const y = toNumber(obj.y, 0);
+
+    if (type === "rect") {
+        const halfWidth = Math.max(1, toNumber(obj.width, 50)) / 2;
+        const halfHeight = Math.max(1, toNumber(obj.height, 40)) / 2;
+        return {
+            minX: x - halfWidth,
+            maxX: x + halfWidth,
+            minY: y - halfHeight,
+            maxY: y + halfHeight,
+        };
+    }
+
+    const radius = Math.max(1, toNumber(obj.size, type === "triangle" ? 40 : 30));
+    return {
+        minX: x - radius,
+        maxX: x + radius,
+        minY: y - radius,
+        maxY: y + radius,
+    };
+};
+
+const doBoundsOverlap = (a, b) =>
+    a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
+
+const isWallObject = (obj = {}) => normalizeTerrainType(obj.terrainType) === "wall";
+
+const wouldWallOverlap = (candidate = {}, objects = [], ignoreId = null) => {
+    if (!isWallObject(candidate)) return false;
+    const candidateBounds = getObjectBounds(candidate);
+    const candidateLevel = clampZLevel(candidate.zLevel);
+    const ignoredValue = toNumber(ignoreId, NaN);
+    const ignored =
+        Number.isFinite(ignoredValue) && ignoredValue > 0 ? Math.round(ignoredValue) : null;
+
+    return (Array.isArray(objects) ? objects : []).some((obj) => {
+        if (!isWallObject(obj)) return false;
+        if (clampZLevel(obj.zLevel) !== candidateLevel) return false;
+        if (ignored != null && Math.round(toNumber(obj.id, -1)) === ignored) return false;
+        return doBoundsOverlap(candidateBounds, getObjectBounds(obj));
+    });
+};
+
+const enforceWallOverlapRules = (objects = []) => {
+    const accepted = [];
+    (Array.isArray(objects) ? objects : []).forEach((obj) => {
+        if (wouldWallOverlap(obj, accepted)) {
+            return;
+        }
+        accepted.push(obj);
+    });
+    return accepted;
+};
+
 const normalizeMapObjects = (input = []) => {
     const safeList = Array.isArray(input) ? input : [];
-    return safeList.map((entry, index) => normalizeMapObject(entry, index + 1));
+    const normalized = safeList.map((entry, index) => normalizeMapObject(entry, index + 1));
+    return enforceWallOverlapRules(normalized);
 };
 
 const normalizeSnapshot = (snapshot = {}) => {

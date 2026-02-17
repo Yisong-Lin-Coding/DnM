@@ -574,7 +574,7 @@ function MapEditor() {
                             key={obj.id}
                             className={`p-3 rounded cursor-pointer ${
                                 selectedObject === obj.id
-                                    ? "bg-blue-600"
+                                    ? "bg-blue-700 ring-2 ring-yellow-300 border border-yellow-200/70"
                                     : "bg-gray-800 hover:bg-gray-700"
                             }`}
                             onClick={() => setSelectedObject(obj.id)}
