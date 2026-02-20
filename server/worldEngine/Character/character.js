@@ -1596,6 +1596,7 @@ _rollDice(context) {
             
             // Damage
             damageParts: [
+                ...params.damageParts,
                 {
                     dice: params.weapon?.damage || '1d1',
                     type: params.weapon?.damageType || 'bludgeoning',
@@ -1692,7 +1693,7 @@ _rollDice(context) {
             damageParts: damageInfo.damageParts || [],
             flatBonus: damageInfo.flatBonus || [],
             finalDamage: damageInfo.damage,
-            isCrit: damageInfo.isCrit || false,
+            isCrit: damageInfo.isCrit || 0,
             
             // Resistance tracking
             resistances: {},

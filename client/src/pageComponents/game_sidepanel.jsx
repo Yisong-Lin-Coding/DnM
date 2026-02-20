@@ -14,6 +14,7 @@ import { useGame } from "../data/gameContext";
 
 import Admin from "./gamesidepanel/admin";
 import MapEditor from "./gamesidepanel/mapeditor";
+import { LightingPanel } from "./gamesidepanel/lighting";
 
 function PlaceholderPanel({ title, subtitle, hint }) {
   return (
@@ -143,6 +144,7 @@ export default function GameSidePanel() {
         {isDM && (
           <Tabs.Panel index={9} className="!p-0 h-full min-h-0 overflow-hidden">
             <MapEditor />
+
           </Tabs.Panel>
         )}
       </Tabs.Panels>

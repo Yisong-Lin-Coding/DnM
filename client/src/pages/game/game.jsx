@@ -1,13 +1,10 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { michelangeloEngine } from "./michelangeloEngine";
-import { backgroundLayer } from "./Map Layers/0Background";
-import { gridlayer } from "./Map Layers/4Grid";
-import { lightingLayer } from "./Map Layers/7lighting";
+import { GAME_LAYER_REGISTRY, bindLayerCanvases } from "./Map Layers/layerRegistry";
 import getImage from "../../handlers/getImage";
 import GameSidePanel from "../../pageComponents/game_sidepanel";
 import { useGame } from "../../data/gameContext";
-import { mapObjectsLayer } from "./Map Layers/2Enviornment";
 import { SocketContext } from "../../socket.io/context";
 import { emitWithAck } from "../campaign/socketEmit";
 
@@ -25,10 +22,6 @@ const INFO_PANEL_WIDTH = 320;
 const INFO_PANEL_MIN_LEFT = 12;
 const INFO_PANEL_MIN_TOP = 12;
 const INFO_PANEL_MAX_BOTTOM_PADDING = 120;
-const LIGHT_CONTROL_OUTER_SIZE = 92;
-const LIGHT_CONTROL_INNER_MARGIN = 12;
-const LIGHT_CONTROL_KNOB_SIZE = 16;
-const LIGHT_CONTROL_CENTER_DEADZONE = 0.14;
 const RESIZE_HANDLE_HIT_RADIUS_PX = 15;
 const HEIGHT_HANDLE_OFFSET_PX = 32;
 
@@ -37,13 +30,6 @@ const DEFAULT_MAX_HP_BY_TERRAIN = {
     wall: 1200,
     obstacle: 700,
 };
-
-const LAYER_CONFIG = [
-    { name: "background", component: backgroundLayer, zIndex: 0 },
-    { name: "grid", component: gridlayer, zIndex: 1 },
-    { name: "mapObjects", component: mapObjectsLayer, zIndex: 2 },
-    { name: "lighting", component: lightingLayer, zIndex: 3 },
-];
 
 function isPointInsideTriangle(worldX, worldY, objX, objY, size) {
     const p0 = { x: objX, y: objY - size };
@@ -112,10 +98,6 @@ function isSameEntity(a, b) {
 
 function getObjectZLevel(obj) {
     return Math.round(Number(obj?.zLevel) || 0);
-}
-
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
 }
 
 function getMapObjectBounds(obj) {
@@ -268,34 +250,36 @@ function GameComponent() {
     const safeSessionID = sessionID || sessionStorage.getItem("session_ID") || "default";
 
     const {
-        selectedChar,
-        selectCharacter,
-        fogEnabled,
-        characters,
-        lastMouse,
-        setLastMouse,
-        camera,
-        handleCharacterAction,
-        mapObjects,
-        addMapObject,
-        updateMapObject,
-        deleteMapObject,
-        updateCharacter,
-        moveCharacter,
-        isDM,
-        setIsDM,
-        backgroundKey,
-        floorTypes,
-        replaceFloorTypes,
-        lighting,
-        setLightingDirection,
-        currentZLevel,
-        stepZLevelUp,
-        stepZLevelDown,
-        mapObjectPlacement,
-        clearMapObjectPlacement,
-        placePendingMapObjectAt,
-        loadGameSnapshot,
+    selectedChar,
+    selectCharacter,
+    fogEnabled,
+    characters,
+    lastMouse,
+    setLastMouse,
+    camera,
+    handleCharacterAction,
+    mapObjects,
+    addMapObject,
+    updateMapObject,
+    deleteMapObject,
+    updateCharacter,
+    moveCharacter,
+    isDM,
+    setIsDM,
+    backgroundKey,
+    floorTypes,
+    replaceFloorTypes,
+    lighting,
+    currentZLevel,
+    stepZLevelUp,
+    stepZLevelDown,
+    mapObjectPlacement,
+    clearMapObjectPlacement,
+    placePendingMapObjectAt,
+    lightPlacement,        // ADD THIS
+    placeLightAt,          // ADD THIS
+    clearLightPlacement,   // ADD THIS
+    loadGameSnapshot,
     } = useGame();
 
     const [sideWidth, setSideWidth] = useState(320);
@@ -311,18 +295,17 @@ function GameComponent() {
     const [infoPanelPosition, setInfoPanelPosition] = useState(null);
     const [infoPanelDrag, setInfoPanelDrag] = useState(null);
     const [blockedMovePreview, setBlockedMovePreview] = useState(null);
-    const [lightControlDragging, setLightControlDragging] = useState(false);
     const [resizeTarget, setResizeTarget] = useState(null);
 
     const isPanning = useRef(false);
     const layerRefs = useRef({});
+    const layerBindingsRef = useRef([]);
     const prevStateRef = useRef(null);
     const applyingServerStateRef = useRef(false);
     const skipNextAutoSaveRef = useRef(false);
     const syncingWorldRef = useRef(false);
     const autoSavingRef = useRef(false);
     const autoSaveTimerRef = useRef(null);
-    const lightControlRef = useRef(null);
     const hasAutoSaveBaselineRef = useRef(false);
     const latestSnapshotRef = useRef({
         mapObjects: [],
@@ -432,7 +415,7 @@ function GameComponent() {
     );
 
     useEffect(() => {
-        const selectedBackgroundKey = String(backgroundKey || "calm1").toLowerCase();
+        const selectedBackgroundKey = String(backgroundKey || "gray").toLowerCase();
         const backgroundImage = getImage(selectedBackgroundKey);
         if (!backgroundImage) {
             camera.current.bgImage = null;
@@ -666,92 +649,6 @@ function GameComponent() {
         };
     };
 
-    const lightControlRadius = useMemo(
-        () => LIGHT_CONTROL_OUTER_SIZE / 2 - LIGHT_CONTROL_INNER_MARGIN,
-        []
-    );
-
-    const lightingSource = useMemo(() => {
-        const directionalFromSources = Array.isArray(lighting?.sources)
-            ? lighting.sources.find(
-                  (source) =>
-                      source &&
-                      String(source?.type || "").toLowerCase() === "directional" &&
-                      source.enabled !== false
-              )
-            : null;
-        const source = directionalFromSources || lighting?.source || lighting || {};
-        const x = Number(source?.x) || 0;
-        const y = Number(source?.y) || 0;
-        const magnitude = Math.hypot(x, y);
-        if (magnitude <= 1 || magnitude === 0) {
-            return { x, y };
-        }
-        return {
-            x: x / magnitude,
-            y: y / magnitude,
-        };
-    }, [lighting]);
-
-    const lightKnobOffset = useMemo(
-        () => ({
-            x: lightingSource.x * lightControlRadius,
-            y: lightingSource.y * lightControlRadius,
-        }),
-        [lightingSource, lightControlRadius]
-    );
-
-    const updateLightingFromClientPoint = useCallback(
-        (clientX, clientY) => {
-            if (!isDM || !lightControlRef.current) return;
-            const rect = lightControlRef.current.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            const maxDistance = Math.max(1, rect.width / 2 - LIGHT_CONTROL_INNER_MARGIN);
-            let dx = clientX - centerX;
-            let dy = clientY - centerY;
-            const distance = Math.hypot(dx, dy);
-            if (distance <= maxDistance * LIGHT_CONTROL_CENTER_DEADZONE) {
-                setLightingDirection(0, 0);
-                return;
-            }
-            if (distance > maxDistance && distance > 0) {
-                const ratio = maxDistance / distance;
-                dx *= ratio;
-                dy *= ratio;
-            }
-            setLightingDirection(dx / maxDistance, dy / maxDistance);
-        },
-        [isDM, setLightingDirection]
-    );
-
-    const handleLightControlMouseDown = useCallback(
-        (event) => {
-            if (!isDM || event.button !== 0) return;
-            event.preventDefault();
-            event.stopPropagation();
-            setLightControlDragging(true);
-            updateLightingFromClientPoint(event.clientX, event.clientY);
-        },
-        [isDM, updateLightingFromClientPoint]
-    );
-
-    useEffect(() => {
-        if (!lightControlDragging) return undefined;
-
-        const onMouseMove = (event) => {
-            updateLightingFromClientPoint(event.clientX, event.clientY);
-        };
-        const onMouseUp = () => setLightControlDragging(false);
-
-        window.addEventListener("mousemove", onMouseMove);
-        window.addEventListener("mouseup", onMouseUp);
-        return () => {
-            window.removeEventListener("mousemove", onMouseMove);
-            window.removeEventListener("mouseup", onMouseUp);
-        };
-    }, [lightControlDragging, updateLightingFromClientPoint]);
-
     const isVisible = (x, y) => {
         if (!fogEnabled) return true;
 
@@ -955,7 +852,8 @@ function GameComponent() {
         let raf;
 
         const loop = () => {
-            if (!Object.values(layerRefs.current).every((canvas) => canvas)) {
+            const missingCanvas = GAME_LAYER_REGISTRY.some((entry) => !layerRefs.current[entry.name]);
+            if (missingCanvas) {
                 raf = requestAnimationFrame(loop);
                 return;
             }
@@ -965,11 +863,22 @@ function GameComponent() {
                 return;
             }
 
-            const layers = LAYER_CONFIG.map((config) => ({
-                ...config.component,
-                ctx: layerRefs.current[config.name]?.getContext("2d"),
-                canvas: layerRefs.current[config.name],
-            }));
+            const needsRebind =
+                layerBindingsRef.current.length !== GAME_LAYER_REGISTRY.length ||
+                GAME_LAYER_REGISTRY.some((entry, index) => {
+                    const binding = layerBindingsRef.current[index];
+                    const canvas = layerRefs.current[entry.name];
+                    return !binding || binding.canvas !== canvas || !binding.ctx;
+                });
+
+            if (needsRebind) {
+                layerBindingsRef.current = bindLayerCanvases(
+                    GAME_LAYER_REGISTRY,
+                    layerRefs.current
+                );
+            }
+
+            const layers = layerBindingsRef.current;
 
             const cameraSnapshot = {
                 x: Number(camera.current.x) || 0,
@@ -982,6 +891,7 @@ function GameComponent() {
 
             const currentState = {
                 bgImage: cameraSnapshot.bgImage,
+                backgroundKey,
                 camera: cameraSnapshot,
                 mapObjects,
                 floorTypes,
@@ -994,8 +904,11 @@ function GameComponent() {
 
             michelangeloEngine({
                 layers,
-                state: currentState,
-                prevState: prevStateRef.current,
+                frame: {
+                    state: currentState,
+                    prevState: prevStateRef.current,
+                    cache: {},
+                },
             });
 
             prevStateRef.current = currentState;
@@ -1004,7 +917,7 @@ function GameComponent() {
 
         loop();
         return () => cancelAnimationFrame(raf);
-    }, [camera, mapObjects, floorTypes, currentZLevel, selectedEntity, blockedMovePreview, lighting, isDM]);
+    }, [camera, mapObjects, floorTypes, currentZLevel, selectedEntity, blockedMovePreview, lighting, backgroundKey, isDM]);
 
     useEffect(() => {
         const onMouseMove = (event) => {
@@ -1103,10 +1016,10 @@ function GameComponent() {
             setResizeTarget(null);
             setPlacementDrag(null);
             setBlockedMovePreview(null);
-            setLightControlDragging(false);
             setSelectedEntity(null);
             selectCharacter(null);
             clearMapObjectPlacement();
+            clearLightPlacement();
         };
 
         window.addEventListener("keydown", onEscape);
@@ -1182,6 +1095,10 @@ function GameComponent() {
                 currentWorld: { x: world.x, y: world.y },
                 startClient: { x: event.clientX, y: event.clientY },
             });
+            return;
+        }
+        if (isDM && lightPlacement) {
+            placeLightAt(world.x, world.y);
             return;
         }
 
@@ -1899,6 +1816,7 @@ function GameComponent() {
                             Placement: {mapObjectPlacement.type} (click or drag on map)
                         </span>
                     )}
+                    
                     {loadingGameContext && (
                         <span className="text-xs px-3 py-2 rounded border bg-slate-900/70 border-slate-500 text-slate-200">
                             Loading game context...
@@ -1916,78 +1834,7 @@ function GameComponent() {
                     )}
                 </div>
 
-                {isDM && (
-                    <div
-                        className="absolute left-3 z-[131] rounded border border-slate-600 bg-slate-900/90 px-3 py-2 select-none"
-                        style={{ top: 56 }}
-                        onMouseDown={(event) => event.stopPropagation()}
-                    >
-                        <p className="mb-2 text-[10px] uppercase tracking-[0.08em] text-slate-300">
-                            Light Source
-                        </p>
-                        <div
-                            ref={lightControlRef}
-                            aria-label="Light direction"
-                            tabIndex={0}
-                            onMouseDown={handleLightControlMouseDown}
-                            onKeyDown={(event) => {
-                                const step = 0.08;
-                                let nextX = lightingSource.x;
-                                let nextY = lightingSource.y;
-                                if (event.key === "ArrowLeft") nextX -= step;
-                                if (event.key === "ArrowRight") nextX += step;
-                                if (event.key === "ArrowUp") nextY -= step;
-                                if (event.key === "ArrowDown") nextY += step;
-                                if (
-                                    event.key === "ArrowLeft" ||
-                                    event.key === "ArrowRight" ||
-                                    event.key === "ArrowUp" ||
-                                    event.key === "ArrowDown"
-                                ) {
-                                    event.preventDefault();
-                                    setLightingDirection(clamp(nextX, -1, 1), clamp(nextY, -1, 1));
-                                }
-                            }}
-                            className={`relative rounded-full border border-amber-200/60 bg-slate-950/85 ${
-                                lightControlDragging ? "cursor-grabbing" : "cursor-grab"
-                            }`}
-                            style={{
-                                width: LIGHT_CONTROL_OUTER_SIZE,
-                                height: LIGHT_CONTROL_OUTER_SIZE,
-                            }}
-                        >
-                            <div
-                                className="absolute rounded-full border border-slate-600/80"
-                                style={{
-                                    left: LIGHT_CONTROL_INNER_MARGIN,
-                                    top: LIGHT_CONTROL_INNER_MARGIN,
-                                    width: LIGHT_CONTROL_OUTER_SIZE - LIGHT_CONTROL_INNER_MARGIN * 2,
-                                    height: LIGHT_CONTROL_OUTER_SIZE - LIGHT_CONTROL_INNER_MARGIN * 2,
-                                }}
-                            />
-                            <div
-                                className="absolute rounded-full border border-amber-100 bg-amber-300 shadow"
-                                style={{
-                                    width: LIGHT_CONTROL_KNOB_SIZE,
-                                    height: LIGHT_CONTROL_KNOB_SIZE,
-                                    left:
-                                        LIGHT_CONTROL_OUTER_SIZE / 2 +
-                                        lightKnobOffset.x -
-                                        LIGHT_CONTROL_KNOB_SIZE / 2,
-                                    top:
-                                        LIGHT_CONTROL_OUTER_SIZE / 2 +
-                                        lightKnobOffset.y -
-                                        LIGHT_CONTROL_KNOB_SIZE / 2,
-                                }}
-                            />
-                        </div>
-                        <p className="mt-2 text-[10px] text-slate-400">
-                            Center = overhead sun (short, softer shadows)
-                        </p>
-                    </div>
-                )}
-
-                {LAYER_CONFIG.map((layer) => (
+                {GAME_LAYER_REGISTRY.map((layer) => (
                     <canvas
                         key={layer.name}
                         ref={(el) => (layerRefs.current[layer.name] = el)}

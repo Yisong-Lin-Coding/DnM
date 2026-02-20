@@ -1,4 +1,4 @@
-const DEFAULT_BACKGROUND_KEY = "calm1";
+const DEFAULT_BACKGROUND_KEY = "gray";
 const MIN_Z_LEVEL = -20;
 const MAX_Z_LEVEL = 20;
 const MIN_HITBOX_SCALE = 0.1;
@@ -96,6 +96,8 @@ const normalizeHexColor = (value, fallback = "#3B82F6") => {
     const raw = String(value || "").trim();
     return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : fallback;
 };
+
+const normalizeMapAssetKey = (value) => String(value || "").trim().toLowerCase();
 
 const normalizeLightingDirection = (value = {}) => {
     const x = clampLightAxis(value?.x);
@@ -268,6 +270,7 @@ const normalizeMapObject = (raw = {}, fallbackId = 1) => {
         y: Math.round(toNumber(raw.y, 0)),
         z: Math.round(toNumber(raw.z, 0)),
         color: normalizeHexColor(raw.color),
+        mapAssetKey: normalizeMapAssetKey(raw.mapAssetKey || raw.mapKey || raw.mapImageKey),
         elevationHeight: Math.round(
             toNonNegativeNumber(resolveElevationInput(raw, type, terrainType), 0)
         ),

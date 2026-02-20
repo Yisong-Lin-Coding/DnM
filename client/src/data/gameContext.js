@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { MAP_IMAGE_OPTIONS } from "../handlers/getMapImage";
 
 const GameContext = createContext();
 
-const DEFAULT_BACKGROUND_KEY = "calm1";
+const DEFAULT_BACKGROUND_KEY = "gray";
 const MIN_Z_LEVEL = -20;
 const MAX_Z_LEVEL = 20;
 const MIN_HITBOX_SCALE = 0.1;
@@ -127,6 +128,7 @@ const DEFAULT_FLOOR_TYPES = [
 ];
 
 const BACKGROUND_OPTIONS = [
+    "gray",
     "calm1",
     "calm2",
     "calm3",
@@ -266,6 +268,8 @@ const normalizeHexColor = (value, fallback = "#3B82F6") => {
     const raw = String(value || "").trim();
     return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : fallback;
 };
+
+const normalizeMapAssetKey = (value) => String(value || "").trim().toLowerCase();
 
 const normalizeTerrainType = (value) => {
     const type = String(value || "").trim().toLowerCase();
@@ -459,6 +463,7 @@ const normalizeMapObject = (raw = {}, fallbackId = 1) => {
         terrainType,
         floorTypeId,
         color: normalizeHexColor(raw.color),
+        mapAssetKey: normalizeMapAssetKey(raw.mapAssetKey || raw.mapKey || raw.mapImageKey),
         elevationHeight: Math.round(
             toNonNegativeNumber(resolveElevationInput(raw, type, terrainType), 0)
         ),
@@ -735,6 +740,7 @@ export const GameProvider = ({ children }) => {
             floorTypeId,
             zLevel: clampZLevel(config.zLevel),
             color: normalizeHexColor(config.color),
+            mapAssetKey: normalizeMapAssetKey(config.mapAssetKey || config.mapKey || config.mapImageKey),
             z: Math.round(toNumber(config.z, 0)),
             size: toPositiveNumber(config.size, type === "triangle" ? 40 : 30),
             width: toPositiveNumber(config.width, 50),
@@ -947,6 +953,48 @@ export const GameProvider = ({ children }) => {
         return screenToWorld(lastMouse.x, lastMouse.y);
     }, [lastMouse, screenToWorld]);
 
+
+
+
+    const [lightPlacement, setLightPlacement] = useState(null);
+
+// Add these functions
+const armLightPlacement = useCallback((config = {}) => {
+  setLightPlacement({
+    type: "point",
+    color: String(config.color || "#ffffff"),
+    intensity: Number(config.intensity) ?? 0.8,
+    blend: Number(config.blend) ?? 0.7,
+    range: Number(config.range) || 420,
+  });
+}, []);
+
+const clearLightPlacement = useCallback(() => {
+  setLightPlacement(null);
+}, []);
+
+const placeLightAt = useCallback((worldX, worldY) => {
+  if (!lightPlacement) return;
+  
+  addLightSource({
+    id: `point_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name: `Light ${(lighting?.sources?.length || 0) + 1}`,
+    type: "point",
+    enabled: true,
+    worldX: Math.round(worldX),
+    worldY: Math.round(worldY),
+    color: lightPlacement.color,
+    intensity: lightPlacement.intensity,
+    blend: lightPlacement.blend,
+    range: lightPlacement.range,
+  });
+  
+  clearLightPlacement();
+}, [lightPlacement, lighting, addLightSource, clearLightPlacement]);
+
+
+
+
     const value = {
         selectedChar,
         setSelectedChar,
@@ -968,6 +1016,7 @@ export const GameProvider = ({ children }) => {
         backgroundKey,
         setBackgroundKey,
         backgroundOptions: BACKGROUND_OPTIONS,
+        mapImageOptions: MAP_IMAGE_OPTIONS,
         floorTypes,
         replaceFloorTypes,
         lighting,
@@ -1000,6 +1049,10 @@ export const GameProvider = ({ children }) => {
         saveMapToDatabase,
         loadMapFromDatabase,
         loadGameSnapshot,
+        lightPlacement,
+        armLightPlacement,
+        clearLightPlacement,
+        placeLightAt,
     };
 
     return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

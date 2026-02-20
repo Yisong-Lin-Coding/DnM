@@ -8,6 +8,7 @@ export const backgroundLayer = {
 
     // Redraw if image changes or camera moves/zooms
     return (
+      state.backgroundKey !== prevState.backgroundKey ||
       state.bgImage !== prevState.bgImage ||
       c.x !== p.x ||
       c.y !== p.y ||
@@ -16,14 +17,22 @@ export const backgroundLayer = {
   },
 
   draw(ctx, canvas, state) {
-    const { bgImage, camera } = state;
+    const { bgImage, camera, backgroundKey } = state;
 
-    // Skip if no image or canvas
-    if (!bgImage || !camera || !canvas || canvas.width === 0 || canvas.height === 0) {
+    if (!camera || !canvas || canvas.width === 0 || canvas.height === 0) {
       return;
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!bgImage) {
+      const key = String(backgroundKey || "").trim().toLowerCase();
+      if (!key || key === "gray" || key === "grey") {
+        ctx.fillStyle = "#4b5563";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
 
     // Calculate aspect ratios
     const canvasRatio = canvas.width / canvas.height;
