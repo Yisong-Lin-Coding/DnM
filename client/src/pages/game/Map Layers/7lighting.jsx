@@ -1,5 +1,7 @@
-// Lighting layer with COLORED light support
+// 7lighting.jsx
+// Lighting layer for Michelangelo engine with proper point-light visibility
 
+// ─── DEFAULT LIGHTING ─────────────────────────────
 const DEFAULT_LIGHTING = {
   enabled: true,
   ambient: 0.24,
@@ -17,64 +19,9 @@ const DEFAULT_LIGHTING = {
   ],
 };
 
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+// ─── UTILITY FUNCTIONS ────────────────────────────
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-const normalizeDirectionalVector = (value = {}) => {
-  const x = clamp(Number(value?.x) || 0, -1, 1);
-  const y = clamp(Number(value?.y) || 0, -1, 1);
-  const magnitude = Math.hypot(x, y);
-  if (magnitude === 0 || magnitude <= 1) return { x, y };
-  return { x: x / magnitude, y: y / magnitude };
-};
-
-const normalizeLightingSource = (raw = {}, fallbackIndex = 0) => {
-  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-  const type = String(source.type || "").trim().toLowerCase() === "point" ? "point" : "directional";
-
-  const normalized = {
-    id:        String(source.id   || `light_${fallbackIndex + 1}`).trim() || `light_${fallbackIndex + 1}`,
-    name:      String(source.name || `Light ${fallbackIndex + 1}`).trim() || `Light ${fallbackIndex + 1}`,
-    type,
-    enabled:   source.enabled !== false,
-    intensity: clamp(Number(source.intensity) ?? 0.8, 0, 2),
-    blend:     clamp(Number(source.blend)     ?? 0.7, 0, 1),
-    color:     String(source.color || "#ffffff").trim() || "#ffffff",
-  };
-
-  if (type === "point") {
-    normalized.worldX = Number(source.worldX ?? source.position?.x) || 0;
-    normalized.worldY = Number(source.worldY ?? source.position?.y) || 0;
-    normalized.range  = clamp(Number(source.range) || 420, 10, 5000);
-    return normalized;
-  }
-
-  const direction = normalizeDirectionalVector(source);
-  normalized.x = direction.x;
-  normalized.y = direction.y;
-  return normalized;
-};
-
-const normalizeLighting = (lighting = {}) => {
-  const safe = lighting && typeof lighting === "object" ? lighting : {};
-  const rawSources = Array.isArray(safe.sources) ? safe.sources : [];
-  let sources = rawSources.map((entry, index) => normalizeLightingSource(entry, index));
-
-  if (sources.length === 0) {
-    if (safe.source && typeof safe.source === "object" && !Array.isArray(safe.source)) {
-      sources = [normalizeLightingSource(safe.source, 0)];
-    } else {
-      sources = [normalizeLightingSource({ ...DEFAULT_LIGHTING.sources[0] }, 0)];
-    }
-  }
-
-  return {
-    enabled: safe.enabled !== false,
-    ambient: clamp(Number(safe.ambient) ?? DEFAULT_LIGHTING.ambient, 0, 0.9),
-    sources,
-  };
-};
-
-// Parse hex color to RGB
 const hexToRgb = (hex) => {
   const normalized = String(hex || "#ffffff").trim();
   const match = normalized.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
@@ -86,161 +33,364 @@ const hexToRgb = (hex) => {
   };
 };
 
-const drawDirectionalLightContribution = (ctx, width, height, source, ambientAlpha) => {
-  const direction = normalizeDirectionalVector(source);
-  const tilt      = clamp(Math.hypot(direction.x, direction.y), 0, 1);
-  const strength  = clamp(source.intensity * source.blend, 0, 2);
-  const rgb       = hexToRgb(source.color);
+const normalizeDirectionalVector = (value = {}) => {
+  const x = clamp(Number(value?.x) || 0, -1, 1);
+  const y = clamp(Number(value?.y) || 0, -1, 1);
+  const mag = Math.hypot(x, y);
+  if (mag === 0 || mag <= 1) return { x, y };
+  return { x: x / mag, y: y / mag };
+};
 
-  if (tilt < 0.02) {
-    const overheadLift = clamp(strength * (0.08 + ambientAlpha * 0.22), 0.01, 0.18);
-    ctx.fillStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${overheadLift})`;
-    ctx.fillRect(0, 0, width, height);
-    return;
+// ─── LIGHT SOURCE NORMALIZATION ───────────────────
+const normalizeLightingSource = (raw = {}, fallbackIndex = 0) => {
+  const source =
+    raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+
+  const type =
+    String(source.type || "").trim().toLowerCase() === "point"
+      ? "point"
+      : "directional";
+
+  const normalized = {
+    id:
+      String(source.id || `light_${fallbackIndex + 1}`).trim() ||
+      `light_${fallbackIndex + 1}`,
+    type,
+    enabled:   source.enabled !== false,
+    intensity: clamp(Number(source.intensity) || 0.8, 0, 2),
+    blend:     clamp(Number(source.blend)     || 0.7, 0, 1),
+    color:     String(source.color || "#ffffff").trim() || "#ffffff",
+  };
+
+  if (type === "point") {
+    normalized.worldX  = Number(source.worldX ?? source.position?.x) || 0;
+    normalized.worldY  = Number(source.worldY ?? source.position?.y) || 0;
+    normalized.range   = clamp(Number(source.range) || 420, 10, 5000);
+    normalized.zLevel  = Math.round(Number(source.zLevel) || 0);
+  }
+ else {
+    const dir = normalizeDirectionalVector(source);
+    normalized.x = dir.x;
+    normalized.y = dir.y;
   }
 
-  const centerX        = width / 2;
-  const centerY        = height / 2;
-  const sourceDistance = Math.max(width, height) * (0.22 + tilt * 0.82);
-  const lightX         = centerX + direction.x * sourceDistance;
-  const lightY         = centerY + direction.y * sourceDistance;
-  const darkX          = centerX - direction.x * sourceDistance;
-  const darkY          = centerY - direction.y * sourceDistance;
-  const gradient       = ctx.createLinearGradient(lightX, lightY, darkX, darkY);
-  const maxLift        = clamp((0.1 + tilt * 0.85) * strength, 0.02, 0.9);
-
-  gradient.addColorStop(0,    `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(maxLift * 0.95, 0.01, 0.9)})`);
-  gradient.addColorStop(0.58, `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(maxLift * 0.45, 0.01, 0.7)})`);
-  gradient.addColorStop(1,    `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
-
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
+  return normalized;
 };
 
-const drawPointLightContribution = (ctx, width, height, camera, source) => {
-  const zoom     = Number(camera?.zoom) || 1;
-  const camX     = Number(camera?.x)    || 0;
-  const camY     = Number(camera?.y)    || 0;
-  const centerX  = source.worldX * zoom - camX;
-  const centerY  = source.worldY * zoom - camY;
-  const radius   = Math.max(8, source.range * zoom);
-  const strength = clamp(source.intensity * source.blend, 0, 2);
-  const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-  const rgb      = hexToRgb(source.color);
+const normalizeLighting = (lighting = {}) => {
+  const safe = lighting && typeof lighting === "object" ? lighting : {};
+  const rawSources = Array.isArray(safe.sources) ? safe.sources : [];
 
-  gradient.addColorStop(0,    `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(0.95 * strength, 0.02, 0.95)})`);
-  gradient.addColorStop(0.62, `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(0.28 * strength, 0.01, 0.50)})`);
-  gradient.addColorStop(1,    `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
+  let sources = rawSources.map((entry, index) =>
+    normalizeLightingSource(entry, index)
+  );
 
-  const minX = Math.max(0, centerX - radius);
-  const minY = Math.max(0, centerY - radius);
-  const boxW = Math.min(width - minX, radius * 2);
-  const boxH = Math.min(height - minY, radius * 2);
-  if (boxW <= 0 || boxH <= 0) return;
+  if (sources.length === 0) {
+    sources = [normalizeLightingSource({ ...DEFAULT_LIGHTING.sources[0] }, 0)];
+  }
 
-  ctx.fillStyle = gradient;
-  ctx.fillRect(minX, minY, boxW, boxH);
+  return {
+    enabled: safe.enabled !== false,
+    ambient: clamp(Number(safe.ambient) || DEFAULT_LIGHTING.ambient, 0, 0.9),
+    sources,
+  };
 };
 
+// ─── RAYCAST / VISIBILITY HELPERS ────────────────
+const cross2d = (ax, ay, bx, by) => ax * by - ay * bx;
+
+const raySegmentT = (ox, oy, dx, dy, ax, ay, bx, by) => {
+  const rx = bx - ax, ry = by - ay;
+  const denom = cross2d(dx, dy, rx, ry);
+  if (Math.abs(denom) < 1e-10) return Infinity;
+  const tx = ax - ox, ty = ay - oy;
+  const t = cross2d(tx, ty, rx, ry) / denom;
+  const u = cross2d(tx, ty, dx, dy) / denom;
+  if (t < -1e-8 || u < -1e-8 || u > 1 + 1e-8) return Infinity;
+  return Math.max(0, t);
+};
+
+const castRay = (ox, oy, dx, dy, segments, maxRange) => {
+  let nearest = maxRange;
+  for (const [a, b] of segments) {
+    const t = raySegmentT(ox, oy, dx, dy, a.x, a.y, b.x, b.y);
+    if (t < nearest) nearest = t;
+  }
+  return { x: ox + dx * nearest, y: oy + dy * nearest };
+};
+
+export const getObjectSegmentsWorld = (obj, circleSegments = 16) => {
+  const objectType = String(obj?.type || "circle").toLowerCase();
+  const cx = Number(obj?.x) || 0;
+  const cy = Number(obj?.y) || 0;
+  const segs = [];
+
+  const buildPolySegs = (pts) => {
+    for (let i = 0; i < pts.length; i++)
+      segs.push([pts[i], pts[(i + 1) % pts.length]]);
+  };
+
+  if (objectType === "rect") {
+    const hw = Math.max(1, Number(obj?.width)  || 0) / 2;
+    const hh = Math.max(1, Number(obj?.height) || 0) / 2;
+    buildPolySegs([
+      { x: cx - hw, y: cy - hh }, { x: cx + hw, y: cy - hh },
+      { x: cx + hw, y: cy + hh }, { x: cx - hw, y: cy + hh },
+    ]);
+    return segs;
+  }
+
+  if (objectType === "circle") {
+    const r   = Math.max(1, Number(obj?.size) || 0);
+    const pts = [];
+    for (let i = 0; i < circleSegments; i++) {
+      const a = (i / circleSegments) * Math.PI * 2;
+      pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+    }
+    buildPolySegs(pts);
+    return segs;
+  }
+
+  const s = Math.max(1, Number(obj?.size) || 0);
+  buildPolySegs([
+    { x: cx, y: cy - s }, { x: cx - s, y: cy + s }, { x: cx + s, y: cy + s },
+  ]);
+  return segs;
+};
+
+// Returns world-space {angle, x, y} points — camera transform applied at draw time.
+export const computeVisibilityPolygon = (lx, ly, segments, range) => {
+  const ANGLE_EPSILON = 0.0001;
+  const pad = 2;
+
+  const bx0 = lx - range - pad, by0 = ly - range - pad;
+  const bx1 = lx + range + pad, by1 = ly + range + pad;
+
+  const boundary = [
+    [{ x: bx0, y: by0 }, { x: bx1, y: by0 }],
+    [{ x: bx1, y: by0 }, { x: bx1, y: by1 }],
+    [{ x: bx1, y: by1 }, { x: bx0, y: by1 }],
+    [{ x: bx0, y: by1 }, { x: bx0, y: by0 }],
+  ];
+
+  const allSegs = [...segments, ...boundary];
+  const angles  = [];
+
+  for (const [a, b] of allSegs) {
+    for (const pt of [a, b]) {
+      const dx = pt.x - lx, dy = pt.y - ly;
+      if (dx * dx + dy * dy > range * range * 2.1) continue;
+      const base = Math.atan2(dy, dx);
+      angles.push(base - ANGLE_EPSILON, base, base + ANGLE_EPSILON);
+    }
+  }
+
+  angles.sort((a, b) => a - b);
+
+  const points = [];
+  for (const angle of angles) {
+    const hit = castRay(lx, ly, Math.cos(angle), Math.sin(angle), allSegs, range + pad);
+    points.push({ angle, x: hit.x, y: hit.y });
+  }
+
+  return points; // world-space {angle, x, y}[]
+};
+
+// ─── POINT LIGHT ─────────────────────────────────
+//
+// Approach:
+//   1. Build an offscreen canvas clipped to the visibility polygon.
+//   2. Fill it with a radial gradient (bright at source → transparent at range).
+//   3. Use destination-out on the main canvas to erase ambient darkness
+//      proportionally — fully erased where the light is brightest.
+//
+// Winding order is irrelevant because destination-out is alpha-driven.
+//
+const drawPointLight = (ctx, width, height, source, worldPoints, camera) => {
+  const sp = worldPoints.map((pt) => ({
+    x: pt.x * camera.zoom - camera.x,
+    y: pt.y * camera.zoom - camera.y,
+  }));
+  if (sp.length < 3) return;
+
+  const lsx         = source.worldX * camera.zoom - camera.x;
+  const lsy         = source.worldY * camera.zoom - camera.y;
+  const screenRange = source.range * camera.zoom;
+  const rgb         = hexToRgb(source.color);
+  const intensity   = clamp(source.intensity, 0, 2);
+
+  const off = document.createElement("canvas");
+  off.width = width;
+  off.height = height;
+  const oc = off.getContext("2d");
+
+  // ── Step 1: Fill the full radial gradient (no clip yet) ──────────────────
+  // Steeper falloff so walls far from the source receive little light,
+  // which prevents the "light extends all the way to the wall" look.
+  const gradient = oc.createRadialGradient(lsx, lsy, 0, lsx, lsy, screenRange);
+  gradient.addColorStop(0,    `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(intensity, 0, 1)})`);
+  gradient.addColorStop(0.25, `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(intensity * 0.75, 0, 1)})`);
+  gradient.addColorStop(0.55, `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(intensity * 0.3, 0, 1)})`);
+  gradient.addColorStop(0.8,  `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(intensity * 0.08, 0, 1)})`);
+  gradient.addColorStop(1,    `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
+  oc.fillStyle = gradient;
+  oc.fillRect(0, 0, width, height);
+
+  // ── Step 2: Clip to visibility polygon ───────────────────────────────────
+  // destination-in keeps only pixels inside the polygon, preserving
+  // the gradient alpha values everywhere else as-is.
+  oc.globalCompositeOperation = "destination-in";
+  oc.beginPath();
+  oc.moveTo(sp[0].x, sp[0].y);
+  for (let i = 1; i < sp.length; i++) oc.lineTo(sp[i].x, sp[i].y);
+  oc.closePath();
+  oc.fillStyle = "rgba(0,0,0,1)";
+  oc.fill();
+
+  // ── Step 3: Soft circular edge fade ──────────────────────────────────────
+  // A second destination-in multiplies the existing alpha by a radial
+  // gradient that goes opaque→transparent near the range boundary.
+  // This rounds off the hard polygon edge where it meets the range circle,
+  // blending it naturally into the surrounding darkness.
+  oc.globalCompositeOperation = "destination-in";
+  const softEdge = oc.createRadialGradient(
+    lsx, lsy, screenRange * 0.55,
+    lsx, lsy, screenRange * 0.97
+  );
+  softEdge.addColorStop(0, "rgba(0,0,0,1)");
+  softEdge.addColorStop(1, "rgba(0,0,0,0)");
+  oc.fillStyle = softEdge;
+  oc.fillRect(0, 0, width, height);
+
+  // ── Carve lit area out of the ambient darkness layer ─────────────────────
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.drawImage(off, 0, 0);
+
+  // ── Colored tint (non-white lights only) ─────────────────────────────────
+  if (!(rgb.r === 255 && rgb.g === 255 && rgb.b === 255)) {
+    const tint = document.createElement("canvas");
+    tint.width = width;
+    tint.height = height;
+    const tc = tint.getContext("2d");
+
+    tc.beginPath();
+    tc.moveTo(sp[0].x, sp[0].y);
+    for (let i = 1; i < sp.length; i++) tc.lineTo(sp[i].x, sp[i].y);
+    tc.closePath();
+    tc.clip();
+
+    const tintGrad = tc.createRadialGradient(lsx, lsy, 0, lsx, lsy, screenRange * 0.8);
+    const tintStrength = clamp(source.blend * 0.3, 0, 0.45);
+    tintGrad.addColorStop(0,   `rgba(${rgb.r},${rgb.g},${rgb.b},${tintStrength})`);
+    tintGrad.addColorStop(0.5, `rgba(${rgb.r},${rgb.g},${rgb.b},${tintStrength * 0.4})`);
+    tintGrad.addColorStop(1,   `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
+    tc.fillStyle = tintGrad;
+    tc.fillRect(0, 0, width, height);
+
+    ctx.globalCompositeOperation = "lighten";
+    ctx.drawImage(tint, 0, 0);
+  }
+};
+
+
+// ─── LIGHTING LAYER ──────────────────────────────
 export const lightingLayer = {
   id: "lighting",
-
   shouldRedraw() {
     return true;
   },
-
   draw(ctx, canvas, state) {
     if (!ctx || !canvas || canvas.width === 0 || canvas.height === 0) return;
 
     const width  = canvas.width;
     const height = canvas.height;
-
     ctx.clearRect(0, 0, width, height);
 
-    const lighting = normalizeLighting(state?.lighting || DEFAULT_LIGHTING);
+    // Defensive: if state.lighting is missing entirely, still apply ambient darkness
+    // using the default so the layer is never invisible in a broken state.
+    const lighting = normalizeLighting(state?.lighting ?? DEFAULT_LIGHTING);
     if (!lighting.enabled) return;
 
-    const camera       = state?.camera || { x: 0, y: 0, zoom: 1 };
     const ambientAlpha = clamp(lighting.ambient, 0, 0.9);
+    const camera       = state?.camera || { x: 0, y: 0, zoom: 1 };
 
     ctx.save();
 
-    // Base darkness
+    // ── Base darkness ─────────────────────────────────────────────────────
+    // This is always drawn. If you can't see this dark overlay at all, the
+    // lighting canvas isn't being composited onto the scene correctly —
+    // check that the layer is registered and rendered above the map layers.
+    ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = `rgba(0,0,0,${ambientAlpha})`;
     ctx.fillRect(0, 0, width, height);
 
-    // Carve light out of darkness using destination-out, then add color with lighten
-    ctx.globalCompositeOperation = "destination-out";
+    // ── Build obstacle segments ───────────────────────────────────────────
+    const objects = state?.mapObjects || [];
+
+    // Pre-bucket all objects by z-level so each light only occludes against
+    // geometry on its own floor — lights on level 1 don't cast shadows for
+    // objects on level 0 and vice versa.
+    const objectsByZLevel = new Map();
+    for (const obj of objects) {
+      const zl = Math.round(Number(obj?.zLevel) || 0);
+      if (!objectsByZLevel.has(zl)) objectsByZLevel.set(zl, []);
+      objectsByZLevel.get(zl).push(obj);
+    }
+
+    // ── Point lights: carve lit areas out of the darkness ─────────────────
+    const polygonCache = state?.lightingCache?.polygons;
+
+    const currentZLevel = Math.round(Number(state?.currentZLevel) || 0);
+
     lighting.sources.forEach((source) => {
-      if (!source?.enabled) return;
-      if (String(source.type) === "point") {
-        drawPointLightContribution(ctx, width, height, camera, source);
-        return;
+      if (!source.enabled || source.type !== "point") return;
+
+      const lightZLevel = Math.round(Number(source.zLevel) || 0);
+      if (lightZLevel !== currentZLevel) return;
+
+      const zLevelObjs    = objectsByZLevel.get(lightZLevel) || [];
+      const lightSegments = [];
+      for (const obj of zLevelObjs) lightSegments.push(...getObjectSegmentsWorld(obj));
+
+      let worldPoints = polygonCache?.get?.(source.id);
+      if (!worldPoints) {
+        worldPoints = computeVisibilityPolygon(
+          source.worldX, source.worldY, lightSegments, source.range
+        );
       }
-      drawDirectionalLightContribution(ctx, width, height, source, ambientAlpha);
+      if (!worldPoints || worldPoints.length < 3) return;
+
+      drawPointLight(ctx, width, height, source, worldPoints, camera);
     });
 
-    // Now add colored light using lighten mode
+
+
+    // ── Directional lights ────────────────────────────────────────────────
     ctx.globalCompositeOperation = "lighten";
     lighting.sources.forEach((source) => {
-      if (!source?.enabled) return;
-      // Only add color if it's not white
-      const rgb = hexToRgb(source.color);
-      if (rgb.r === 255 && rgb.g === 255 && rgb.b === 255) return;
-      
-      if (String(source.type) === "point") {
-        const zoom     = Number(camera?.zoom) || 1;
-        const camX     = Number(camera?.x)    || 0;
-        const camY     = Number(camera?.y)    || 0;
-        const centerX  = source.worldX * zoom - camX;
-        const centerY  = source.worldY * zoom - camY;
-        const radius   = Math.max(8, source.range * zoom);
-        const strength = clamp(source.intensity * source.blend * 0.3, 0, 1);
-        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+      if (!source.enabled || source.type !== "directional") return;
 
-        gradient.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},${strength})`);
-        gradient.addColorStop(0.6, `rgba(${rgb.r},${rgb.g},${rgb.b},${strength * 0.3})`);
-        gradient.addColorStop(1, `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
-
-        const minX = Math.max(0, centerX - radius);
-        const minY = Math.max(0, centerY - radius);
-        const boxW = Math.min(width - minX, radius * 2);
-        const boxH = Math.min(height - minY, radius * 2);
-        if (boxW > 0 && boxH > 0) {
-          ctx.fillStyle = gradient;
-          ctx.fillRect(minX, minY, boxW, boxH);
-        }
-      } else {
-        // Directional colored light
-        const direction = normalizeDirectionalVector(source);
-        const tilt      = clamp(Math.hypot(direction.x, direction.y), 0, 1);
-        if (tilt < 0.02) return;
-        
-        const strength = clamp(source.intensity * source.blend * 0.2, 0, 0.4);
-        const centerX  = width / 2;
-        const centerY  = height / 2;
-        const sourceDistance = Math.max(width, height) * (0.22 + tilt * 0.82);
-        const lightX   = centerX + direction.x * sourceDistance;
-        const lightY   = centerY + direction.y * sourceDistance;
-        const darkX    = centerX - direction.x * sourceDistance;
-        const darkY    = centerY - direction.y * sourceDistance;
-        const gradient = ctx.createLinearGradient(lightX, lightY, darkX, darkY);
-
-        gradient.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},${strength})`);
-        gradient.addColorStop(0.6, `rgba(${rgb.r},${rgb.g},${rgb.b},${strength * 0.3})`);
-        gradient.addColorStop(1, `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
-      }
+      const rgb      = hexToRgb(source.color);
+      const strength = clamp(source.intensity * source.blend * 0.4, 0, 1);
+      const cx       = width / 2, cy = height / 2;
+      const dist     = Math.max(width, height) * 0.8;
+      const gradient = ctx.createLinearGradient(
+        cx + source.x * dist, cy + source.y * dist,
+        cx - source.x * dist, cy - source.y * dist
+      );
+      const maxLift = clamp(strength, 0.02, 0.9);
+      gradient.addColorStop(0,   `rgba(${rgb.r},${rgb.g},${rgb.b},${maxLift})`);
+      gradient.addColorStop(0.6, `rgba(${rgb.r},${rgb.g},${rgb.b},${maxLift * 0.4})`);
+      gradient.addColorStop(1,   `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
     });
 
+    // ── Vignette ──────────────────────────────────────────────────────────
     ctx.globalCompositeOperation = "source-over";
-
-    // Soft vignette
     const vignette = ctx.createRadialGradient(
       width / 2, height / 2, Math.max(10, Math.min(width, height) * 0.22),
-      width / 2, height / 2, Math.max(width, height) * 0.95,
+      width / 2, height / 2, Math.max(width, height) * 0.95
     );
     vignette.addColorStop(0, "rgba(0,0,0,0)");
     vignette.addColorStop(1, `rgba(0,0,0,${clamp(ambientAlpha * 0.22, 0.02, 0.2)})`);

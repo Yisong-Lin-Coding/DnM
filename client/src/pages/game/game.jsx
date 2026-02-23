@@ -7,6 +7,7 @@ import GameSidePanel from "../../pageComponents/game_sidepanel";
 import { useGame } from "../../data/gameContext";
 import { SocketContext } from "../../socket.io/context";
 import { emitWithAck } from "../campaign/socketEmit";
+import { HEIGHT_UNITS_PER_ZLEVEL } from "./Map Layers/mapLayerShared";
 
 const MIN_SIDE_WIDTH = 200;
 const MAX_SIDE_WIDTH = 800;
@@ -296,6 +297,7 @@ function GameComponent() {
     const [infoPanelDrag, setInfoPanelDrag] = useState(null);
     const [blockedMovePreview, setBlockedMovePreview] = useState(null);
     const [resizeTarget, setResizeTarget] = useState(null);
+    const [controlledCharacterIDs, setControlledCharacterIDs] = useState([]);
 
     const isPanning = useRef(false);
     const layerRefs = useRef({});
@@ -307,6 +309,9 @@ function GameComponent() {
     const autoSavingRef = useRef(false);
     const autoSaveTimerRef = useRef(null);
     const hasAutoSaveBaselineRef = useRef(false);
+    const pendingMoveRef = useRef(null);
+    const moveSyncTimerRef = useRef(null);
+    const syncingMoveRef = useRef(false);
     const latestSnapshotRef = useRef({
         mapObjects: [],
         backgroundKey: "",
@@ -323,6 +328,14 @@ function GameComponent() {
         KeyQ: false,
         KeyE: false,
     });
+    const controlledCharacterIdSet = useMemo(
+        () => new Set((controlledCharacterIDs || []).map((id) => toEntityID(id))),
+        [controlledCharacterIDs]
+    );
+    const canControlCharacterId = useCallback(
+        (characterId) => isDM || controlledCharacterIdSet.has(toEntityID(characterId)),
+        [isDM, controlledCharacterIdSet]
+    );
 
     const runAutoSave = useCallback(
         async (trigger = "map_change") => {
@@ -410,6 +423,10 @@ function GameComponent() {
                 clearTimeout(autoSaveTimerRef.current);
                 autoSaveTimerRef.current = null;
             }
+            if (moveSyncTimerRef.current) {
+                clearTimeout(moveSyncTimerRef.current);
+                moveSyncTimerRef.current = null;
+            }
         },
         []
     );
@@ -459,6 +476,15 @@ function GameComponent() {
             setIsDM(canEdit);
             setGameContextError("");
             setLoadingGameContext(false);
+
+            const assignments = Array.isArray(response?.campaign?.characterAssignments)
+                ? response.campaign.characterAssignments
+                : [];
+            const assignedIds = assignments
+                .filter((assignment) => toEntityID(assignment?.playerId) === toEntityID(playerID))
+                .map((assignment) => toEntityID(assignment?.characterId))
+                .filter(Boolean);
+            setControlledCharacterIDs(assignedIds);
 
             if (Array.isArray(response?.floorTypes)) {
                 replaceFloorTypes(response.floorTypes);
@@ -694,6 +720,19 @@ function GameComponent() {
         [mapObjects, currentZLevel]
     );
 
+const tallSolidsFromBelow = useMemo(() => {
+    return mapObjects.filter((obj) => {
+      const level       = getObjectZLevel(obj);
+      if (level >= currentZLevel) return false;
+      const terrainType = String(obj?.terrainType || "").toLowerCase();
+      if (terrainType === "floor") return false;
+      const elevHeight  = Math.max(0, Number(obj?.elevationHeight) || 0);
+      const topZLevel   = level + Math.floor(elevHeight / HEIGHT_UNITS_PER_ZLEVEL);
+      return topZLevel >= currentZLevel;
+    });
+  }, [mapObjects, currentZLevel]);
+
+
     const floorTypesByID = useMemo(() => {
         const byID = new Map();
         (Array.isArray(floorTypes) ? floorTypes : []).forEach((entry) => {
@@ -704,25 +743,23 @@ function GameComponent() {
         return byID;
     }, [floorTypes]);
 
-    const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false) => {
-        const characterTarget = findCharacterAt(worldX, worldY, includeHiddenCharacters);
-        if (characterTarget) {
-            return {
-                type: "character",
-                id: characterTarget.id,
-            };
-        }
+const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false) => {
+    const characterTarget = findCharacterAt(worldX, worldY, includeHiddenCharacters);
+    if (characterTarget) {
+      return { type: "character", id: characterTarget.id };
+    }
 
-        const mapObjectTarget = findTopMapObjectAt(worldX, worldY, activeMapObjects);
-        if (mapObjectTarget) {
-            return {
-                type: "mapObject",
-                id: mapObjectTarget.id,
-            };
-        }
+    // Search active-level objects first, then tall objects poking up from below.
+    const mapObjectTarget = findTopMapObjectAt(
+      worldX, worldY, [...activeMapObjects, ...tallSolidsFromBelow]
+    );
+    if (mapObjectTarget) {
+      return { type: "mapObject", id: mapObjectTarget.id };
+    }
 
-        return null;
-    };
+    return null;
+  };
+
 
     const selectedEntityData = useMemo(() => {
         if (!selectedEntity?.type) return null;
@@ -894,6 +931,11 @@ function GameComponent() {
                 backgroundKey,
                 camera: cameraSnapshot,
                 mapObjects,
+                characters,
+                selectedChar,
+                fogEnabled,
+                isDM,
+                controlledCharacterIDs,
                 floorTypes,
                 currentZLevel,
                 selectedMapObjectID,
@@ -917,7 +959,21 @@ function GameComponent() {
 
         loop();
         return () => cancelAnimationFrame(raf);
-    }, [camera, mapObjects, floorTypes, currentZLevel, selectedEntity, blockedMovePreview, lighting, backgroundKey, isDM]);
+    }, [
+        camera,
+        mapObjects,
+        characters,
+        selectedChar,
+        fogEnabled,
+        controlledCharacterIDs,
+        floorTypes,
+        currentZLevel,
+        selectedEntity,
+        blockedMovePreview,
+        lighting,
+        backgroundKey,
+        isDM,
+    ]);
 
     useEffect(() => {
         const onMouseMove = (event) => {
@@ -1152,9 +1208,8 @@ function GameComponent() {
 
         selectEntity(target);
 
-        if (!isDM) return;
-
         if (target.type === "mapObject") {
+            if (!isDM) return;
             const objectTarget = activeMapObjects.find(
                 (obj) => toEntityID(obj?.id) === toEntityID(target.id)
             );
@@ -1173,6 +1228,7 @@ function GameComponent() {
                 (char) => toEntityID(char?.id) === toEntityID(target.id)
             );
             if (!characterTarget) return;
+            if (!canControlCharacterId(characterTarget.id)) return;
             setDragTarget({
                 type: "character",
                 id: characterTarget.id,
@@ -1255,13 +1311,14 @@ function GameComponent() {
             return;
         }
 
-        if (dragTarget && isDM) {
+        if (dragTarget) {
             const world = getWorldFromMouseEvent(event);
             if (!world) return;
             const targetX = world.x - dragTarget.offsetX;
             const targetY = world.y - dragTarget.offsetY;
 
             if (dragTarget.type === "mapObject") {
+                if (!isDM) return;
                 const objectTarget = mapObjects.find(
                     (obj) => toEntityID(obj?.id) === toEntityID(dragTarget.id)
                 );
@@ -1288,7 +1345,8 @@ function GameComponent() {
 
             if (dragTarget.type === "character") {
                 setBlockedMovePreview(null);
-                moveCharacter(dragTarget.id, Math.round(targetX), Math.round(targetY));
+                if (!canControlCharacterId(dragTarget.id)) return;
+                queueCharacterMove(dragTarget.id, Math.round(targetX), Math.round(targetY));
                 return;
             }
         }
@@ -1390,6 +1448,67 @@ function GameComponent() {
         setGameContextError("");
     };
 
+    const flushPendingMove = useCallback(async () => {
+        if (!socket || !playerID || !gameID) return;
+        if (syncingMoveRef.current) return;
+        const pending = pendingMoveRef.current;
+        if (!pending) return;
+
+        syncingMoveRef.current = true;
+        pendingMoveRef.current = null;
+        const response = await emitWithAck(socket, "campaign_moveCharacter", {
+            playerID,
+            campaignID: gameID,
+            characterID: pending.characterId,
+            position: {
+                x: pending.x,
+                y: pending.y,
+            },
+        });
+        syncingMoveRef.current = false;
+        moveSyncTimerRef.current = null;
+
+        if (!response?.success) {
+            if (response?.message) {
+                setGameContextError((prev) => prev || response.message);
+            }
+            return;
+        }
+
+        const snapshot =
+            response?.engineState?.snapshot && typeof response.engineState.snapshot === "object"
+                ? response.engineState.snapshot
+                : null;
+        if (snapshot) {
+            applyingServerStateRef.current = true;
+            skipNextAutoSaveRef.current = true;
+            loadGameSnapshot(snapshot);
+            setGameContextError("");
+        }
+
+        if (pendingMoveRef.current) {
+            moveSyncTimerRef.current = setTimeout(() => {
+                flushPendingMove();
+            }, 60);
+        }
+    }, [socket, playerID, gameID, loadGameSnapshot]);
+
+    const queueCharacterMove = useCallback(
+        (characterId, x, y) => {
+            moveCharacter(characterId, x, y);
+            if (isDM) return;
+            if (!socket || !playerID || !gameID) return;
+
+            pendingMoveRef.current = { characterId, x, y };
+            if (moveSyncTimerRef.current) return;
+
+            moveSyncTimerRef.current = setTimeout(() => {
+                flushPendingMove();
+            }, 120);
+        },
+        [moveCharacter, isDM, socket, playerID, gameID, flushPendingMove]
+    );
+
     const handleContextAction = async (action) => {
         const target = contextMenu?.target;
         const contextWorld =
@@ -1422,8 +1541,13 @@ function GameComponent() {
                 return;
             }
 
-            if (action === "placeHere" && isDM && contextWorld) {
-                moveCharacter(character.id, Math.round(contextWorld.x), Math.round(contextWorld.y));
+            if (action === "placeHere" && contextWorld) {
+                if (!canControlCharacterId(character.id)) return;
+                queueCharacterMove(
+                    character.id,
+                    Math.round(contextWorld.x),
+                    Math.round(contextWorld.y)
+                );
                 selectEntity({ type: "character", id: character.id });
                 return;
             }
@@ -1943,7 +2067,7 @@ function GameComponent() {
                                     >
                                         Inspect
                                     </button>
-                                    {isDM && (
+                                    {(isDM || canControlCharacterId(contextMenu?.target?.id)) && (
                                         <>
                                             <div className="border-t border-gray-600 my-1" />
                                             <button
@@ -1952,6 +2076,10 @@ function GameComponent() {
                                             >
                                                 Place Character Here
                                             </button>
+                                        </>
+                                    )}
+                                    {isDM && (
+                                        <>
                                             <button
                                                 onClick={() => handleContextAction("toggleTeam")}
                                                 className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
@@ -2054,4 +2182,3 @@ function GameComponent() {
 }
 
 export default GameComponent;
-

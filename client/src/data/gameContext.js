@@ -326,10 +326,12 @@ const normalizeLightingSource = (raw = {}, fallbackIndex = 0) => {
     };
 
     if (type === "point") {
-        normalized.worldX = toNumber(source.worldX ?? source.position?.x, 0);
-        normalized.worldY = toNumber(source.worldY ?? source.position?.y, 0);
-        normalized.range = Math.max(LIGHT_RANGE_MIN, Math.min(LIGHT_RANGE_MAX, toNumber(source.range, 420)));
-    } else {
+    normalized.worldX  = toNumber(source.worldX ?? source.position?.x, 0);
+    normalized.worldY  = toNumber(source.worldY ?? source.position?.y, 0);
+    normalized.range   = Math.max(LIGHT_RANGE_MIN, Math.min(LIGHT_RANGE_MAX, toNumber(source.range, 420)));
+    normalized.zLevel  = clampZLevel(source.zLevel ?? 0);
+  }
+ else {
         const direction = normalizeLightingDirection({
             x: sourceInput?.x,
             y: sourceInput?.y,

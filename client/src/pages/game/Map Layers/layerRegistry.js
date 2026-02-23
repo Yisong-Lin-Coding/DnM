@@ -1,6 +1,7 @@
 import { backgroundLayer } from "./0Background";
 import { mapFloorLayer } from "./1Map";
 import { mapSolidsLayer } from "./2Enviornment";
+import { mapCharactersLayer } from "./3Characters";
 import { mapShadowsLayer } from "./3Shadows";
 import { gridlayer } from "./4Grid";
 import { lightingLayer } from "./7lighting";
@@ -13,7 +14,8 @@ export const GAME_LAYER_REGISTRY = [
   { name: "mapShadows", component: mapShadowsLayer, zIndex: 3 },
   { name: "mapSolids", component: mapSolidsLayer, zIndex: 4 },
   { name: "lighting", component: lightingLayer, zIndex: 5 },
-  { name: "mapEffects", component: mapEffectsLayer, zIndex: 6 },
+  { name: "mapCharacters", component: mapCharactersLayer, zIndex: 6 },
+  { name: "mapEffects", component: mapEffectsLayer, zIndex: 7 },
 ];
 
 export const bindLayerCanvases = (registry = [], layerRefs = {}) =>

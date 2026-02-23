@@ -26,6 +26,8 @@ const MAX_AUTO_SAVE_HISTORY = 5;
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const JOIN_CODE_LENGTH = 6;
 const GAME_ROOM_PREFIX = "campaign_game_room";
+const GAME_PLAYER_ROOM_SUFFIX = "players";
+const GAME_DM_ROOM_SUFFIX = "dm";
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -51,6 +53,10 @@ const FLOOR_TYPES = normalizeFloorTypeCollection(rawFloorTypes);
 const campaignRuntimeStateByID = new Map();
 
 const getCampaignGameRoom = (campaignID) => `${GAME_ROOM_PREFIX}:${String(campaignID || "")}`;
+const getCampaignPlayersRoom = (campaignID) =>
+    `${GAME_ROOM_PREFIX}:${GAME_PLAYER_ROOM_SUFFIX}:${String(campaignID || "")}`;
+const getCampaignDMRoom = (campaignID) =>
+    `${GAME_ROOM_PREFIX}:${GAME_DM_ROOM_SUFFIX}:${String(campaignID || "")}`;
 
 const cloneEngineState = (state) => ({
     campaignID: String(state?.campaignID || ""),
@@ -64,6 +70,108 @@ const cloneEngineState = (state) => ({
         }
     })(),
 });
+
+const toNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeAngle = (value) => {
+    let angle = Number(value) || 0;
+    while (angle > 180) angle -= 360;
+    while (angle < -180) angle += 360;
+    return angle;
+};
+
+const isPointInFOV = (source = {}, point = {}) => {
+    const sourcePos = source?.position || {};
+    const sx = toNumber(sourcePos.x, 0);
+    const sy = toNumber(sourcePos.y, 0);
+    const dx = toNumber(point.x, 0) - sx;
+    const dy = toNumber(point.y, 0) - sy;
+    const maxDistance = Math.max(1, toNumber(source.visionDistance, 150));
+    if (dx * dx + dy * dy > maxDistance * maxDistance) return false;
+
+    const arc = Math.max(0, Math.min(360, toNumber(source.visionArc, 90)));
+    if (arc >= 360) return true;
+
+    const angleToPoint = (Math.atan2(dy, dx) * 180) / Math.PI;
+    const diff = normalizeAngle(angleToPoint - toNumber(source.rotation, 0));
+    return Math.abs(diff) <= arc / 2;
+};
+
+const getObjectSamplePoints = (obj = {}) => {
+    const type = String(obj?.type || "circle").toLowerCase();
+    const x = toNumber(obj?.x, 0);
+    const y = toNumber(obj?.y, 0);
+
+    if (type === "rect") {
+        const halfW = Math.max(1, toNumber(obj?.width, 50)) / 2;
+        const halfH = Math.max(1, toNumber(obj?.height, 40)) / 2;
+        return [
+            { x, y },
+            { x: x - halfW, y: y - halfH },
+            { x: x + halfW, y: y - halfH },
+            { x: x + halfW, y: y + halfH },
+            { x: x - halfW, y: y + halfH },
+        ];
+    }
+
+    if (type === "triangle") {
+        const size = Math.max(1, toNumber(obj?.size, 30));
+        return [
+            { x, y },
+            { x, y: y - size },
+            { x: x - size, y: y + size },
+            { x: x + size, y: y + size },
+        ];
+    }
+
+    const radius = Math.max(1, toNumber(obj?.size, 30));
+    return [
+        { x, y },
+        { x: x + radius, y },
+        { x: x - radius, y },
+        { x, y: y + radius },
+        { x, y: y - radius },
+    ];
+};
+
+const filterSnapshotForFOV = (snapshot = {}, viewerTeam = "player") => {
+    const safeSnapshot = toPlainObject(snapshot);
+    const characters = Array.isArray(safeSnapshot.characters) ? safeSnapshot.characters : [];
+    const mapObjects = Array.isArray(safeSnapshot.mapObjects) ? safeSnapshot.mapObjects : [];
+    const normalizedTeam = String(viewerTeam || "player").toLowerCase();
+
+    const fovSources = characters.filter(
+        (char) => String(char?.team || "player").toLowerCase() === normalizedTeam
+    );
+    if (fovSources.length === 0) {
+        return {
+            ...safeSnapshot,
+            characters: [],
+            mapObjects: [],
+        };
+    }
+
+    const isVisiblePoint = (point) => fovSources.some((source) => isPointInFOV(source, point));
+    const isVisibleObject = (obj) =>
+        getObjectSamplePoints(obj).some((point) => isVisiblePoint(point));
+
+    const filteredMapObjects = mapObjects.filter((obj) => isVisibleObject(obj));
+    const filteredCharacters = characters.filter((char) => {
+        const team = String(char?.team || "player").toLowerCase();
+        if (team === normalizedTeam) return true;
+        const pos = char?.position || {};
+        return isVisiblePoint({ x: toNumber(pos.x, 0), y: toNumber(pos.y, 0) });
+    });
+
+    return {
+        ...safeSnapshot,
+        characters: filteredCharacters,
+        mapObjects: filteredMapObjects,
+    };
+};
 
 const getOrCreateRuntimeState = (campaignID, snapshot = {}) => {
     const key = String(campaignID || "");
@@ -334,6 +442,19 @@ module.exports = (socket) => {
             const isDM = isCampaignDM(campaign, playerID);
             const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
             socket.join(getCampaignGameRoom(campaign._id));
+            if (isDM) {
+                socket.join(getCampaignDMRoom(campaign._id));
+            } else {
+                socket.join(getCampaignPlayersRoom(campaign._id));
+            }
+
+            const engineState = cloneEngineState(runtimeState);
+            const filteredSnapshot = isDM
+                ? toPlainObject(runtimeState.snapshot)
+                : filterSnapshotForFOV(engineState.snapshot);
+            if (!isDM) {
+                engineState.snapshot = filteredSnapshot;
+            }
 
             respond({
                 success: true,
@@ -344,8 +465,8 @@ module.exports = (socket) => {
                 },
                 activeGameSave,
                 floorTypes: FLOOR_TYPES,
-                engineState: cloneEngineState(runtimeState),
-                snapshot: toPlainObject(runtimeState.snapshot),
+                engineState,
+                snapshot: filteredSnapshot,
             });
         } catch (error) {
             console.error("[campaign_getGameContext] failed", error);
@@ -393,12 +514,23 @@ module.exports = (socket) => {
 
             const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
             socket.join(getCampaignGameRoom(campaign._id));
+            const isDM = isCampaignDM(campaign, playerID);
+            if (isDM) {
+                socket.join(getCampaignDMRoom(campaign._id));
+            } else {
+                socket.join(getCampaignPlayersRoom(campaign._id));
+            }
+
+            const engineState = cloneEngineState(runtimeState);
+            if (!isDM) {
+                engineState.snapshot = filterSnapshotForFOV(engineState.snapshot);
+            }
 
             respond({
                 success: true,
                 campaignID: String(campaign._id),
                 floorTypes: FLOOR_TYPES,
-                engineState: cloneEngineState(runtimeState),
+                engineState,
             });
         } catch (error) {
             console.error("[campaign_gameRequestState] failed", error);
@@ -447,14 +579,27 @@ module.exports = (socket) => {
             const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
             updateEngineState(runtimeState, statePatch);
 
+            const engineState = cloneEngineState(runtimeState);
             const payload = {
                 success: true,
                 campaignID: String(campaign._id),
                 floorTypes: FLOOR_TYPES,
-                engineState: cloneEngineState(runtimeState),
+                engineState,
+            };
+            const playerPayload = {
+                ...payload,
+                engineState: {
+                    ...engineState,
+                    snapshot: filterSnapshotForFOV(engineState.snapshot),
+                },
             };
             socket.join(getCampaignGameRoom(campaign._id));
-            socket.to(getCampaignGameRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
+            socket.join(getCampaignDMRoom(campaign._id));
+            socket.to(getCampaignPlayersRoom(campaign._id)).emit(
+                "campaign_gameStateUpdated",
+                playerPayload
+            );
+            socket.to(getCampaignDMRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
             respond(payload);
         } catch (error) {
             console.error("[campaign_gameSyncWorld] failed", error);
@@ -488,6 +633,7 @@ module.exports = (socket) => {
                     message: "Only campaign members can modify objects",
                 });
             }
+            const isDM = isCampaignDM(campaign, playerID);
 
             let snapshot = {};
             if (!campaignRuntimeStateByID.has(String(campaign._id)) && campaign.activeGameSave) {
@@ -517,21 +663,199 @@ module.exports = (socket) => {
                 });
             }
 
+            const engineState = cloneEngineState(runtimeState);
             const payload = {
                 success: true,
                 campaignID: String(campaign._id),
                 floorTypes: FLOOR_TYPES,
-                engineState: cloneEngineState(runtimeState),
+                engineState,
                 object: result.object || null,
             };
+            const filteredSnapshot = filterSnapshotForFOV(engineState.snapshot);
+            const objectIsVisible = (filteredSnapshot.mapObjects || []).some(
+                (obj) => String(obj?.id ?? "") === String(result.object?.id ?? "")
+            );
+            const playerPayload = {
+                ...payload,
+                engineState: {
+                    ...engineState,
+                    snapshot: filteredSnapshot,
+                },
+                object: objectIsVisible ? result.object || null : null,
+            };
             socket.join(getCampaignGameRoom(campaign._id));
-            socket.to(getCampaignGameRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
-            respond(payload);
+            if (isDM) {
+                socket.join(getCampaignDMRoom(campaign._id));
+            } else {
+                socket.join(getCampaignPlayersRoom(campaign._id));
+            }
+            socket.to(getCampaignPlayersRoom(campaign._id)).emit(
+                "campaign_gameStateUpdated",
+                playerPayload
+            );
+            socket.to(getCampaignDMRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
+            respond(isDM ? payload : playerPayload);
         } catch (error) {
             console.error("[campaign_gameDamageObject] failed", error);
             respond({
                 success: false,
                 message: error.message || "Failed to modify object HP",
+            });
+        }
+    });
+
+    socket.on("campaign_moveCharacter", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID, characterID } = data || {};
+        const positionPatch = toPlainObject(data?.position);
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const normalizedCharacterID = String(characterID || "").trim();
+            if (!normalizedCharacterID) {
+                return respond({
+                    success: false,
+                    message: "characterID is required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players activeGameSave characterAssignments characterStates"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can move characters",
+                });
+            }
+
+            const isDM = isCampaignDM(campaign, playerID);
+            if (!isDM && !mongoose.isValidObjectId(normalizedCharacterID)) {
+                return respond({
+                    success: false,
+                    message: "characterID must be a valid character id",
+                });
+            }
+
+            if (!isDM) {
+                const assignment = Array.isArray(campaign.characterAssignments)
+                    ? campaign.characterAssignments.find(
+                          (entry) =>
+                              toObjectIdString(entry?.characterId) === normalizedCharacterID
+                      ) || null
+                    : null;
+                const ownerID = toObjectIdString(assignment?.playerId);
+                if (!ownerID || ownerID !== String(playerID)) {
+                    return respond({
+                        success: false,
+                        message: "Only the character owner or DM can move this character",
+                    });
+                }
+            }
+
+            let snapshot = {};
+            if (!campaignRuntimeStateByID.has(String(campaign._id)) && campaign.activeGameSave) {
+                const saveDoc = await GameSave.findOne({
+                    _id: campaign.activeGameSave,
+                    campaignId: campaign._id,
+                }).select("snapshot");
+                if (saveDoc) {
+                    snapshot = toPlainObject(saveDoc.snapshot);
+                }
+            }
+
+            const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
+            if (!Array.isArray(runtimeState.snapshot.characters)) {
+                runtimeState.snapshot.characters = [];
+            }
+
+            let characterToken = runtimeState.snapshot.characters.find(
+                (char) => String(char?.id ?? "") === normalizedCharacterID
+            );
+
+            if (!characterToken) {
+                let name = "Character";
+                if (mongoose.isValidObjectId(normalizedCharacterID)) {
+                    const characterDoc = await Character.findById(normalizedCharacterID).select(
+                        "_id name"
+                    );
+                    if (characterDoc?.name) {
+                        name = characterDoc.name;
+                    }
+                } else if (data?.name) {
+                    name = sanitizeText(data.name, 120) || name;
+                }
+
+                characterToken = {
+                    id: normalizedCharacterID,
+                    name,
+                    position: { x: 0, y: 0 },
+                    size: 30,
+                    visionDistance: 150,
+                    rotation: 0,
+                    visionArc: 90,
+                    team: isDM ? String(data?.team || "neutral") : "player",
+                };
+                runtimeState.snapshot.characters.push(characterToken);
+            }
+
+            const nextX = Math.round(toNumber(positionPatch?.x ?? data?.x, 0));
+            const nextY = Math.round(toNumber(positionPatch?.y ?? data?.y, 0));
+            characterToken.position = { x: nextX, y: nextY };
+
+            if (data?.rotation != null) {
+                characterToken.rotation = toNumber(data.rotation, characterToken.rotation || 0);
+            }
+
+            runtimeState.revision = Number(runtimeState.revision) + 1;
+            runtimeState.updatedAt = Date.now();
+
+            const engineState = cloneEngineState(runtimeState);
+            const payload = {
+                success: true,
+                campaignID: String(campaign._id),
+                floorTypes: FLOOR_TYPES,
+                engineState,
+                characterID: normalizedCharacterID,
+            };
+
+            const playerPayload = {
+                ...payload,
+                engineState: {
+                    ...engineState,
+                    snapshot: filterSnapshotForFOV(engineState.snapshot),
+                },
+            };
+
+            socket.join(getCampaignGameRoom(campaign._id));
+            if (isDM) {
+                socket.join(getCampaignDMRoom(campaign._id));
+            } else {
+                socket.join(getCampaignPlayersRoom(campaign._id));
+            }
+
+            socket.to(getCampaignPlayersRoom(campaign._id)).emit(
+                "campaign_gameStateUpdated",
+                playerPayload
+            );
+            socket.to(getCampaignDMRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
+
+            respond(isDM ? payload : playerPayload);
+        } catch (error) {
+            console.error("[campaign_moveCharacter] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to move character",
             });
         }
     });
@@ -1875,8 +2199,21 @@ module.exports = (socket) => {
                 gameID: String(campaign._id),
                 activeGameSave: toObjectIdString(campaign.activeGameSave),
             };
+            const playerPayload = {
+                ...payload,
+                snapshot: filterSnapshotForFOV(payload.engineState.snapshot),
+                engineState: {
+                    ...payload.engineState,
+                    snapshot: filterSnapshotForFOV(payload.engineState.snapshot),
+                },
+            };
             socket.join(getCampaignGameRoom(campaign._id));
-            socket.to(getCampaignGameRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
+            socket.join(getCampaignDMRoom(campaign._id));
+            socket.to(getCampaignPlayersRoom(campaign._id)).emit(
+                "campaign_gameStateUpdated",
+                playerPayload
+            );
+            socket.to(getCampaignDMRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
 
             respond(payload);
         } catch (error) {
