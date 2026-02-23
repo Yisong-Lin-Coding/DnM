@@ -254,6 +254,11 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const toOptionalNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 const toPositiveNumber = (value, fallback = 1) => Math.max(1, toNumber(value, fallback));
 
 const toNonNegativeNumber = (value, fallback = 0) => Math.max(0, toNumber(value, fallback));
@@ -546,6 +551,8 @@ const enforceWallOverlapRules = (objects = []) => {
 
 const normalizeCharacter = (raw = {}, fallback = {}) => {
     const source = { ...fallback, ...raw };
+    const hp = toOptionalNumber(source.hp ?? source.HP?.current);
+    const maxHP = toOptionalNumber(source.maxHP ?? source.HP?.max);
     return {
         ...source,
         id: String(source.id || fallback.id || ""),
@@ -559,6 +566,8 @@ const normalizeCharacter = (raw = {}, fallback = {}) => {
         rotation: toNumber(source.rotation, 0),
         visionArc: toPositiveNumber(source.visionArc, 90),
         team: String(source.team || fallback.team || "player"),
+        hp,
+        maxHP,
     };
 };
 

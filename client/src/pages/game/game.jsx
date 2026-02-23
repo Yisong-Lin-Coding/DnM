@@ -216,6 +216,65 @@ function resolveDMPermission(response, playerID) {
     return Boolean(dmID && normalizedPlayerID && dmID === normalizedPlayerID);
 }
 
+const ACTION_TAB_ORDER = [
+    "main",
+    "movement",
+    "bonus",
+    "reaction",
+    "free",
+    "passive",
+    "special",
+];
+
+const ACTION_TAB_LABELS = {
+    main: "Main",
+    movement: "Movement",
+    bonus: "Bonus",
+    reaction: "Reaction",
+    free: "Free",
+    passive: "Passive",
+    special: "Special",
+};
+
+function groupActionsByTab(actions = []) {
+    const groups = new Map();
+    actions.forEach((action) => {
+        if (!action) return;
+        const tab = String(action.tab || action.actionType || "main").toLowerCase();
+        if (!groups.has(tab)) {
+            groups.set(tab, []);
+        }
+        groups.get(tab).push(action);
+    });
+
+    const ordered = [];
+    ACTION_TAB_ORDER.forEach((tab) => {
+        if (!groups.has(tab)) return;
+        ordered.push({
+            key: tab,
+            label: ACTION_TAB_LABELS[tab] || tab,
+            actions: groups.get(tab).sort((a, b) =>
+                String(a?.name || "").localeCompare(String(b?.name || ""))
+            ),
+        });
+        groups.delete(tab);
+    });
+
+    Array.from(groups.keys())
+        .sort()
+        .forEach((tab) => {
+            ordered.push({
+                key: tab,
+                label: ACTION_TAB_LABELS[tab] || tab,
+                actions: (groups.get(tab) || []).sort((a, b) =>
+                    String(a?.name || "").localeCompare(String(b?.name || ""))
+                ),
+            });
+        });
+
+    return ordered;
+}
+
 function buildPlacementFromDrag(placementConfig, startWorld, endWorld) {
     const type = String(placementConfig?.type || "circle").toLowerCase();
     const centerX = (startWorld.x + endWorld.x) / 2;
@@ -258,7 +317,6 @@ function GameComponent() {
     lastMouse,
     setLastMouse,
     camera,
-    handleCharacterAction,
     mapObjects,
     addMapObject,
     updateMapObject,
@@ -286,6 +344,8 @@ function GameComponent() {
     const [sideWidth, setSideWidth] = useState(320);
     const [dragging, setDragging] = useState(false);
     const [contextMenu, setContextMenu] = useState(null);
+    const [characterActionCache, setCharacterActionCache] = useState({});
+    const [loadingActionCharacterId, setLoadingActionCharacterId] = useState("");
     const [selectedEntity, setSelectedEntity] = useState(null);
     const [dragTarget, setDragTarget] = useState(null);
     const [gameContextError, setGameContextError] = useState("");
@@ -1088,6 +1148,21 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         }
     }, [mapObjectPlacement]);
 
+    useEffect(() => {
+        if (!contextMenu || contextMenu?.target?.type !== "character") return;
+        const targetId = toEntityID(contextMenu.target.id);
+        if (!targetId) return;
+        if (!isDM && !canControlCharacterId(targetId)) return;
+        if (characterActionCache[targetId]) return;
+        fetchCharacterActions(targetId);
+    }, [
+        contextMenu,
+        isDM,
+        canControlCharacterId,
+        characterActionCache,
+        fetchCharacterActions,
+    ]);
+
     const selectEntity = useCallback(
         (target) => {
             if (!target?.type) {
@@ -1509,6 +1584,100 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         [moveCharacter, isDM, socket, playerID, gameID, flushPendingMove]
     );
 
+    const fetchCharacterActions = useCallback(
+        async (characterId, options = {}) => {
+            const safeId = toEntityID(characterId);
+            if (!safeId || !socket || !playerID || !gameID) return null;
+            if (!options.force && characterActionCache[safeId]) {
+                return characterActionCache[safeId];
+            }
+            if (loadingActionCharacterId === safeId) return null;
+
+            setLoadingActionCharacterId(safeId);
+            const response = await emitWithAck(socket, "campaign_getCharacterActions", {
+                playerID,
+                campaignID: gameID,
+                characterID: safeId,
+            });
+            setLoadingActionCharacterId("");
+
+            if (!response?.success) {
+                if (response?.message) {
+                    setGameContextError((prev) => prev || response.message);
+                }
+                return null;
+            }
+
+            const payload = {
+                actions: Array.isArray(response?.actions) ? response.actions : [],
+                actionTree: response?.actionTree || null,
+            };
+            setCharacterActionCache((prev) => ({
+                ...prev,
+                [safeId]: payload,
+            }));
+            return payload;
+        },
+        [
+            socket,
+            playerID,
+            gameID,
+            characterActionCache,
+            loadingActionCharacterId,
+            setGameContextError,
+        ]
+    );
+
+    const executeCharacterAction = useCallback(
+        async (characterId, actionMeta, contextWorld) => {
+            const safeId = toEntityID(characterId);
+            if (!safeId || !actionMeta || !socket || !playerID || !gameID) return;
+
+            const actionPath = String(actionMeta?.path || actionMeta?.actionPath || "").trim();
+            const actionId = String(actionMeta?.id || actionMeta?.actionId || "").trim();
+            const actionRef = actionPath || actionId;
+            if (!actionRef) return;
+
+            const actionType = String(actionMeta?.actionType || actionMeta?.tab || "").toLowerCase();
+            const actionPathHint = String(actionMeta?.path || "");
+            const params = {};
+            if ((actionType === "movement" || actionPathHint.startsWith("movement.")) && contextWorld) {
+                params.position = {
+                    x: Math.round(contextWorld.x),
+                    y: Math.round(contextWorld.y),
+                };
+            }
+
+            const response = await emitWithAck(socket, "campaign_executeCharacterAction", {
+                playerID,
+                campaignID: gameID,
+                characterID: safeId,
+                actionPath: actionRef,
+                actionId,
+                params,
+            });
+
+            if (!response?.success) {
+                if (response?.message) {
+                    setGameContextError((prev) => prev || response.message);
+                }
+                return;
+            }
+
+            const snapshot =
+                response?.engineState?.snapshot && typeof response.engineState.snapshot === "object"
+                    ? response.engineState.snapshot
+                    : null;
+            if (snapshot) {
+                applyingServerStateRef.current = true;
+                skipNextAutoSaveRef.current = true;
+                loadGameSnapshot(snapshot);
+            }
+            setGameContextError("");
+        },
+        [socket, playerID, gameID, loadGameSnapshot]
+    );
+
     const handleContextAction = async (action) => {
         const target = contextMenu?.target;
         const contextWorld =
@@ -1528,6 +1697,16 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 (char) => toEntityID(char?.id) === toEntityID(target.id)
             );
             if (!character) return;
+
+            const actionMeta =
+                action && typeof action === "object" && (action.path || action.id)
+                    ? action
+                    : null;
+            if (actionMeta) {
+                if (!isDM && !canControlCharacterId(character.id)) return;
+                await executeCharacterAction(character.id, actionMeta, contextWorld);
+                return;
+            }
 
             if (action === "info") {
                 selectEntity(target);
@@ -1565,8 +1744,6 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 handleTurnDone();
                 return;
             }
-
-            handleCharacterAction(character.id, action);
             return;
         }
 
@@ -1883,6 +2060,13 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         };
     })();
 
+    const contextCharacterId =
+        contextMenu?.target?.type === "character" ? toEntityID(contextMenu.target.id) : "";
+    const contextActionData = contextCharacterId
+        ? characterActionCache[contextCharacterId]
+        : null;
+    const contextActionGroups = groupActionsByTab(contextActionData?.actions || []);
+
     return (
         <div className="h-screen overflow-hidden">
             <div
@@ -2045,16 +2229,69 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                         <div className="py-1">
                             {contextMenu?.target?.type === "character" && (
                                 <>
-                                    {["move", "attack", "defend", "skills"].map((action) => (
-                                        <button
-                                            key={action}
-                                            onClick={() => handleContextAction(action)}
-                                            className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                        >
-                                            {action.charAt(0).toUpperCase() + action.slice(1)}
-                                        </button>
-                                    ))}
-                                    <div className="border-t border-gray-600 my-1" />
+                                    {(isDM || canControlCharacterId(contextMenu?.target?.id)) && (
+                                        <>
+                                            {loadingActionCharacterId === contextCharacterId && (
+                                                <div className="px-4 py-2 text-xs text-gray-300">
+                                                    Loading actions...
+                                                </div>
+                                            )}
+                                            {loadingActionCharacterId !== contextCharacterId &&
+                                                !contextActionData && (
+                                                    <button
+                                                        onClick={() =>
+                                                            fetchCharacterActions(
+                                                                contextCharacterId,
+                                                                { force: true }
+                                                            )
+                                                        }
+                                                        className="w-full px-4 py-2 text-left text-emerald-200 hover:bg-gray-700 text-sm"
+                                                    >
+                                                        Load Actions
+                                                    </button>
+                                                )}
+                                            {contextActionGroups.map((group, groupIndex) => (
+                                                <div key={group.key} className="py-1">
+                                                    <div className="px-4 py-1 text-[10px] uppercase tracking-wide text-gray-400">
+                                                        {group.label}
+                                                    </div>
+                                                    {group.actions.map((action) => (
+                                                        <button
+                                                            key={action.path || action.id}
+                                                            onClick={() =>
+                                                                handleContextAction(action)
+                                                            }
+                                                            disabled={action.enabled === false}
+                                                            title={
+                                                                action.description ||
+                                                                action.path ||
+                                                                ""
+                                                            }
+                                                            className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm disabled:text-gray-500 disabled:hover:bg-transparent"
+                                                        >
+                                                            {action.name || action.path}
+                                                        </button>
+                                                    ))}
+                                                    {groupIndex < contextActionGroups.length - 1 && (
+                                                        <div className="border-t border-gray-700 my-1" />
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {contextActionGroups.length > 0 && (
+                                                <button
+                                                    onClick={() =>
+                                                        fetchCharacterActions(contextCharacterId, {
+                                                            force: true,
+                                                        })
+                                                    }
+                                                    className="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-gray-700"
+                                                >
+                                                    Refresh Actions
+                                                </button>
+                                            )}
+                                            <div className="border-t border-gray-600 my-1" />
+                                        </>
+                                    )}
                                     <button
                                         onClick={() => handleContextAction("center")}
                                         className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"

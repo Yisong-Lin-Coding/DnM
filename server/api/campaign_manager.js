@@ -4,6 +4,8 @@ const GameSave = require("../data/mongooseDataStructure/gameSave");
 const Player = require("../data/mongooseDataStructure/player");
 const Messages = require("../data/mongooseDataStructure/messages");
 const Character = require("../data/mongooseDataStructure/character");
+const Enemy = require("../data/mongooseDataStructure/enemy");
+const CharacterBuilder = require("../worldEngine/Character/characterbuilder");
 const rawFloorTypes = require("../data/gameFiles/modifiers/floorTypes");
 const {
     normalizeFloorTypeCollection,
@@ -83,6 +85,43 @@ const normalizeAngle = (value) => {
     return angle;
 };
 
+const readCampaignSetting = (campaign, key) => {
+    if (!campaign || !key) return undefined;
+    const settings = campaign.settings;
+    if (!settings) return undefined;
+    if (typeof settings.get === "function") {
+        return settings.get(key);
+    }
+    return settings[key];
+};
+
+const normalizeFovMode = (value) => {
+    const normalized = String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "");
+    if (normalized === "perplayer" || normalized === "player") return "perPlayer";
+    return "party";
+};
+
+const getCampaignFovMode = (campaign) =>
+    normalizeFovMode(readCampaignSetting(campaign, "fovMode"));
+
+const getAssignedCharacterIDsForPlayer = (campaign, playerID) => {
+    const normalizedPlayerID = String(playerID || "");
+    if (!normalizedPlayerID || !campaign) return [];
+    const assignments = Array.isArray(campaign.characterAssignments)
+        ? campaign.characterAssignments
+        : [];
+    const ids = new Set();
+    assignments.forEach((assignment) => {
+        if (toObjectIdString(assignment?.playerId) !== normalizedPlayerID) return;
+        const characterID = toObjectIdString(assignment?.characterId);
+        if (characterID) ids.add(characterID);
+    });
+    return Array.from(ids);
+};
+
 const isPointInFOV = (source = {}, point = {}) => {
     const sourcePos = source?.position || {};
     const sx = toNumber(sourcePos.x, 0);
@@ -137,15 +176,49 @@ const getObjectSamplePoints = (obj = {}) => {
     ];
 };
 
-const filterSnapshotForFOV = (snapshot = {}, viewerTeam = "player") => {
+const resolveFovSources = (characters = [], options = {}) => {
+    const sources = [];
+    const sourceIdSet = new Set();
+    const explicitSourceIds = Array.isArray(options.sourceIds) ? options.sourceIds : null;
+    if (explicitSourceIds && explicitSourceIds.length > 0) {
+        explicitSourceIds.forEach((entry) => {
+            const normalized = String(entry || "").trim();
+            if (normalized) sourceIdSet.add(normalized);
+        });
+        characters.forEach((char) => {
+            const charId = String(char?.id ?? "");
+            if (sourceIdSet.has(charId)) sources.push(char);
+        });
+        return { sources, sourceIdSet };
+    }
+
+    const explicitSources = Array.isArray(options.sources) ? options.sources : null;
+    if (explicitSources && explicitSources.length > 0) {
+        explicitSources.forEach((char) => {
+            if (!char) return;
+            const charId = String(char?.id ?? "");
+            if (charId) sourceIdSet.add(charId);
+            sources.push(char);
+        });
+        return { sources, sourceIdSet };
+    }
+
+    const normalizedTeam = String(options.viewerTeam || "player").toLowerCase();
+    characters.forEach((char) => {
+        if (String(char?.team || "player").toLowerCase() !== normalizedTeam) return;
+        sources.push(char);
+        const charId = String(char?.id ?? "");
+        if (charId) sourceIdSet.add(charId);
+    });
+
+    return { sources, sourceIdSet };
+};
+
+const filterSnapshotForFOV = (snapshot = {}, options = {}) => {
     const safeSnapshot = toPlainObject(snapshot);
     const characters = Array.isArray(safeSnapshot.characters) ? safeSnapshot.characters : [];
     const mapObjects = Array.isArray(safeSnapshot.mapObjects) ? safeSnapshot.mapObjects : [];
-    const normalizedTeam = String(viewerTeam || "player").toLowerCase();
-
-    const fovSources = characters.filter(
-        (char) => String(char?.team || "player").toLowerCase() === normalizedTeam
-    );
+    const { sources: fovSources, sourceIdSet } = resolveFovSources(characters, options);
     if (fovSources.length === 0) {
         return {
             ...safeSnapshot,
@@ -160,8 +233,8 @@ const filterSnapshotForFOV = (snapshot = {}, viewerTeam = "player") => {
 
     const filteredMapObjects = mapObjects.filter((obj) => isVisibleObject(obj));
     const filteredCharacters = characters.filter((char) => {
-        const team = String(char?.team || "player").toLowerCase();
-        if (team === normalizedTeam) return true;
+        const charId = String(char?.id ?? "");
+        if (sourceIdSet.has(charId)) return true;
         const pos = char?.position || {};
         return isVisiblePoint({ x: toNumber(pos.x, 0), y: toNumber(pos.y, 0) });
     });
@@ -171,6 +244,209 @@ const filterSnapshotForFOV = (snapshot = {}, viewerTeam = "player") => {
         characters: filteredCharacters,
         mapObjects: filteredMapObjects,
     };
+};
+
+const filterSnapshotForPlayer = (snapshot = {}, campaign, playerID) => {
+    const mode = getCampaignFovMode(campaign);
+    if (mode === "perPlayer") {
+        const sourceIds = getAssignedCharacterIDsForPlayer(campaign, playerID);
+        return filterSnapshotForFOV(snapshot, { sourceIds, viewerTeam: "player" });
+    }
+    return filterSnapshotForFOV(snapshot, { viewerTeam: "player" });
+};
+
+const buildPlayerPayload = (payload, snapshot) => ({
+    ...payload,
+    snapshot,
+    engineState: {
+        ...payload.engineState,
+        snapshot,
+    },
+});
+
+const buildPlayerPayloadForPlayer = (payload, campaign, playerID, options = {}) => {
+    const filteredSnapshot = filterSnapshotForPlayer(
+        payload?.engineState?.snapshot || {},
+        campaign,
+        playerID
+    );
+    let playerPayload = buildPlayerPayload(payload, filteredSnapshot);
+    if (typeof options.transform === "function") {
+        playerPayload = options.transform(playerPayload, filteredSnapshot, playerID);
+    }
+    return playerPayload;
+};
+
+const emitPlayerStateUpdate = async (socket, campaign, payload, options = {}) => {
+    if (!socket || !campaign || !payload?.engineState) return;
+    const playersRoom = getCampaignPlayersRoom(campaign._id);
+    const fovMode = getCampaignFovMode(campaign);
+    const baseSnapshot = payload.engineState.snapshot || {};
+
+    const sendPayload = (clientSocket, playerID) => {
+        const filteredSnapshot =
+            fovMode === "perPlayer"
+                ? filterSnapshotForPlayer(baseSnapshot, campaign, playerID)
+                : filterSnapshotForFOV(baseSnapshot, { viewerTeam: "player" });
+        let playerPayload = buildPlayerPayload(payload, filteredSnapshot);
+        if (typeof options.transform === "function") {
+            playerPayload = options.transform(playerPayload, filteredSnapshot, playerID);
+        }
+        clientSocket.emit("campaign_gameStateUpdated", playerPayload);
+    };
+
+    if (fovMode === "perPlayer" && socket.server && typeof socket.server.in === "function") {
+        try {
+            const sockets = await socket.server.in(playersRoom).fetchSockets();
+            if (Array.isArray(sockets) && sockets.length > 0) {
+                sockets.forEach((clientSocket) => {
+                    if (clientSocket.id === socket.id) return;
+                    sendPayload(clientSocket, clientSocket.data?.playerID);
+                });
+                return;
+            }
+        } catch (error) {
+            // Fall back to party broadcast below.
+        }
+    }
+
+    const filteredSnapshot = filterSnapshotForFOV(baseSnapshot, { viewerTeam: "player" });
+    let playerPayload = buildPlayerPayload(payload, filteredSnapshot);
+    if (typeof options.transform === "function") {
+        playerPayload = options.transform(playerPayload, filteredSnapshot, null);
+    }
+    socket.to(playersRoom).emit("campaign_gameStateUpdated", playerPayload);
+};
+
+const getCharacterNameFromAssignment = (assignment = {}) => {
+    if (assignment?.characterName) return assignment.characterName;
+    if (assignment?.character?.name) return assignment.character.name;
+    if (assignment?.characterId && typeof assignment.characterId === "object") {
+        return assignment.characterId?.name || "";
+    }
+    return "";
+};
+
+const extractHPFromState = (stateEntry = {}) => {
+    const hp = toPlainObject(stateEntry?.state?.HP || stateEntry?.HP || {});
+    const maxHP = toNumber(hp.max, NaN);
+    const currentHP = toNumber(hp.current, NaN);
+
+    return {
+        maxHP: Number.isFinite(maxHP) ? Math.max(1, Math.round(maxHP)) : null,
+        hp: Number.isFinite(currentHP) ? Math.max(0, Math.round(currentHP)) : null,
+    };
+};
+
+const ensureCampaignCharactersInSnapshot = async (campaign, runtimeState) => {
+    if (!campaign || !runtimeState?.snapshot) return false;
+    const assignments = Array.isArray(campaign.characterAssignments)
+        ? campaign.characterAssignments
+        : [];
+    if (assignments.length === 0) return false;
+
+    if (!Array.isArray(runtimeState.snapshot.characters)) {
+        runtimeState.snapshot.characters = [];
+    }
+
+    const existingById = new Map();
+    runtimeState.snapshot.characters.forEach((token, index) => {
+        const tokenId = String(token?.id ?? "");
+        if (!tokenId || existingById.has(tokenId)) return;
+        existingById.set(tokenId, { token, index });
+    });
+
+    const missingNameIds = [];
+    assignments.forEach((assignment) => {
+        const characterId = toObjectIdString(assignment?.characterId);
+        if (!characterId) return;
+        const name = getCharacterNameFromAssignment(assignment);
+        if (!name && mongoose.isValidObjectId(characterId)) {
+            missingNameIds.push(characterId);
+        }
+    });
+
+    const nameLookup = new Map();
+    if (missingNameIds.length > 0) {
+        const uniqueIds = Array.from(new Set(missingNameIds));
+        const docs = await Character.find({ _id: { $in: uniqueIds } }).select("_id name");
+        docs.forEach((doc) => {
+            const id = toObjectIdString(doc?._id);
+            if (id && doc?.name) {
+                nameLookup.set(id, doc.name);
+            }
+        });
+    }
+
+    let changed = false;
+
+    assignments.forEach((assignment) => {
+        const characterId = toObjectIdString(assignment?.characterId);
+        if (!characterId) return;
+
+        const assignmentName =
+            getCharacterNameFromAssignment(assignment) ||
+            nameLookup.get(characterId) ||
+            "Character";
+
+        const stateEntry = findCampaignCharacterState(campaign, characterId);
+        const { hp, maxHP } = extractHPFromState(stateEntry);
+
+        const existing = existingById.get(characterId);
+        if (existing) {
+            const token = existing.token;
+            let tokenChanged = false;
+
+            if (assignmentName && token?.name !== assignmentName) {
+                token.name = assignmentName;
+                tokenChanged = true;
+            }
+            const currentTeam = String(token?.team || "").toLowerCase();
+            if (!currentTeam || currentTeam === "neutral") {
+                token.team = "player";
+                tokenChanged = true;
+            }
+            if (!token?.kind) {
+                token.kind = "character";
+                tokenChanged = true;
+            }
+            if (maxHP != null && token?.maxHP !== maxHP) {
+                token.maxHP = maxHP;
+                tokenChanged = true;
+            }
+            if (hp != null && token?.hp !== hp) {
+                token.hp = hp;
+                tokenChanged = true;
+            }
+
+            if (tokenChanged) changed = true;
+            return;
+        }
+
+        const token = {
+            id: characterId,
+            name: assignmentName,
+            position: { x: 0, y: 0 },
+            size: 30,
+            visionDistance: 150,
+            rotation: 0,
+            visionArc: 90,
+            team: "player",
+            kind: "character",
+        };
+        if (maxHP != null) token.maxHP = maxHP;
+        if (hp != null) token.hp = hp;
+
+        runtimeState.snapshot.characters.push(token);
+        changed = true;
+    });
+
+    if (changed) {
+        runtimeState.revision = Number(runtimeState.revision) + 1;
+        runtimeState.updatedAt = Date.now();
+    }
+
+    return changed;
 };
 
 const getOrCreateRuntimeState = (campaignID, snapshot = {}) => {
@@ -332,6 +608,7 @@ const formatCampaign = (campaignDoc) => {
             ? campaign.gameSaves.map((saveRef) => toObjectIdString(saveRef))
             : [],
         activeGameSave: toObjectIdString(campaign.activeGameSave),
+        fovMode: getCampaignFovMode(campaign),
         activeLobby: {
             isActive: Boolean(activeLobby.isActive),
             lobbyCode: activeLobby.lobbyCode || "",
@@ -366,6 +643,63 @@ const formatGameSave = (gameSaveDoc) => {
         metadata,
         createdAt: gameSave.createdAt || null,
         updatedAt: gameSave.updatedAt || null,
+    };
+};
+
+const formatEnemy = (enemyDoc) => {
+    const enemy = enemyDoc?.toObject ? enemyDoc.toObject() : enemyDoc;
+    if (!enemy) return null;
+
+    return {
+        _id: String(enemy._id),
+        campaignId: toObjectIdString(enemy.campaignId),
+        name: enemy.name || "Enemy",
+        kind: enemy.kind || "enemy",
+        level: Number(enemy.level) || 1,
+        HP: enemy.HP || { current: 0, max: 0, temp: 0 },
+        MP: enemy.MP || { current: 0, max: 0, temp: 0 },
+        STA: enemy.STA || { current: 0, max: 0, temp: 0 },
+        size: Number(enemy.size) || 30,
+        visionDistance: Number(enemy.visionDistance) || 150,
+        visionArc: Number(enemy.visionArc) || 90,
+        rotation: Number(enemy.rotation) || 0,
+        notes: enemy.notes || "",
+        createdAt: enemy.createdAt || null,
+        updatedAt: enemy.updatedAt || null,
+    };
+};
+
+const normalizeEnemyInput = (raw = {}) => {
+    const name = sanitizeText(raw.name, 120) || "Enemy";
+    const level = clamp(Math.round(toNumber(raw.level, 1)), 1, 60);
+    const maxHP = clamp(Math.round(toNumber(raw.maxHP ?? raw.HP?.max, 10)), 1, 100000);
+    const currentHP = clamp(Math.round(toNumber(raw.hp ?? raw.HP?.current, maxHP)), 0, maxHP);
+    const tempHP = clamp(Math.round(toNumber(raw.HP?.temp, 0)), 0, maxHP);
+
+    return {
+        name,
+        kind: sanitizeText(raw.kind || "enemy", 40) || "enemy",
+        level,
+        HP: {
+            current: currentHP,
+            max: maxHP,
+            temp: tempHP,
+        },
+        MP: {
+            current: clamp(Math.round(toNumber(raw.MP?.current, 0)), 0, 100000),
+            max: clamp(Math.round(toNumber(raw.MP?.max, 0)), 0, 100000),
+            temp: clamp(Math.round(toNumber(raw.MP?.temp, 0)), 0, 100000),
+        },
+        STA: {
+            current: clamp(Math.round(toNumber(raw.STA?.current, 0)), 0, 100000),
+            max: clamp(Math.round(toNumber(raw.STA?.max, 0)), 0, 100000),
+            temp: clamp(Math.round(toNumber(raw.STA?.temp, 0)), 0, 100000),
+        },
+        size: clamp(Math.round(toNumber(raw.size, 30)), 8, 300),
+        visionDistance: clamp(Math.round(toNumber(raw.visionDistance, 150)), 10, 5000),
+        visionArc: clamp(Math.round(toNumber(raw.visionArc, 90)), 10, 360),
+        rotation: toNumber(raw.rotation, 0),
+        notes: sanitizeText(raw.notes, 1000),
     };
 };
 
@@ -441,6 +775,9 @@ module.exports = (socket) => {
 
             const isDM = isCampaignDM(campaign, playerID);
             const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
+            socket.data.playerID = String(playerID);
+            socket.data.campaignID = String(campaign._id);
+            socket.data.isDM = isDM;
             socket.join(getCampaignGameRoom(campaign._id));
             if (isDM) {
                 socket.join(getCampaignDMRoom(campaign._id));
@@ -449,10 +786,9 @@ module.exports = (socket) => {
             }
 
             const engineState = cloneEngineState(runtimeState);
-            const filteredSnapshot = isDM
-                ? toPlainObject(runtimeState.snapshot)
-                : filterSnapshotForFOV(engineState.snapshot);
+            let filteredSnapshot = toPlainObject(engineState.snapshot);
             if (!isDM) {
+                filteredSnapshot = filterSnapshotForPlayer(engineState.snapshot, campaign, playerID);
                 engineState.snapshot = filteredSnapshot;
             }
 
@@ -489,7 +825,9 @@ module.exports = (socket) => {
                 });
             }
 
-            const campaign = await Campaign.findById(campaignID).select("_id dmId players activeGameSave");
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players activeGameSave characterAssignments settings"
+            );
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
             }
@@ -515,6 +853,9 @@ module.exports = (socket) => {
             const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
             socket.join(getCampaignGameRoom(campaign._id));
             const isDM = isCampaignDM(campaign, playerID);
+            socket.data.playerID = String(playerID);
+            socket.data.campaignID = String(campaign._id);
+            socket.data.isDM = isDM;
             if (isDM) {
                 socket.join(getCampaignDMRoom(campaign._id));
             } else {
@@ -523,7 +864,7 @@ module.exports = (socket) => {
 
             const engineState = cloneEngineState(runtimeState);
             if (!isDM) {
-                engineState.snapshot = filterSnapshotForFOV(engineState.snapshot);
+                engineState.snapshot = filterSnapshotForPlayer(engineState.snapshot, campaign, playerID);
             }
 
             respond({
@@ -553,7 +894,9 @@ module.exports = (socket) => {
                 });
             }
 
-            const campaign = await Campaign.findById(campaignID).select("_id dmId players activeGameSave");
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players activeGameSave characterAssignments settings"
+            );
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
             }
@@ -586,19 +929,9 @@ module.exports = (socket) => {
                 floorTypes: FLOOR_TYPES,
                 engineState,
             };
-            const playerPayload = {
-                ...payload,
-                engineState: {
-                    ...engineState,
-                    snapshot: filterSnapshotForFOV(engineState.snapshot),
-                },
-            };
             socket.join(getCampaignGameRoom(campaign._id));
             socket.join(getCampaignDMRoom(campaign._id));
-            socket.to(getCampaignPlayersRoom(campaign._id)).emit(
-                "campaign_gameStateUpdated",
-                playerPayload
-            );
+            await emitPlayerStateUpdate(socket, campaign, payload);
             socket.to(getCampaignDMRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
             respond(payload);
         } catch (error) {
@@ -622,7 +955,9 @@ module.exports = (socket) => {
                 });
             }
 
-            const campaign = await Campaign.findById(campaignID).select("_id dmId players activeGameSave");
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players activeGameSave characterAssignments settings"
+            );
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
             }
@@ -671,17 +1006,14 @@ module.exports = (socket) => {
                 engineState,
                 object: result.object || null,
             };
-            const filteredSnapshot = filterSnapshotForFOV(engineState.snapshot);
-            const objectIsVisible = (filteredSnapshot.mapObjects || []).some(
-                (obj) => String(obj?.id ?? "") === String(result.object?.id ?? "")
-            );
-            const playerPayload = {
-                ...payload,
-                engineState: {
-                    ...engineState,
-                    snapshot: filteredSnapshot,
-                },
-                object: objectIsVisible ? result.object || null : null,
+            const transformPayload = (playerPayload, filteredSnapshot) => {
+                const objectIsVisible = (filteredSnapshot.mapObjects || []).some(
+                    (obj) => String(obj?.id ?? "") === String(result.object?.id ?? "")
+                );
+                return {
+                    ...playerPayload,
+                    object: objectIsVisible ? result.object || null : null,
+                };
             };
             socket.join(getCampaignGameRoom(campaign._id));
             if (isDM) {
@@ -689,12 +1021,15 @@ module.exports = (socket) => {
             } else {
                 socket.join(getCampaignPlayersRoom(campaign._id));
             }
-            socket.to(getCampaignPlayersRoom(campaign._id)).emit(
-                "campaign_gameStateUpdated",
-                playerPayload
-            );
+            await emitPlayerStateUpdate(socket, campaign, payload, { transform: transformPayload });
             socket.to(getCampaignDMRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
-            respond(isDM ? payload : playerPayload);
+            respond(
+                isDM
+                    ? payload
+                    : buildPlayerPayloadForPlayer(payload, campaign, playerID, {
+                          transform: transformPayload,
+                      })
+            );
         } catch (error) {
             console.error("[campaign_gameDamageObject] failed", error);
             respond({
@@ -726,7 +1061,7 @@ module.exports = (socket) => {
             }
 
             const campaign = await Campaign.findById(campaignID).select(
-                "_id dmId players activeGameSave characterAssignments characterStates"
+                "_id dmId players activeGameSave characterAssignments characterStates settings"
             );
             if (!campaign) {
                 return respond({ success: false, message: "Campaign not found" });
@@ -747,13 +1082,17 @@ module.exports = (socket) => {
                 });
             }
 
+            const assignment = Array.isArray(campaign.characterAssignments)
+                ? campaign.characterAssignments.find(
+                      (entry) => toObjectIdString(entry?.characterId) === normalizedCharacterID
+                  ) || null
+                : null;
+            const stateEntry = assignment
+                ? findCampaignCharacterState(campaign, normalizedCharacterID)
+                : null;
+            const { hp, maxHP } = extractHPFromState(stateEntry);
+
             if (!isDM) {
-                const assignment = Array.isArray(campaign.characterAssignments)
-                    ? campaign.characterAssignments.find(
-                          (entry) =>
-                              toObjectIdString(entry?.characterId) === normalizedCharacterID
-                      ) || null
-                    : null;
                 const ownerID = toObjectIdString(assignment?.playerId);
                 if (!ownerID || ownerID !== String(playerID)) {
                     return respond({
@@ -796,6 +1135,7 @@ module.exports = (socket) => {
                     name = sanitizeText(data.name, 120) || name;
                 }
 
+                const resolvedTeam = assignment ? "player" : String(data?.team || "neutral");
                 characterToken = {
                     id: normalizedCharacterID,
                     name,
@@ -804,8 +1144,10 @@ module.exports = (socket) => {
                     visionDistance: 150,
                     rotation: 0,
                     visionArc: 90,
-                    team: isDM ? String(data?.team || "neutral") : "player",
+                    team: isDM ? resolvedTeam : "player",
                 };
+                if (maxHP != null) characterToken.maxHP = maxHP;
+                if (hp != null) characterToken.hp = hp;
                 runtimeState.snapshot.characters.push(characterToken);
             }
 
@@ -829,14 +1171,6 @@ module.exports = (socket) => {
                 characterID: normalizedCharacterID,
             };
 
-            const playerPayload = {
-                ...payload,
-                engineState: {
-                    ...engineState,
-                    snapshot: filterSnapshotForFOV(engineState.snapshot),
-                },
-            };
-
             socket.join(getCampaignGameRoom(campaign._id));
             if (isDM) {
                 socket.join(getCampaignDMRoom(campaign._id));
@@ -844,18 +1178,610 @@ module.exports = (socket) => {
                 socket.join(getCampaignPlayersRoom(campaign._id));
             }
 
-            socket.to(getCampaignPlayersRoom(campaign._id)).emit(
-                "campaign_gameStateUpdated",
-                playerPayload
-            );
+            await emitPlayerStateUpdate(socket, campaign, payload);
             socket.to(getCampaignDMRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
 
-            respond(isDM ? payload : playerPayload);
+            respond(
+                isDM ? payload : buildPlayerPayloadForPlayer(payload, campaign, playerID)
+            );
         } catch (error) {
             console.error("[campaign_moveCharacter] failed", error);
             respond({
                 success: false,
                 message: error.message || "Failed to move character",
+            });
+        }
+    });
+
+    socket.on("campaign_setFovMode", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId settings activeGameSave characterAssignments"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the DM can change FOV mode",
+                });
+            }
+
+            const nextMode = normalizeFovMode(data?.fovMode || data?.mode);
+            if (campaign.settings && typeof campaign.settings.set === "function") {
+                campaign.settings.set("fovMode", nextMode);
+            } else {
+                const nextSettings =
+                    campaign.settings && typeof campaign.settings === "object"
+                        ? { ...campaign.settings }
+                        : {};
+                nextSettings.fovMode = nextMode;
+                campaign.settings = nextSettings;
+            }
+
+            await campaign.save();
+
+            const runtimeKey = String(campaign._id || "");
+            let runtimeState = null;
+            if (campaignRuntimeStateByID.has(runtimeKey)) {
+                runtimeState = getOrCreateRuntimeState(campaign._id, {});
+            } else if (campaign.activeGameSave) {
+                const saveDoc = await GameSave.findOne({
+                    _id: campaign.activeGameSave,
+                    campaignId: campaign._id,
+                }).select("snapshot");
+                const snapshot = saveDoc ? toPlainObject(saveDoc.snapshot) : {};
+                if (saveDoc) {
+                    runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
+                }
+            }
+
+            if (runtimeState) {
+                const payload = {
+                    success: true,
+                    campaignID: String(campaign._id),
+                    floorTypes: FLOOR_TYPES,
+                    engineState: cloneEngineState(runtimeState),
+                    fovMode: nextMode,
+                };
+                socket.join(getCampaignGameRoom(campaign._id));
+                socket.join(getCampaignDMRoom(campaign._id));
+                await emitPlayerStateUpdate(socket, campaign, payload);
+            }
+
+            respond({
+                success: true,
+                campaignID: String(campaign._id),
+                fovMode: nextMode,
+            });
+        } catch (error) {
+            console.error("[campaign_setFovMode] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to update FOV mode",
+            });
+        }
+    });
+
+    socket.on("campaign_getCharacterActions", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID, characterID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const normalizedCharacterID = String(characterID || "").trim();
+            if (!normalizedCharacterID || !mongoose.isValidObjectId(normalizedCharacterID)) {
+                return respond({
+                    success: false,
+                    message: "Valid characterID is required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players characterAssignments characterStates"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can view character actions",
+                });
+            }
+
+            if (!isCharacterInCampaign(campaign, normalizedCharacterID)) {
+                return respond({
+                    success: false,
+                    message: "Character is not assigned to this campaign",
+                });
+            }
+
+            const isDM = isCampaignDM(campaign, playerID);
+            if (!isDM) {
+                const assignment = Array.isArray(campaign.characterAssignments)
+                    ? campaign.characterAssignments.find(
+                          (entry) =>
+                              toObjectIdString(entry?.characterId) === normalizedCharacterID
+                      ) || null
+                    : null;
+                const ownerID = toObjectIdString(assignment?.playerId);
+                if (!ownerID || ownerID !== String(playerID)) {
+                    return respond({
+                        success: false,
+                        message: "Only the character owner or DM can view actions",
+                    });
+                }
+            }
+
+            const builder = new CharacterBuilder(socket);
+            const character = await builder.buildFromId(normalizedCharacterID);
+            if (!character) {
+                return respond({
+                    success: false,
+                    message: "Failed to build character actions",
+                });
+            }
+
+            respond({
+                success: true,
+                characterID: normalizedCharacterID,
+                actions: Array.isArray(character.actions) ? character.actions : [],
+                actionTree: character.getActionTree(),
+            });
+        } catch (error) {
+            console.error("[campaign_getCharacterActions] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to load character actions",
+            });
+        }
+    });
+
+    socket.on("campaign_executeCharacterAction", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID, characterID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const normalizedCharacterID = String(characterID || "").trim();
+            if (!normalizedCharacterID || !mongoose.isValidObjectId(normalizedCharacterID)) {
+                return respond({
+                    success: false,
+                    message: "Valid characterID is required",
+                });
+            }
+
+            const actionRef = String(
+                data?.actionPath || data?.actionId || data?.action || ""
+            ).trim();
+            if (!actionRef) {
+                return respond({ success: false, message: "Action path is required" });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players activeGameSave characterAssignments characterStates settings"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignMember(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only campaign members can perform actions",
+                });
+            }
+
+            if (!isCharacterInCampaign(campaign, normalizedCharacterID)) {
+                return respond({
+                    success: false,
+                    message: "Character is not assigned to this campaign",
+                });
+            }
+
+            const isDM = isCampaignDM(campaign, playerID);
+            if (!isDM) {
+                const assignment = Array.isArray(campaign.characterAssignments)
+                    ? campaign.characterAssignments.find(
+                          (entry) =>
+                              toObjectIdString(entry?.characterId) === normalizedCharacterID
+                      ) || null
+                    : null;
+                const ownerID = toObjectIdString(assignment?.playerId);
+                if (!ownerID || ownerID !== String(playerID)) {
+                    return respond({
+                        success: false,
+                        message: "Only the character owner or DM can perform this action",
+                    });
+                }
+            }
+
+            let snapshot = {};
+            if (!campaignRuntimeStateByID.has(String(campaign._id)) && campaign.activeGameSave) {
+                const saveDoc = await GameSave.findOne({
+                    _id: campaign.activeGameSave,
+                    campaignId: campaign._id,
+                }).select("snapshot");
+                if (saveDoc) {
+                    snapshot = toPlainObject(saveDoc.snapshot);
+                }
+            }
+
+            const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
+            if (!Array.isArray(runtimeState.snapshot.characters)) {
+                runtimeState.snapshot.characters = [];
+            }
+
+            const characterToken = runtimeState.snapshot.characters.find(
+                (char) => String(char?.id ?? "") === normalizedCharacterID
+            );
+            if (!characterToken) {
+                return respond({
+                    success: false,
+                    message: "Character is not placed on the map yet",
+                });
+            }
+
+            const builder = new CharacterBuilder(socket);
+            const characterInstance = await builder.buildFromId(normalizedCharacterID);
+            if (!characterInstance) {
+                return respond({
+                    success: false,
+                    message: "Failed to load character data",
+                });
+            }
+            if (characterToken?.position) {
+                characterInstance.position = {
+                    x: toNumber(characterToken.position?.x, 0),
+                    y: toNumber(characterToken.position?.y, 0),
+                    z: toNumber(characterToken.position?.z, 0),
+                };
+            }
+
+            const params = toPlainObject(data?.params);
+            let actionResult;
+            try {
+                actionResult = characterInstance.executeAction(actionRef, params);
+            } catch (error) {
+                return respond({
+                    success: false,
+                    message: error.message || "Failed to execute action",
+                });
+            }
+
+            let didUpdateSnapshot = false;
+            if (
+                actionResult?.position &&
+                Number.isFinite(Number(actionResult.position?.x)) &&
+                Number.isFinite(Number(actionResult.position?.y))
+            ) {
+                characterToken.position = {
+                    x: Math.round(Number(actionResult.position.x)),
+                    y: Math.round(Number(actionResult.position.y)),
+                    z: Number.isFinite(Number(actionResult.position?.z))
+                        ? Number(actionResult.position.z)
+                        : toNumber(characterToken.position?.z, 0),
+                };
+                didUpdateSnapshot = true;
+            }
+
+            if (didUpdateSnapshot) {
+                runtimeState.revision = Number(runtimeState.revision) + 1;
+                runtimeState.updatedAt = Date.now();
+            }
+
+            const engineState = cloneEngineState(runtimeState);
+            const payload = {
+                success: true,
+                campaignID: String(campaign._id),
+                floorTypes: FLOOR_TYPES,
+                engineState,
+                characterID: normalizedCharacterID,
+                actionResult: actionResult || null,
+            };
+
+            if (didUpdateSnapshot) {
+                socket.join(getCampaignGameRoom(campaign._id));
+                if (isDM) {
+                    socket.join(getCampaignDMRoom(campaign._id));
+                } else {
+                    socket.join(getCampaignPlayersRoom(campaign._id));
+                }
+                await emitPlayerStateUpdate(socket, campaign, payload);
+                socket
+                    .to(getCampaignDMRoom(campaign._id))
+                    .emit("campaign_gameStateUpdated", payload);
+            }
+
+            respond(
+                isDM ? payload : buildPlayerPayloadForPlayer(payload, campaign, playerID)
+            );
+        } catch (error) {
+            console.error("[campaign_executeCharacterAction] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to execute character action",
+            });
+        }
+    });
+
+    socket.on("campaign_listEnemies", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select("_id dmId");
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the DM can list enemies",
+                });
+            }
+
+            const enemies = await Enemy.find({ campaignId: campaign._id }).sort({
+                updatedAt: -1,
+                _id: -1,
+            });
+
+            respond({
+                success: true,
+                enemies: enemies.map((enemy) => formatEnemy(enemy)).filter(Boolean),
+            });
+        } catch (error) {
+            console.error("[campaign_listEnemies] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to list enemies",
+            });
+        }
+    });
+
+    socket.on("campaign_createEnemy", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+
+        try {
+            if (!mongoose.isValidObjectId(playerID) || !mongoose.isValidObjectId(campaignID)) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID and campaignID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select("_id dmId");
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the DM can create enemies",
+                });
+            }
+
+            const enemyInput = normalizeEnemyInput(data?.enemy || data || {});
+            const created = await Enemy.create({
+                campaignId: campaign._id,
+                createdBy: playerID,
+                ...enemyInput,
+            });
+
+            respond({
+                success: true,
+                enemy: formatEnemy(created),
+            });
+        } catch (error) {
+            console.error("[campaign_createEnemy] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to create enemy",
+            });
+        }
+    });
+
+    socket.on("campaign_deleteEnemy", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+        const enemyID = String(data?.enemyID || "").trim();
+
+        try {
+            if (
+                !mongoose.isValidObjectId(playerID) ||
+                !mongoose.isValidObjectId(campaignID) ||
+                !mongoose.isValidObjectId(enemyID)
+            ) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID, campaignID, and enemyID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select("_id dmId");
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the DM can delete enemies",
+                });
+            }
+
+            const deleted = await Enemy.findOneAndDelete({
+                _id: enemyID,
+                campaignId: campaign._id,
+            });
+
+            if (!deleted) {
+                return respond({ success: false, message: "Enemy not found" });
+            }
+
+            respond({
+                success: true,
+                enemyID: String(enemyID),
+            });
+        } catch (error) {
+            console.error("[campaign_deleteEnemy] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to delete enemy",
+            });
+        }
+    });
+
+    socket.on("campaign_spawnEnemy", async (data, callback) => {
+        const respond = safeCallback(callback);
+        const { playerID, campaignID } = data || {};
+        const enemyID = String(data?.enemyID || "").trim();
+        const position = toPlainObject(data?.position);
+
+        try {
+            if (
+                !mongoose.isValidObjectId(playerID) ||
+                !mongoose.isValidObjectId(campaignID) ||
+                !mongoose.isValidObjectId(enemyID)
+            ) {
+                return respond({
+                    success: false,
+                    message: "Valid playerID, campaignID, and enemyID are required",
+                });
+            }
+
+            const campaign = await Campaign.findById(campaignID).select(
+                "_id dmId players activeGameSave characterAssignments settings"
+            );
+            if (!campaign) {
+                return respond({ success: false, message: "Campaign not found" });
+            }
+
+            if (!isCampaignDM(campaign, playerID)) {
+                return respond({
+                    success: false,
+                    message: "Only the DM can spawn enemies",
+                });
+            }
+
+            const enemy = await Enemy.findOne({ _id: enemyID, campaignId: campaign._id });
+            if (!enemy) {
+                return respond({ success: false, message: "Enemy not found" });
+            }
+
+            let snapshot = {};
+            if (!campaignRuntimeStateByID.has(String(campaign._id)) && campaign.activeGameSave) {
+                const saveDoc = await GameSave.findOne({
+                    _id: campaign.activeGameSave,
+                    campaignId: campaign._id,
+                }).select("snapshot");
+                if (saveDoc) {
+                    snapshot = toPlainObject(saveDoc.snapshot);
+                }
+            }
+
+            const runtimeState = getOrCreateRuntimeState(campaign._id, snapshot);
+            if (!Array.isArray(runtimeState.snapshot.characters)) {
+                runtimeState.snapshot.characters = [];
+            }
+
+            const tokenId = `enemy_${String(enemy._id)}`;
+            let token = runtimeState.snapshot.characters.find(
+                (entry) => String(entry?.id ?? "") === tokenId
+            );
+
+            const nextX = Math.round(toNumber(position?.x ?? data?.x, 0));
+            const nextY = Math.round(toNumber(position?.y ?? data?.y, 0));
+
+            if (!token) {
+                token = {
+                    id: tokenId,
+                    name: enemy.name || "Enemy",
+                    position: { x: nextX, y: nextY },
+                    size: Number(enemy.size) || 30,
+                    visionDistance: Number(enemy.visionDistance) || 150,
+                    visionArc: Number(enemy.visionArc) || 90,
+                    rotation: Number(enemy.rotation) || 0,
+                    team: "enemy",
+                    kind: "enemy",
+                    enemyId: String(enemy._id),
+                    hp: Number(enemy?.HP?.current) || 0,
+                    maxHP: Number(enemy?.HP?.max) || 0,
+                };
+                runtimeState.snapshot.characters.push(token);
+            } else {
+                token.name = enemy.name || token.name;
+                token.position = { x: nextX, y: nextY };
+                token.size = Number(enemy.size) || token.size;
+                token.visionDistance = Number(enemy.visionDistance) || token.visionDistance;
+                token.visionArc = Number(enemy.visionArc) || token.visionArc;
+                token.rotation = Number(enemy.rotation) || token.rotation;
+                token.team = "enemy";
+                token.kind = "enemy";
+                token.enemyId = String(enemy._id);
+                token.hp = Number(enemy?.HP?.current) || token.hp || 0;
+                token.maxHP = Number(enemy?.HP?.max) || token.maxHP || 0;
+            }
+
+            runtimeState.revision = Number(runtimeState.revision) + 1;
+            runtimeState.updatedAt = Date.now();
+
+            const engineState = cloneEngineState(runtimeState);
+            const payload = {
+                success: true,
+                campaignID: String(campaign._id),
+                floorTypes: FLOOR_TYPES,
+                engineState,
+                enemyID: String(enemy._id),
+            };
+
+            socket.join(getCampaignGameRoom(campaign._id));
+            socket.join(getCampaignDMRoom(campaign._id));
+            await emitPlayerStateUpdate(socket, campaign, payload);
+            socket.to(getCampaignDMRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
+
+            respond(payload);
+        } catch (error) {
+            console.error("[campaign_spawnEnemy] failed", error);
+            respond({
+                success: false,
+                message: error.message || "Failed to spawn enemy",
             });
         }
     });
@@ -2199,20 +3125,9 @@ module.exports = (socket) => {
                 gameID: String(campaign._id),
                 activeGameSave: toObjectIdString(campaign.activeGameSave),
             };
-            const playerPayload = {
-                ...payload,
-                snapshot: filterSnapshotForFOV(payload.engineState.snapshot),
-                engineState: {
-                    ...payload.engineState,
-                    snapshot: filterSnapshotForFOV(payload.engineState.snapshot),
-                },
-            };
             socket.join(getCampaignGameRoom(campaign._id));
             socket.join(getCampaignDMRoom(campaign._id));
-            socket.to(getCampaignPlayersRoom(campaign._id)).emit(
-                "campaign_gameStateUpdated",
-                playerPayload
-            );
+            await emitPlayerStateUpdate(socket, campaign, payload);
             socket.to(getCampaignDMRoom(campaign._id)).emit("campaign_gameStateUpdated", payload);
 
             respond(payload);
