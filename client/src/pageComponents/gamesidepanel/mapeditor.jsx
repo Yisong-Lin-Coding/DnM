@@ -88,7 +88,6 @@ function MapEditor() {
     mapObjectPlacement,
     armMapObjectPlacement,
     clearMapObjectPlacement,
-    placePendingMapObjectAt,
     currentZLevel,
     stepZLevelUp,
     stepZLevelDown,
@@ -111,6 +110,7 @@ function MapEditor() {
         maxHP: 700,
         hp: 700,
         hitboxScale: 1,
+        rotation: 0,
     });
     const [saveName, setSaveName] = useState("");
     const [saveDescription, setSaveDescription] = useState("");
@@ -352,7 +352,7 @@ const lightPresets = [
     const armPlacement = () => {
         setError("");
         armMapObjectPlacement(creationDraft);
-        setStatus("Placement armed. Click for default size, or drag on the map to size the shape.");
+        setStatus("Placement armed. Click on the map to place, or drag to size the shape.");
     };
 
     const armMapStampPlacement = () => {
@@ -386,20 +386,6 @@ const lightPresets = [
         setStatus("Map placement armed. Click to place or drag to size.");
     };
 
-    const quickPlaceAtCursor = () => {
-        if (!mapObjectPlacement) {
-            setError("Arm placement first.");
-            return;
-        }
-        const placed = placePendingMapObjectAt(worldMouseCoords?.x || 0, worldMouseCoords?.y || 0, {
-            zLevel: currentZLevel,
-        });
-        if (placed) {
-            setStatus(`Placed ${placed.type} #${placed.id}`);
-            setError("");
-            setSelectedObject(placed.id);
-        }
-    };
 
     const applyObjectHPDelta = async (objectID, amount) => {
         if (!socket || !playerID || !gameID) {
@@ -533,7 +519,7 @@ const lightPresets = [
                         Cursor: ({Math.round(worldMouseCoords?.x || 0)}, {Math.round(worldMouseCoords?.y || 0)})
                     </p>
                     <p className="text-xs text-gray-400">
-                        DM placement: click for quick drop, or click-drag to define shape size.
+                        DM placement: click on the map to place, or click-drag to define shape size.
                     </p>
                     {mapObjectPlacement && (
                         <p className="text-emerald-300">Placement Active: {placementLabel}</p>
@@ -1189,6 +1175,22 @@ const lightPresets = [
                         />
                     </div>
 
+                    <div className="grid grid-cols-2 gap-2 items-center">
+                        <label className="text-xs">Rotation</label>
+                        <input
+                            type="number"
+                            step="1"
+                            value={Number(creationDraft.rotation) || 0}
+                            onChange={(e) =>
+                                setCreationDraft((prev) => ({
+                                    ...prev,
+                                    rotation: Number(e.target.value),
+                                }))
+                            }
+                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                        />
+                    </div>
+
                     {creationDraft.type === "rect" ? (
                         <div className="grid grid-cols-2 gap-2">
                             <div>
@@ -1234,21 +1236,13 @@ const lightPresets = [
                         </div>
                     )}
 
-                    <div className="flex gap-2">
+                    <div>
                         <button
                             type="button"
                             onClick={armPlacement}
-                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 px-3 py-2 rounded text-sm"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 px-3 py-2 rounded text-sm"
                         >
                             Arm Placement
-                        </button>
-                        <button
-                            type="button"
-                            onClick={quickPlaceAtCursor}
-                            disabled={!mapObjectPlacement}
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 px-3 py-2 rounded text-sm"
-                        >
-                            Place Now
                         </button>
                     </div>
 
@@ -1541,6 +1535,19 @@ const lightPresets = [
                                         />
                                     </div>
 
+                                    <div>
+                                        <label className="text-xs">Rotation</label>
+                                        <input
+                                            type="number"
+                                            step="1"
+                                            value={Number(obj.rotation) || 0}
+                                            onChange={(e) =>
+                                                updateMapObject(obj.id, { rotation: Number(e.target.value) })
+                                            }
+                                            className="w-full bg-gray-700 px-2 py-1 rounded text-sm"
+                                        />
+                                    </div>
+
                                     {obj.type === "rect" ? (
                                         <div className="grid grid-cols-2 gap-2">
                                             <div>
@@ -1605,4 +1612,3 @@ const lightPresets = [
 }
 
 export default MapEditor;
-

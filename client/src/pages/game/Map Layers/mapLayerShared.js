@@ -154,6 +154,8 @@ export const worldToScreen = (camera, worldX, worldY) => ({
   y: worldY * camera.zoom - camera.y,
 });
 
+const getObjectRotationRad = (obj) => (Number(obj?.rotation) || 0) * (Math.PI / 180);
+
 export const getLowerLevelOpacity = (distance) => {
   if (!Number.isFinite(distance) || distance <= 0) return 1;
   return Math.max(0.1, 0.26 - (distance - 1) * 0.05);
@@ -194,6 +196,12 @@ const drawHatchOverlay = (ctx, obj, camera) => {
   const objectType = String(obj?.type || "circle").toLowerCase();
   const screenX    = (Number(obj?.x) || 0) * camera.zoom - camera.x;
   const screenY    = (Number(obj?.y) || 0) * camera.zoom - camera.y;
+  const rotation   = getObjectRotationRad(obj);
+
+  if (rotation && objectType !== "circle") {
+    ctx.translate(screenX, screenY);
+    ctx.rotate(rotation);
+  }
 
   // Clip to the object's shape
   ctx.beginPath();
@@ -203,24 +211,65 @@ const drawHatchOverlay = (ctx, obj, camera) => {
   } else if (objectType === "rect") {
     const w = Math.max(1, (Number(obj?.width)  || 0) * camera.zoom);
     const h = Math.max(1, (Number(obj?.height) || 0) * camera.zoom);
-    ctx.rect(screenX - w / 2, screenY - h / 2, w, h);
+    if (rotation) {
+      ctx.rect(-w / 2, -h / 2, w, h);
+    } else {
+      ctx.rect(screenX - w / 2, screenY - h / 2, w, h);
+    }
   } else {
     const s = Math.max(1, (Number(obj?.size) || 0) * camera.zoom);
-    ctx.moveTo(screenX,     screenY - s);
-    ctx.lineTo(screenX - s, screenY + s);
-    ctx.lineTo(screenX + s, screenY + s);
-    ctx.closePath();
+    if (rotation) {
+      ctx.moveTo(0, -s);
+      ctx.lineTo(-s, s);
+      ctx.lineTo(s, s);
+      ctx.closePath();
+    } else {
+      ctx.moveTo(screenX,     screenY - s);
+      ctx.lineTo(screenX - s, screenY + s);
+      ctx.lineTo(screenX + s, screenY + s);
+      ctx.closePath();
+    }
   }
   ctx.clip();
 
   // Diagonal stripes across the bounding box
-  const bounds = getObjectBoundsWorld(obj);
-  const x0 = bounds.minX * camera.zoom - camera.x;
-  const y0 = bounds.minY * camera.zoom - camera.y;
-  const x1 = bounds.maxX * camera.zoom - camera.x;
-  const y1 = bounds.maxY * camera.zoom - camera.y;
-  const w  = x1 - x0;
-  const h  = y1 - y0;
+  let x0 = 0;
+  let y0 = 0;
+  let x1 = 0;
+  let y1 = 0;
+
+  if (objectType === "rect") {
+    const w = Math.max(1, (Number(obj?.width)  || 0) * camera.zoom);
+    const h = Math.max(1, (Number(obj?.height) || 0) * camera.zoom);
+    if (rotation) {
+      x0 = -w / 2;
+      x1 = w / 2;
+      y0 = -h / 2;
+      y1 = h / 2;
+    } else {
+      x0 = screenX - w / 2;
+      x1 = screenX + w / 2;
+      y0 = screenY - h / 2;
+      y1 = screenY + h / 2;
+    }
+  } else {
+    const s = Math.max(1, (Number(obj?.size) || 0) * camera.zoom);
+    if (rotation && objectType !== "circle") {
+      x0 = -s;
+      x1 = s;
+      y0 = -s;
+      y1 = s;
+    } else {
+      const bounds = getObjectBoundsWorld(obj);
+      x0 = bounds.minX * camera.zoom - camera.x;
+      y0 = bounds.minY * camera.zoom - camera.y;
+      x1 = bounds.maxX * camera.zoom - camera.x;
+      y1 = bounds.maxY * camera.zoom - camera.y;
+    }
+  }
+
+  const w = x1 - x0;
+  const h = y1 - y0;
   const step = 9;
 
   ctx.strokeStyle = "rgba(0,0,0,0.28)";
@@ -285,8 +334,17 @@ const drawRectMapImage = (ctx, obj, camera, image) => {
   const screenY = (Number(obj?.y) || 0) * camera.zoom - camera.y;
   const width   = Math.max(1, (Number(obj?.width)  || 0) * camera.zoom);
   const height  = Math.max(1, (Number(obj?.height) || 0) * camera.zoom);
+  const rotation = getObjectRotationRad(obj);
+  ctx.save();
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(image, screenX - width / 2, screenY - height / 2, width, height);
+  if (rotation) {
+    ctx.translate(screenX, screenY);
+    ctx.rotate(rotation);
+    ctx.drawImage(image, -width / 2, -height / 2, width, height);
+  } else {
+    ctx.drawImage(image, screenX - width / 2, screenY - height / 2, width, height);
+  }
+  ctx.restore();
   return { screenX, screenY };
 };
 
@@ -296,6 +354,7 @@ export const drawShape = (ctx, obj, camera, style = {}) => {
   const objectType = String(obj?.type || "circle").toLowerCase();
   const fill       = style.fill !== false;
   const stroke     = style.stroke !== false;
+  const rotation   = getObjectRotationRad(obj);
 
   if (objectType === "circle") {
     const radius = (Number(obj?.size) || 0) * camera.zoom;
@@ -309,19 +368,42 @@ export const drawShape = (ctx, obj, camera, style = {}) => {
   if (objectType === "rect") {
     const width  = Math.max(1, (Number(obj?.width)  || 0) * camera.zoom);
     const height = Math.max(1, (Number(obj?.height) || 0) * camera.zoom);
-    if (fill)   ctx.fillRect(  screenX - width / 2, screenY - height / 2, width, height);
-    if (stroke) ctx.strokeRect(screenX - width / 2, screenY - height / 2, width, height);
+    if (rotation) {
+      ctx.save();
+      ctx.translate(screenX, screenY);
+      ctx.rotate(rotation);
+      if (fill)   ctx.fillRect(  -width / 2, -height / 2, width, height);
+      if (stroke) ctx.strokeRect(-width / 2, -height / 2, width, height);
+      ctx.restore();
+    } else {
+      if (fill)   ctx.fillRect(  screenX - width / 2, screenY - height / 2, width, height);
+      if (stroke) ctx.strokeRect(screenX - width / 2, screenY - height / 2, width, height);
+    }
     return { screenX, screenY };
   }
 
   const size = Math.max(1, (Number(obj?.size) || 0) * camera.zoom);
-  ctx.beginPath();
-  ctx.moveTo(screenX,        screenY - size);
-  ctx.lineTo(screenX - size, screenY + size);
-  ctx.lineTo(screenX + size, screenY + size);
-  ctx.closePath();
-  if (fill)   ctx.fill();
-  if (stroke) ctx.stroke();
+  if (rotation) {
+    ctx.save();
+    ctx.translate(screenX, screenY);
+    ctx.rotate(rotation);
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.lineTo(-size, size);
+    ctx.lineTo(size, size);
+    ctx.closePath();
+    if (fill)   ctx.fill();
+    if (stroke) ctx.stroke();
+    ctx.restore();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(screenX,        screenY - size);
+    ctx.lineTo(screenX - size, screenY + size);
+    ctx.lineTo(screenX + size, screenY + size);
+    ctx.closePath();
+    if (fill)   ctx.fill();
+    if (stroke) ctx.stroke();
+  }
   return { screenX, screenY };
 };
 
@@ -356,19 +438,36 @@ const getObjectSegmentsWorld = (obj, circleSegmentsBase = 16) => {
   const objectType = String(obj?.type || "circle").toLowerCase();
   const cx = Number(obj?.x) || 0;
   const cy = Number(obj?.y) || 0;
+  const rotation = getObjectRotationRad(obj);
+  const cos = rotation ? Math.cos(rotation) : 1;
+  const sin = rotation ? Math.sin(rotation) : 0;
   const segs = [];
 
   const buildPolySegs = (pts) => {
     for (let i = 0; i < pts.length; i++) segs.push([pts[i], pts[(i + 1) % pts.length]]);
   };
 
+  const rotatePoint = (x, y) => ({
+    x: cx + x * cos - y * sin,
+    y: cy + x * sin + y * cos,
+  });
+
   if (objectType === "rect") {
     const hw = Math.max(1, Number(obj?.width)  || 0) / 2;
     const hh = Math.max(1, Number(obj?.height) || 0) / 2;
-    buildPolySegs([
-      { x: cx - hw, y: cy - hh }, { x: cx + hw, y: cy - hh },
-      { x: cx + hw, y: cy + hh }, { x: cx - hw, y: cy + hh },
-    ]);
+    if (rotation) {
+      buildPolySegs([
+        rotatePoint(-hw, -hh),
+        rotatePoint(hw, -hh),
+        rotatePoint(hw, hh),
+        rotatePoint(-hw, hh),
+      ]);
+    } else {
+      buildPolySegs([
+        { x: cx - hw, y: cy - hh }, { x: cx + hw, y: cy - hh },
+        { x: cx + hw, y: cy + hh }, { x: cx - hw, y: cy + hh },
+      ]);
+    }
     return segs;
   }
 
@@ -385,7 +484,15 @@ const getObjectSegmentsWorld = (obj, circleSegmentsBase = 16) => {
   }
 
   const s = Math.max(1, Number(obj?.size) || 0);
-  buildPolySegs([{ x: cx, y: cy - s }, { x: cx - s, y: cy + s }, { x: cx + s, y: cy + s }]);
+  if (rotation) {
+    buildPolySegs([
+      rotatePoint(0, -s),
+      rotatePoint(-s, s),
+      rotatePoint(s, s),
+    ]);
+  } else {
+    buildPolySegs([{ x: cx, y: cy - s }, { x: cx - s, y: cy + s }, { x: cx + s, y: cy + s }]);
+  }
   return segs;
 };
 
@@ -796,8 +903,12 @@ export const drawBlockedMovePreview = (ctx, obj, camera) => {
   ctx.restore();
 };
 
-const buildMapRenderData = (state = {}) => {
-  const mapObjects   = Array.isArray(state?.mapObjects)  ? state.mapObjects  : [];
+const buildMapRenderData = (state = {}, options = {}) => {
+  const mapObjects = Array.isArray(options?.mapObjects)
+    ? options.mapObjects
+    : Array.isArray(state?.mapObjects)
+    ? state.mapObjects
+    : [];
   const floorTypes   = Array.isArray(state?.floorTypes)  ? state.floorTypes  : [];
   const floorTypesByID   = buildFloorTypesByID(floorTypes);
   const currentZLevel    = Math.round(Number(state?.currentZLevel) || 0);
@@ -866,21 +977,30 @@ return {
 
 };
 
-export const getMapRenderData = (state = {}, frame = null) => {
-  if (!frame || typeof frame !== "object") return buildMapRenderData(state);
+export const getMapRenderData = (state = {}, frame = null, options = {}) => {
+  if (!frame || typeof frame !== "object") return buildMapRenderData(state, options);
   if (!frame.cache || typeof frame.cache !== "object") frame.cache = {};
-  if (frame.cache.mapRenderData) return frame.cache.mapRenderData;
-  const data = buildMapRenderData(state);
-  frame.cache.mapRenderData = data;
+  const cacheKey = String(options?.cacheKey || "mapRenderData");
+  if (frame.cache[cacheKey]) return frame.cache[cacheKey];
+  const data = buildMapRenderData(state, options);
+  frame.cache[cacheKey] = data;
   return data;
 };
 
 export const shouldRedrawMapLayer = (state, prevState, options = {}) => {
-  const { includeLighting = false, includeSelection = false, includeOverlay = false } = options;
+  const {
+    includeLighting = false,
+    includeSelection = false,
+    includeOverlay = false,
+    includeVisibility = false,
+    includeGeometry = false,
+  } = options;
   const c = state?.camera, p = prevState?.camera;
   if (!c || !p) return true;
   if (c.x !== p.x || c.y !== p.y || c.zoom !== p.zoom) return true;
   if (state.mapObjects    !== prevState.mapObjects)    return true;
+  if (includeGeometry && state.mapGeometry !== prevState.mapGeometry) return true;
+  if (includeVisibility && state.visibleMapObjects !== prevState.visibleMapObjects) return true;
   if (state.floorTypes    !== prevState.floorTypes)    return true;
   if (state.currentZLevel !== prevState.currentZLevel) return true;
   if (includeSelection && state.selectedMapObjectID !== prevState.selectedMapObjectID) return true;

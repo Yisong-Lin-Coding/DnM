@@ -14,6 +14,7 @@ const MAX_SIDE_WIDTH = 800;
 const ZOOM_FACTOR = 1.1;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
+const MAX_CANVAS_DPR = 1.5;
 const PAN_SPEED = 13;
 const CLICK_DRAG_THRESHOLD_PX = 6;
 const MIN_RECT_WORLD_SIZE = 8;
@@ -25,6 +26,14 @@ const INFO_PANEL_MIN_TOP = 12;
 const INFO_PANEL_MAX_BOTTOM_PADDING = 120;
 const RESIZE_HANDLE_HIT_RADIUS_PX = 15;
 const HEIGHT_HANDLE_OFFSET_PX = 32;
+const FACE_DOT_OFFSET_PX = 10;
+const FACE_DOT_RADIUS_PX = 4;
+const FACE_DOT_HIT_RADIUS_PX = 12;
+const TEAM_PREVIEW_COLORS = {
+    player: "#3B82F6",
+    enemy: "#EF4444",
+    neutral: "#A855F7",
+};
 
 const DEFAULT_MAX_HP_BY_TERRAIN = {
     floor: 500,
@@ -47,6 +56,27 @@ function isPointInsideTriangle(worldX, worldY, objX, objY, size) {
     return !(hasNeg && hasPos);
 }
 
+function normalizeAngleDegrees(value) {
+    const raw = Number(value) || 0;
+    const normalized = raw % 360;
+    return normalized < 0 ? normalized + 360 : normalized;
+}
+
+function getFacingAngle(rotation) {
+    return (Number(rotation) || 0) - 90;
+}
+
+function getObjectVisibilityRadius(obj) {
+    if (!obj) return 8;
+    const type = String(obj?.type || "circle").toLowerCase();
+    if (type === "rect") {
+        const halfW = Math.max(1, Number(obj?.width) || 0) / 2;
+        const halfH = Math.max(1, Number(obj?.height) || 0) / 2;
+        return Math.max(8, Math.hypot(halfW, halfH));
+    }
+    return Math.max(8, Number(obj?.size) || 0);
+}
+
 function isPointInsideMapObject(worldX, worldY, obj) {
     if (!obj) return false;
 
@@ -54,22 +84,33 @@ function isPointInsideMapObject(worldX, worldY, obj) {
     const hitboxScale = Math.max(0.1, Number(obj?.hitbox?.scale) || 1);
     const x = (Number(obj.x) || 0) + (Number(obj?.hitbox?.offsetX) || 0);
     const y = (Number(obj.y) || 0) + (Number(obj?.hitbox?.offsetY) || 0);
+    const rotation = Number(obj?.rotation) || 0;
+    const rotationRad = rotation ? (-rotation * Math.PI) / 180 : 0;
+    let localX = worldX - x;
+    let localY = worldY - y;
+
+    if (rotationRad) {
+        const cos = Math.cos(rotationRad);
+        const sin = Math.sin(rotationRad);
+        const rotatedX = localX * cos - localY * sin;
+        const rotatedY = localX * sin + localY * cos;
+        localX = rotatedX;
+        localY = rotatedY;
+    }
 
     if (type === "rect") {
         const width = Math.max(1, (Number(obj.width) || 0) * hitboxScale);
         const height = Math.max(1, (Number(obj.height) || 0) * hitboxScale);
-        return Math.abs(worldX - x) <= width / 2 && Math.abs(worldY - y) <= height / 2;
+        return Math.abs(localX) <= width / 2 && Math.abs(localY) <= height / 2;
     }
 
     if (type === "triangle") {
         const size = Math.max(1, (Number(obj.size) || 0) * hitboxScale);
-        return isPointInsideTriangle(worldX, worldY, x, y, size);
+        return isPointInsideTriangle(localX, localY, 0, 0, size);
     }
 
     const radius = Math.max(1, (Number(obj.size) || 0) * hitboxScale);
-    const dx = worldX - x;
-    const dy = worldY - y;
-    return dx * dx + dy * dy <= radius * radius;
+    return localX * localX + localY * localY <= radius * radius;
 }
 
 function findTopMapObjectAt(worldX, worldY, mapObjects = []) {
@@ -227,11 +268,11 @@ const ACTION_TAB_ORDER = [
 ];
 
 const ACTION_TAB_LABELS = {
-    main: "Main",
+    main: "Action",
     movement: "Movement",
-    bonus: "Bonus",
+    bonus: "Bonus Action",
     reaction: "Reaction",
-    free: "Free",
+    free: "Free Action",
     passive: "Passive",
     special: "Special",
 };
@@ -273,6 +314,120 @@ function groupActionsByTab(actions = []) {
         });
 
     return ordered;
+}
+
+const CONTEXT_ACTION_ROOTS = [
+    {
+        key: "action",
+        label: "Action",
+        tabs: ["main", "reaction", "free", "passive", "special"],
+    },
+    { key: "bonus", label: "Bonus Action", tabs: ["bonus"] },
+    { key: "movement", label: "Movement", tabs: ["movement"] },
+];
+
+function toDisplayLabel(value = "") {
+    return String(value || "")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function buildContextActionRoot(actionTree, rootConfig) {
+    const children = [];
+    const tabs = Array.isArray(rootConfig?.tabs) ? rootConfig.tabs : [];
+    const [primaryTab, ...extraTabs] = tabs;
+    const primaryNode = primaryTab ? actionTree?.[primaryTab] : null;
+
+    if (primaryNode?.children?.length) {
+        children.push(...primaryNode.children);
+    } else if (primaryNode?.action) {
+        children.push({
+            key: primaryNode.key || primaryTab,
+            label: primaryNode.label || toDisplayLabel(primaryTab),
+            path: primaryNode.path || primaryTab,
+            action: primaryNode.action,
+            children: [],
+        });
+    }
+
+    extraTabs.forEach((tabKey) => {
+        const tabNode = actionTree?.[tabKey];
+        if (!tabNode) return;
+        const tabChildren = Array.isArray(tabNode.children) ? tabNode.children : [];
+        const hasAction = Boolean(tabNode.action) && tabChildren.length === 0;
+        if (tabChildren.length === 0 && !hasAction) return;
+        children.push({
+            key: tabNode.key || tabKey,
+            label: ACTION_TAB_LABELS[tabKey] || tabNode.label || toDisplayLabel(tabKey),
+            path: tabNode.path || tabKey,
+            action: hasAction ? tabNode.action : undefined,
+            children: tabChildren,
+        });
+    });
+
+    return {
+        key: rootConfig.key,
+        label: rootConfig.label,
+        path: rootConfig.key,
+        children,
+    };
+}
+
+function buildContextActionMenu(actionTree) {
+    if (!actionTree || typeof actionTree !== "object") return null;
+    const root = { key: "root", label: "Actions", children: [] };
+    CONTEXT_ACTION_ROOTS.forEach((rootConfig) => {
+        root.children.push(buildContextActionRoot(actionTree, rootConfig));
+    });
+    return root;
+}
+
+function getContextActionItems(node, options = {}) {
+    const includeEmpty = options.includeEmpty === true;
+    const children = Array.isArray(node?.children) ? node.children : [];
+
+    return children
+        .map((child) => {
+            if (!child || typeof child !== "object") return null;
+            const childChildren = Array.isArray(child.children) ? child.children : [];
+            const hasChildren = childChildren.length > 0;
+            const hasAction = Boolean(child.action) && !hasChildren;
+
+            if (hasChildren) {
+                return {
+                    type: "folder",
+                    label: child.label || toDisplayLabel(child.key || ""),
+                    node: child,
+                    disabled: false,
+                };
+            }
+
+            if (hasAction) {
+                return {
+                    type: "action",
+                    label:
+                        child.action?.name ||
+                        child.label ||
+                        toDisplayLabel(child.key || ""),
+                    action: child.action,
+                };
+            }
+
+            if (includeEmpty) {
+                return {
+                    type: "folder",
+                    label: child.label || toDisplayLabel(child.key || ""),
+                    node: child,
+                    disabled: true,
+                };
+            }
+
+            return null;
+        })
+        .filter(Boolean);
 }
 
 function buildPlacementFromDrag(placementConfig, startWorld, endWorld) {
@@ -317,7 +472,9 @@ function GameComponent() {
     lastMouse,
     setLastMouse,
     camera,
+    worldMouseCoords,
     mapObjects,
+    mapGeometry,
     addMapObject,
     updateMapObject,
     deleteMapObject,
@@ -335,6 +492,8 @@ function GameComponent() {
     mapObjectPlacement,
     clearMapObjectPlacement,
     placePendingMapObjectAt,
+    characterPlacement,
+    clearCharacterPlacement,
     lightPlacement,        // ADD THIS
     placeLightAt,          // ADD THIS
     clearLightPlacement,   // ADD THIS
@@ -344,10 +503,12 @@ function GameComponent() {
     const [sideWidth, setSideWidth] = useState(320);
     const [dragging, setDragging] = useState(false);
     const [contextMenu, setContextMenu] = useState(null);
+    const [contextActionTrail, setContextActionTrail] = useState([]);
     const [characterActionCache, setCharacterActionCache] = useState({});
     const [loadingActionCharacterId, setLoadingActionCharacterId] = useState("");
     const [selectedEntity, setSelectedEntity] = useState(null);
     const [dragTarget, setDragTarget] = useState(null);
+    const [rotationDrag, setRotationDrag] = useState(null);
     const [gameContextError, setGameContextError] = useState("");
     const [loadingGameContext, setLoadingGameContext] = useState(true);
     const [placementDrag, setPlacementDrag] = useState(null);
@@ -358,11 +519,14 @@ function GameComponent() {
     const [blockedMovePreview, setBlockedMovePreview] = useState(null);
     const [resizeTarget, setResizeTarget] = useState(null);
     const [controlledCharacterIDs, setControlledCharacterIDs] = useState([]);
+    const [fps, setFps] = useState(0);
 
     const isPanning = useRef(false);
     const layerRefs = useRef({});
     const layerBindingsRef = useRef([]);
     const prevStateRef = useRef(null);
+    const lightingCacheRef = useRef({});
+    const fpsRef = useRef({ frames: 0, lastSampleTime: 0, value: 0 });
     const applyingServerStateRef = useRef(false);
     const skipNextAutoSaveRef = useRef(false);
     const syncingWorldRef = useRef(false);
@@ -685,7 +849,7 @@ function GameComponent() {
     ]);
 
     const formatCanvas = (canvas) => {
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = Math.min(window.devicePixelRatio || 1, MAX_CANVAS_DPR);
         const rect = canvas.getBoundingClientRect();
         canvas.width = Math.round(rect.width * dpr);
         canvas.height = Math.round(rect.height * dpr);
@@ -747,7 +911,7 @@ function GameComponent() {
 
             if (distSq <= char.visionDistance * char.visionDistance) {
                 const angleToPoint = (Math.atan2(dy, dx) * 180) / Math.PI;
-                let angleDiff = angleToPoint - char.rotation;
+                let angleDiff = angleToPoint - getFacingAngle(char.rotation);
 
                 while (angleDiff > 180) angleDiff -= 360;
                 while (angleDiff < -180) angleDiff += 360;
@@ -760,6 +924,48 @@ function GameComponent() {
 
         return false;
     };
+
+    const visibleMapObjects = useMemo(() => {
+        if (!fogEnabled || isDM) return mapObjects;
+        const playerChars = characters.filter(
+            (c) => String(c.team || "").toLowerCase() === "player"
+        );
+        if (!playerChars.length) return [];
+
+        return mapObjects.filter((obj) => {
+            const objX = Number(obj?.x) || 0;
+            const objY = Number(obj?.y) || 0;
+            const objRadius = getObjectVisibilityRadius(obj);
+
+            return playerChars.some((char) => {
+                const cx = Number(char?.position?.x) || 0;
+                const cy = Number(char?.position?.y) || 0;
+                const dx = objX - cx;
+                const dy = objY - cy;
+                const dist = Math.hypot(dx, dy);
+                const visionDistance = Number(char?.visionDistance) || 150;
+                if (dist > visionDistance + objRadius) return false;
+
+                const angleToPoint = (Math.atan2(dy, dx) * 180) / Math.PI;
+                let angleDiff = angleToPoint - getFacingAngle(char.rotation);
+                while (angleDiff > 180) angleDiff -= 360;
+                while (angleDiff < -180) angleDiff += 360;
+
+                const arc = Number(char?.visionArc) || 90;
+                const arcPadding =
+                    dist > 0
+                        ? (Math.asin(Math.min(objRadius / dist, 1)) * 180) / Math.PI
+                        : 180;
+                return Math.abs(angleDiff) <= arc / 2 + arcPadding;
+            });
+        });
+    }, [mapObjects, characters, fogEnabled, isDM]);
+
+    const geometryObjects = useMemo(() => {
+        if (isDM) return mapObjects;
+        if (Array.isArray(mapGeometry)) return mapGeometry;
+        return mapObjects;
+    }, [isDM, mapObjects, mapGeometry]);
 
     const findCharacterAt = (worldX, worldY, includeHidden = false) => {
         const list = includeHidden ? characters : characters.filter((char) => isVisible(char.position.x, char.position.y));
@@ -775,13 +981,38 @@ function GameComponent() {
         return null;
     };
 
+    const findFacingHandleAtScreenPoint = useCallback(
+        (screenX, screenY) => {
+            if (!camera?.current) return null;
+            const zoom = Number(camera.current.zoom) || 1;
+            for (let i = characters.length - 1; i >= 0; i -= 1) {
+                const char = characters[i];
+                const charX = Number(char?.position?.x) || 0;
+                const charY = Number(char?.position?.y) || 0;
+                const center = worldToScreen(charX, charY);
+                const radius = Math.max(4, ((Number(char?.size) || 30) / 2) * zoom);
+                const facingRad = (getFacingAngle(char?.rotation) * Math.PI) / 180;
+                const dotDistance = radius + FACE_DOT_OFFSET_PX;
+                const dotX = center.x + Math.cos(facingRad) * dotDistance;
+                const dotY = center.y + Math.sin(facingRad) * dotDistance;
+                const dx = screenX - dotX;
+                const dy = screenY - dotY;
+                if (dx * dx + dy * dy <= FACE_DOT_HIT_RADIUS_PX * FACE_DOT_HIT_RADIUS_PX) {
+                    return char;
+                }
+            }
+            return null;
+        },
+        [camera, characters]
+    );
+
     const activeMapObjects = useMemo(
-        () => mapObjects.filter((obj) => getObjectZLevel(obj) === currentZLevel),
-        [mapObjects, currentZLevel]
+        () => visibleMapObjects.filter((obj) => getObjectZLevel(obj) === currentZLevel),
+        [visibleMapObjects, currentZLevel]
     );
 
 const tallSolidsFromBelow = useMemo(() => {
-    return mapObjects.filter((obj) => {
+    return visibleMapObjects.filter((obj) => {
       const level       = getObjectZLevel(obj);
       if (level >= currentZLevel) return false;
       const terrainType = String(obj?.terrainType || "").toLowerCase();
@@ -790,7 +1021,7 @@ const tallSolidsFromBelow = useMemo(() => {
       const topZLevel   = level + Math.floor(elevHeight / HEIGHT_UNITS_PER_ZLEVEL);
       return topZLevel >= currentZLevel;
     });
-  }, [mapObjects, currentZLevel]);
+  }, [visibleMapObjects, currentZLevel]);
 
 
     const floorTypesByID = useMemo(() => {
@@ -949,6 +1180,24 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         let raf;
 
         const loop = () => {
+            const now =
+                typeof performance !== "undefined" && typeof performance.now === "function"
+                    ? performance.now()
+                    : Date.now();
+            const fpsState = fpsRef.current;
+            if (!fpsState.lastSampleTime) fpsState.lastSampleTime = now;
+            fpsState.frames += 1;
+            const elapsed = now - fpsState.lastSampleTime;
+            if (elapsed >= 500) {
+                const nextFps = Math.round((fpsState.frames * 1000) / elapsed);
+                if (nextFps !== fpsState.value) {
+                    fpsState.value = nextFps;
+                    setFps(nextFps);
+                }
+                fpsState.frames = 0;
+                fpsState.lastSampleTime = now;
+            }
+
             const missingCanvas = GAME_LAYER_REGISTRY.some((entry) => !layerRefs.current[entry.name]);
             if (missingCanvas) {
                 raf = requestAnimationFrame(loop);
@@ -991,6 +1240,8 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 backgroundKey,
                 camera: cameraSnapshot,
                 mapObjects,
+                mapGeometry: geometryObjects,
+                visibleMapObjects,
                 characters,
                 selectedChar,
                 fogEnabled,
@@ -1001,6 +1252,7 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 selectedMapObjectID,
                 blockedMovePreview,
                 lighting,
+                lightingCache: lightingCacheRef.current,
                 showResizeHandles: isDM,
             };
 
@@ -1022,6 +1274,7 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
     }, [
         camera,
         mapObjects,
+        geometryObjects,
         characters,
         selectedChar,
         fogEnabled,
@@ -1131,37 +1384,24 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
             setDragTarget(null);
             setResizeTarget(null);
             setPlacementDrag(null);
+            setRotationDrag(null);
             setBlockedMovePreview(null);
             setSelectedEntity(null);
             selectCharacter(null);
             clearMapObjectPlacement();
             clearLightPlacement();
+            clearCharacterPlacement();
         };
 
         window.addEventListener("keydown", onEscape);
         return () => window.removeEventListener("keydown", onEscape);
-    }, [clearMapObjectPlacement, selectCharacter]);
+    }, [clearMapObjectPlacement, clearLightPlacement, clearCharacterPlacement, selectCharacter]);
 
     useEffect(() => {
         if (!mapObjectPlacement) {
             setPlacementDrag(null);
         }
     }, [mapObjectPlacement]);
-
-    useEffect(() => {
-        if (!contextMenu || contextMenu?.target?.type !== "character") return;
-        const targetId = toEntityID(contextMenu.target.id);
-        if (!targetId) return;
-        if (!isDM && !canControlCharacterId(targetId)) return;
-        if (characterActionCache[targetId]) return;
-        fetchCharacterActions(targetId);
-    }, [
-        contextMenu,
-        isDM,
-        canControlCharacterId,
-        characterActionCache,
-        fetchCharacterActions,
-    ]);
 
     const selectEntity = useCallback(
         (target) => {
@@ -1219,6 +1459,25 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         }
 
         setContextMenu(null);
+
+        if (isDM && characterPlacement) {
+            placeCharacterFromPlacement(world);
+            return;
+        }
+
+        if (isDM && !mapObjectPlacement && !lightPlacement && !characterPlacement) {
+            const screen = getScreenFromMouseEvent(event);
+            const facingTarget = screen
+                ? findFacingHandleAtScreenPoint(screen.x, screen.y)
+                : null;
+            if (facingTarget) {
+                setPlacementDrag(null);
+                setDragTarget(null);
+                setRotationDrag({ characterId: facingTarget.id });
+                selectEntity({ type: "character", id: facingTarget.id });
+                return;
+            }
+        }
 
         if (isDM && mapObjectPlacement) {
             setPlacementDrag({
@@ -1315,6 +1574,25 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
 
     const handleMouseMove = (event) => {
         setLastMouse({ x: event.clientX, y: event.clientY });
+
+        if (rotationDrag && isDM) {
+            const world = getWorldFromMouseEvent(event);
+            if (!world) return;
+            const targetChar = characters.find(
+                (char) => toEntityID(char?.id) === toEntityID(rotationDrag.characterId)
+            );
+            if (!targetChar) {
+                setRotationDrag(null);
+                return;
+            }
+            const dx = world.x - (Number(targetChar?.position?.x) || 0);
+            const dy = world.y - (Number(targetChar?.position?.y) || 0);
+            if (dx === 0 && dy === 0) return;
+            const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+            const nextRotation = normalizeAngleDegrees(angle + 90);
+            updateCharacter(targetChar.id, { rotation: nextRotation });
+            return;
+        }
 
         if (resizeTarget && isDM) {
             const objectTarget = mapObjects.find(
@@ -1435,6 +1713,11 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
     };
 
     const handleMouseUp = (event) => {
+        if (rotationDrag) {
+            setRotationDrag(null);
+            setBlockedMovePreview(null);
+            return;
+        }
         if (placementDrag && isDM && mapObjectPlacement) {
             const fallbackWorld = placementDrag.currentWorld || placementDrag.startWorld;
             const releaseWorld = getWorldFromMouseEvent(event) || fallbackWorld;
@@ -1584,6 +1867,66 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         [moveCharacter, isDM, socket, playerID, gameID, flushPendingMove]
     );
 
+    const placeCharacterFromPlacement = useCallback(
+        async (worldPosition) => {
+            if (!isDM || !characterPlacement) return;
+            if (!socket || !playerID || !gameID) return;
+            if (!worldPosition) return;
+
+            const payloadPosition = {
+                x: Math.round(Number(worldPosition.x) || 0),
+                y: Math.round(Number(worldPosition.y) || 0),
+            };
+            const placementId = String(characterPlacement.id || "").trim();
+            if (!placementId) return;
+            const placementKind = String(characterPlacement.kind || "character").toLowerCase();
+
+            const response =
+                placementKind === "enemy"
+                    ? await emitWithAck(socket, "campaign_spawnEnemy", {
+                          playerID,
+                          campaignID: gameID,
+                          enemyID: placementId,
+                          position: payloadPosition,
+                      })
+                    : await emitWithAck(socket, "campaign_moveCharacter", {
+                          playerID,
+                          campaignID: gameID,
+                          characterID: placementId,
+                          position: payloadPosition,
+                      });
+
+            if (!response?.success) {
+                if (response?.message) {
+                    setGameContextError((prev) => prev || response.message);
+                }
+                return;
+            }
+
+            const snapshot =
+                response?.engineState?.snapshot && typeof response.engineState.snapshot === "object"
+                    ? response.engineState.snapshot
+                    : null;
+            if (snapshot) {
+                applyingServerStateRef.current = true;
+                skipNextAutoSaveRef.current = true;
+                loadGameSnapshot(snapshot);
+            }
+            setGameContextError("");
+            clearCharacterPlacement();
+        },
+        [
+            isDM,
+            characterPlacement,
+            socket,
+            playerID,
+            gameID,
+            loadGameSnapshot,
+            clearCharacterPlacement,
+            setGameContextError,
+        ]
+    );
+
     const fetchCharacterActions = useCallback(
         async (characterId, options = {}) => {
             const safeId = toEntityID(characterId);
@@ -1627,6 +1970,29 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
             setGameContextError,
         ]
     );
+
+    useEffect(() => {
+        if (!contextMenu || contextMenu?.target?.type !== "character") {
+            setContextActionTrail([]);
+            return;
+        }
+        setContextActionTrail([]);
+    }, [contextMenu]);
+
+    useEffect(() => {
+        if (!contextMenu || contextMenu?.target?.type !== "character") return;
+        const targetId = toEntityID(contextMenu.target.id);
+        if (!targetId) return;
+        if (!isDM && !canControlCharacterId(targetId)) return;
+        if (characterActionCache[targetId]) return;
+        fetchCharacterActions(targetId);
+    }, [
+        contextMenu,
+        isDM,
+        canControlCharacterId,
+        characterActionCache,
+        fetchCharacterActions,
+    ]);
 
     const executeCharacterAction = useCallback(
         async (characterId, actionMeta, contextWorld) => {
@@ -1710,6 +2076,14 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
 
             if (action === "info") {
                 selectEntity(target);
+                return;
+            }
+
+            if (action === "viewSheet") {
+                const isFriendly =
+                    String(character?.team || "").toLowerCase() === "player";
+                if (!(isDM || canControlCharacterId(character.id) || isFriendly)) return;
+                navigate(`/ISK/${safeSessionID}/character/view/${character.id}`);
                 return;
             }
 
@@ -2016,37 +2390,63 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         return null;
     };
 
-    const placementPreview = (() => {
-        if (!isDM || !mapObjectPlacement || !placementDrag) return null;
-        const currentWorld = placementDrag.currentWorld || placementDrag.startWorld;
-        const placement = buildPlacementFromDrag(
-            mapObjectPlacement,
-            placementDrag.startWorld,
-            currentWorld
-        );
+    const mapPlacementPreview = (() => {
+        if (!isDM || !mapObjectPlacement) return null;
+        const previewWorld =
+            placementDrag?.currentWorld || placementDrag?.startWorld || worldMouseCoords;
+        if (
+            !previewWorld ||
+            !Number.isFinite(Number(previewWorld.x)) ||
+            !Number.isFinite(Number(previewWorld.y))
+        ) {
+            return null;
+        }
+        const placement = placementDrag
+            ? buildPlacementFromDrag(
+                  mapObjectPlacement,
+                  placementDrag.startWorld,
+                  previewWorld
+              )
+            : {
+                  x: Math.round(Number(previewWorld.x) || 0),
+                  y: Math.round(Number(previewWorld.y) || 0),
+                  overrides: {},
+              };
         const center = worldToScreen(placement.x, placement.y);
         const zoom = Number(camera.current.zoom) || 1;
         const type = String(mapObjectPlacement.type || "circle").toLowerCase();
         const color = String(mapObjectPlacement.color || "#3B82F6");
+        const rotation = Number(mapObjectPlacement.rotation || 0);
 
         if (type === "rect") {
-            const width = (Number(placement.overrides.width) || MIN_RECT_WORLD_SIZE) * zoom;
-            const height = (Number(placement.overrides.height) || MIN_RECT_WORLD_SIZE) * zoom;
+            const widthWorld =
+                Number(placement.overrides.width ?? mapObjectPlacement.width) ||
+                MIN_RECT_WORLD_SIZE;
+            const heightWorld =
+                Number(placement.overrides.height ?? mapObjectPlacement.height) ||
+                MIN_RECT_WORLD_SIZE;
             return {
                 type,
                 color,
+                rotation,
                 x: center.x,
                 y: center.y,
-                width,
-                height,
+                width: widthWorld * zoom,
+                height: heightWorld * zoom,
             };
         }
 
-        const size = (Number(placement.overrides.size) || MIN_SHAPE_WORLD_SIZE) * zoom;
+        const sizeWorld =
+            Number(placement.overrides.size ?? mapObjectPlacement.size) ||
+            MIN_SHAPE_WORLD_SIZE;
+        const size = sizeWorld * zoom;
         if (type === "triangle") {
             return {
                 type,
                 color,
+                rotation,
+                x: center.x,
+                y: center.y,
                 points: `${center.x},${center.y - size} ${center.x - size},${center.y + size} ${center.x + size},${center.y + size}`,
             };
         }
@@ -2060,12 +2460,105 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         };
     })();
 
+    const characterPlacementPreview = (() => {
+        if (!isDM || !characterPlacement || !worldMouseCoords) return null;
+        const center = worldToScreen(
+            Number(worldMouseCoords.x) || 0,
+            Number(worldMouseCoords.y) || 0
+        );
+        const zoom = Number(camera.current.zoom) || 1;
+        const placementChar = characters.find(
+            (char) => toEntityID(char?.id) === toEntityID(characterPlacement.id)
+        );
+        const size =
+            Number(characterPlacement.size) ||
+            Number(placementChar?.size) ||
+            30;
+        const radius = Math.max(6, (size / 2) * zoom);
+        const team = String(
+            characterPlacement.team ||
+                placementChar?.team ||
+                (characterPlacement.kind === "enemy" ? "enemy" : "player")
+        ).toLowerCase();
+        const color = TEAM_PREVIEW_COLORS[team] || TEAM_PREVIEW_COLORS.neutral;
+        const rotation = Number(placementChar?.rotation || 0);
+
+        return {
+            name: characterPlacement.name || placementChar?.name || "",
+            color,
+            rotation,
+            radius,
+            x: center.x,
+            y: center.y,
+        };
+    })();
+
+    const lightPlacementPreview = (() => {
+        if (!isDM || !lightPlacement || !worldMouseCoords) return null;
+        const center = worldToScreen(
+            Number(worldMouseCoords.x) || 0,
+            Number(worldMouseCoords.y) || 0
+        );
+        const zoom = Number(camera.current.zoom) || 1;
+        const range = Math.max(10, Number(lightPlacement.range) || 0) * zoom;
+        return {
+            x: center.x,
+            y: center.y,
+            range,
+            color: String(lightPlacement.color || "#ffffff"),
+        };
+    })();
+
+    const characterPlacementFacing = characterPlacementPreview
+        ? (() => {
+              const facingRad =
+                  (getFacingAngle(characterPlacementPreview.rotation) * Math.PI) /
+                  180;
+              const dotDistance =
+                  characterPlacementPreview.radius + FACE_DOT_OFFSET_PX;
+              return {
+                  x:
+                      characterPlacementPreview.x +
+                      Math.cos(facingRad) * dotDistance,
+                  y:
+                      characterPlacementPreview.y +
+                      Math.sin(facingRad) * dotDistance,
+              };
+          })()
+        : null;
+
     const contextCharacterId =
         contextMenu?.target?.type === "character" ? toEntityID(contextMenu.target.id) : "";
+    const contextCharacter = contextCharacterId
+        ? characters.find((char) => toEntityID(char?.id) === toEntityID(contextCharacterId))
+        : null;
+    const canViewCharacterSheet = Boolean(
+        contextCharacter &&
+            (isDM ||
+                canControlCharacterId(contextCharacter.id) ||
+                String(contextCharacter?.team || "").toLowerCase() === "player")
+    );
     const contextActionData = contextCharacterId
         ? characterActionCache[contextCharacterId]
         : null;
-    const contextActionGroups = groupActionsByTab(contextActionData?.actions || []);
+    const contextActionMenu = buildContextActionMenu(contextActionData?.actionTree);
+    const contextActionNode =
+        contextActionMenu && contextActionTrail.length > 0
+            ? contextActionTrail[contextActionTrail.length - 1]
+            : contextActionMenu;
+    const contextActionItems = contextActionNode
+        ? getContextActionItems(contextActionNode, {
+              includeEmpty: contextActionNode.key === "root",
+          })
+        : [];
+    const contextActionGroups = !contextActionMenu
+        ? groupActionsByTab(contextActionData?.actions || [])
+        : [];
+
+    useEffect(() => {
+        if (!contextActionData) return;
+        setContextActionTrail([]);
+    }, [contextActionData]);
 
     return (
         <div className="h-screen overflow-hidden">
@@ -2124,6 +2617,21 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                             Placement: {mapObjectPlacement.type} (click or drag on map)
                         </span>
                     )}
+                    {characterPlacement && (
+                        <span className="text-xs px-3 py-2 rounded border bg-emerald-900/70 border-emerald-500 text-emerald-200">
+                            Placing:{" "}
+                            {characterPlacement.name ||
+                                (characterPlacement.kind === "enemy"
+                                    ? "Enemy"
+                                    : "Character")}{" "}
+                            (click map)
+                        </span>
+                    )}
+                    {lightPlacement && (
+                        <span className="text-xs px-3 py-2 rounded border bg-amber-900/70 border-amber-500 text-amber-200">
+                            Placing: Light (click map)
+                        </span>
+                    )}
                     
                     {loadingGameContext && (
                         <span className="text-xs px-3 py-2 rounded border bg-slate-900/70 border-slate-500 text-slate-200">
@@ -2142,6 +2650,10 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                     )}
                 </div>
 
+                <div className="absolute bottom-3 left-3 z-[130] text-xs px-2 py-1 rounded bg-slate-900/70 border border-slate-600 text-slate-100 pointer-events-none">
+                    FPS: {Number.isFinite(fps) ? fps : 0}
+                </div>
+
                 {GAME_LAYER_REGISTRY.map((layer) => (
                     <canvas
                         key={layer.name}
@@ -2154,42 +2666,138 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                     />
                 ))}
 
-                {placementPreview && (
+                {(mapPlacementPreview ||
+                    characterPlacementPreview ||
+                    lightPlacementPreview) && (
                     <svg className="absolute inset-0 w-full h-full pointer-events-none z-[25]">
-                        {placementPreview.type === "rect" && (
-                            <rect
-                                x={placementPreview.x - placementPreview.width / 2}
-                                y={placementPreview.y - placementPreview.height / 2}
-                                width={placementPreview.width}
-                                height={placementPreview.height}
-                                fill={placementPreview.color}
-                                fillOpacity="0.28"
-                                stroke={placementPreview.color}
-                                strokeWidth="2"
-                                strokeDasharray="7 5"
-                            />
+                        {mapPlacementPreview && (
+                            <g
+                                transform={
+                                    mapPlacementPreview.rotation
+                                        ? `rotate(${mapPlacementPreview.rotation}, ${mapPlacementPreview.x}, ${mapPlacementPreview.y})`
+                                        : undefined
+                                }
+                            >
+                                {mapPlacementPreview.type === "rect" && (
+                                    <rect
+                                        x={
+                                            mapPlacementPreview.x -
+                                            mapPlacementPreview.width / 2
+                                        }
+                                        y={
+                                            mapPlacementPreview.y -
+                                            mapPlacementPreview.height / 2
+                                        }
+                                        width={mapPlacementPreview.width}
+                                        height={mapPlacementPreview.height}
+                                        fill={mapPlacementPreview.color}
+                                        fillOpacity="0.22"
+                                        stroke={mapPlacementPreview.color}
+                                        strokeWidth="2"
+                                        strokeDasharray="7 5"
+                                    />
+                                )}
+                                {mapPlacementPreview.type === "circle" && (
+                                    <circle
+                                        cx={mapPlacementPreview.x}
+                                        cy={mapPlacementPreview.y}
+                                        r={mapPlacementPreview.radius}
+                                        fill={mapPlacementPreview.color}
+                                        fillOpacity="0.22"
+                                        stroke={mapPlacementPreview.color}
+                                        strokeWidth="2"
+                                        strokeDasharray="7 5"
+                                    />
+                                )}
+                                {mapPlacementPreview.type === "triangle" && (
+                                    <polygon
+                                        points={mapPlacementPreview.points}
+                                        fill={mapPlacementPreview.color}
+                                        fillOpacity="0.22"
+                                        stroke={mapPlacementPreview.color}
+                                        strokeWidth="2"
+                                        strokeDasharray="7 5"
+                                    />
+                                )}
+                            </g>
                         )}
-                        {placementPreview.type === "circle" && (
-                            <circle
-                                cx={placementPreview.x}
-                                cy={placementPreview.y}
-                                r={placementPreview.radius}
-                                fill={placementPreview.color}
-                                fillOpacity="0.28"
-                                stroke={placementPreview.color}
-                                strokeWidth="2"
-                                strokeDasharray="7 5"
-                            />
+
+                        {lightPlacementPreview && (
+                            <>
+                                <circle
+                                    cx={lightPlacementPreview.x}
+                                    cy={lightPlacementPreview.y}
+                                    r={lightPlacementPreview.range}
+                                    fill="none"
+                                    stroke={lightPlacementPreview.color}
+                                    strokeOpacity="0.2"
+                                    strokeDasharray="10 8"
+                                    strokeWidth="2"
+                                />
+                                <circle
+                                    cx={lightPlacementPreview.x}
+                                    cy={lightPlacementPreview.y}
+                                    r="6"
+                                    fill={lightPlacementPreview.color}
+                                    fillOpacity="0.6"
+                                    stroke="#ffffff"
+                                    strokeOpacity="0.5"
+                                    strokeWidth="1"
+                                />
+                            </>
                         )}
-                        {placementPreview.type === "triangle" && (
-                            <polygon
-                                points={placementPreview.points}
-                                fill={placementPreview.color}
-                                fillOpacity="0.28"
-                                stroke={placementPreview.color}
-                                strokeWidth="2"
-                                strokeDasharray="7 5"
-                            />
+
+                        {characterPlacementPreview && (
+                            <>
+                                <circle
+                                    cx={characterPlacementPreview.x}
+                                    cy={characterPlacementPreview.y}
+                                    r={characterPlacementPreview.radius}
+                                    fill={characterPlacementPreview.color}
+                                    fillOpacity="0.22"
+                                    stroke={characterPlacementPreview.color}
+                                    strokeOpacity="0.8"
+                                    strokeWidth="2"
+                                    strokeDasharray="5 4"
+                                />
+                                {characterPlacementFacing && (
+                                    <>
+                                        <line
+                                            x1={characterPlacementPreview.x}
+                                            y1={characterPlacementPreview.y}
+                                            x2={characterPlacementFacing.x}
+                                            y2={characterPlacementFacing.y}
+                                            stroke="#ffffff"
+                                            strokeOpacity="0.6"
+                                            strokeWidth="2"
+                                        />
+                                        <circle
+                                            cx={characterPlacementFacing.x}
+                                            cy={characterPlacementFacing.y}
+                                            r={FACE_DOT_RADIUS_PX}
+                                            fill="#ffffff"
+                                            fillOpacity="0.9"
+                                            stroke="#111827"
+                                            strokeWidth="1"
+                                        />
+                                    </>
+                                )}
+                                {characterPlacementPreview.name && (
+                                    <text
+                                        x={characterPlacementPreview.x}
+                                        y={
+                                            characterPlacementPreview.y -
+                                            characterPlacementPreview.radius -
+                                            8
+                                        }
+                                        fill="#e2e8f0"
+                                        fontSize="12"
+                                        textAnchor="middle"
+                                    >
+                                        {characterPlacementPreview.name}
+                                    </text>
+                                )}
+                            </>
                         )}
                     </svg>
                 )}
@@ -2250,45 +2858,156 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                                                         Load Actions
                                                     </button>
                                                 )}
-                                            {contextActionGroups.map((group, groupIndex) => (
-                                                <div key={group.key} className="py-1">
-                                                    <div className="px-4 py-1 text-[10px] uppercase tracking-wide text-gray-400">
-                                                        {group.label}
-                                                    </div>
-                                                    {group.actions.map((action) => (
+                                            {contextActionMenu && (
+                                                <>
+                                                    {contextActionTrail.length > 0 && (
                                                         <button
-                                                            key={action.path || action.id}
                                                             onClick={() =>
-                                                                handleContextAction(action)
+                                                                setContextActionTrail((prev) =>
+                                                                    prev.slice(0, -1)
+                                                                )
                                                             }
-                                                            disabled={action.enabled === false}
-                                                            title={
-                                                                action.description ||
-                                                                action.path ||
-                                                                ""
-                                                            }
-                                                            className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm disabled:text-gray-500 disabled:hover:bg-transparent"
+                                                            className="w-full px-4 py-2 text-left text-gray-300 hover:bg-gray-700 text-sm"
                                                         >
-                                                            {action.name || action.path}
+                                                            {"< Back"}
                                                         </button>
-                                                    ))}
-                                                    {groupIndex < contextActionGroups.length - 1 && (
-                                                        <div className="border-t border-gray-700 my-1" />
                                                     )}
-                                                </div>
-                                            ))}
-                                            {contextActionGroups.length > 0 && (
-                                                <button
-                                                    onClick={() =>
-                                                        fetchCharacterActions(contextCharacterId, {
-                                                            force: true,
-                                                        })
-                                                    }
-                                                    className="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-gray-700"
-                                                >
-                                                    Refresh Actions
-                                                </button>
+                                                    {contextActionTrail.length > 0 &&
+                                                        contextActionNode?.label && (
+                                                            <div className="px-4 py-1 text-[10px] uppercase tracking-wide text-gray-400">
+                                                                {contextActionNode.label}
+                                                            </div>
+                                                        )}
+                                                    {contextActionItems.length === 0 && (
+                                                        <div className="px-4 py-2 text-xs text-gray-400">
+                                                            No actions available.
+                                                        </div>
+                                                    )}
+                                                    {contextActionItems.map((item) => {
+                                                        if (item.type === "folder") {
+                                                            return (
+                                                                <button
+                                                                    key={
+                                                                        item.node?.path ||
+                                                                        item.node?.key
+                                                                    }
+                                                                    onClick={() =>
+                                                                        setContextActionTrail(
+                                                                            (prev) => [
+                                                                                ...prev,
+                                                                                item.node,
+                                                                            ]
+                                                                        )
+                                                                    }
+                                                                    disabled={item.disabled}
+                                                                    title={
+                                                                        item.node?.path || ""
+                                                                    }
+                                                                    className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm disabled:text-gray-500 disabled:hover:bg-transparent flex items-center justify-between"
+                                                                >
+                                                                    <span>{item.label}</span>
+                                                                    <span className="text-gray-500">
+                                                                        {">"}
+                                                                    </span>
+                                                                </button>
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <button
+                                                                key={
+                                                                    item.action?.path ||
+                                                                    item.action?.id
+                                                                }
+                                                                onClick={() =>
+                                                                    handleContextAction(
+                                                                        item.action
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    item.action?.enabled ===
+                                                                    false
+                                                                }
+                                                                title={
+                                                                    item.action?.description ||
+                                                                    item.action?.path ||
+                                                                    ""
+                                                                }
+                                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm disabled:text-gray-500 disabled:hover:bg-transparent"
+                                                            >
+                                                                {item.label}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </>
                                             )}
+                                            {!contextActionMenu &&
+                                                contextActionGroups.map(
+                                                    (group, groupIndex) => (
+                                                        <div
+                                                            key={group.key}
+                                                            className="py-1"
+                                                        >
+                                                            <div className="px-4 py-1 text-[10px] uppercase tracking-wide text-gray-400">
+                                                                {group.label}
+                                                            </div>
+                                                            {group.actions.map(
+                                                                (action) => (
+                                                                    <button
+                                                                        key={
+                                                                            action.path ||
+                                                                            action.id
+                                                                        }
+                                                                        onClick={() =>
+                                                                            handleContextAction(
+                                                                                action
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            action.enabled ===
+                                                                            false
+                                                                        }
+                                                                        title={
+                                                                            action.description ||
+                                                                            action.path ||
+                                                                            ""
+                                                                        }
+                                                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm disabled:text-gray-500 disabled:hover:bg-transparent"
+                                                                    >
+                                                                        {action.name ||
+                                                                            action.path}
+                                                                    </button>
+                                                                )
+                                                            )}
+                                                            {groupIndex <
+                                                                contextActionGroups.length -
+                                                                    1 && (
+                                                                <div className="border-t border-gray-700 my-1" />
+                                                            )}
+                                                        </div>
+                                                    )
+                                                )}
+                                            {contextActionData &&
+                                                ((!contextActionMenu &&
+                                                    contextActionGroups.length >
+                                                        0) ||
+                                                    (contextActionMenu &&
+                                                        contextActionTrail.length >
+                                                            0)) && (
+                                                    <button
+                                                        onClick={() =>
+                                                            fetchCharacterActions(
+                                                                contextCharacterId,
+                                                                {
+                                                                    force: true,
+                                                                }
+                                                            )
+                                                        }
+                                                        className="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-gray-700"
+                                                    >
+                                                        Refresh Actions
+                                                    </button>
+                                                )}
                                             <div className="border-t border-gray-600 my-1" />
                                         </>
                                     )}
@@ -2304,6 +3023,14 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                                     >
                                         Inspect
                                     </button>
+                                    {canViewCharacterSheet && (
+                                        <button
+                                            onClick={() => handleContextAction("viewSheet")}
+                                            className="w-full px-4 py-2 text-left text-slate-200 hover:bg-gray-700 text-sm"
+                                        >
+                                            View Sheet
+                                        </button>
+                                    )}
                                     {(isDM || canControlCharacterId(contextMenu?.target?.id)) && (
                                         <>
                                             <div className="border-t border-gray-600 my-1" />

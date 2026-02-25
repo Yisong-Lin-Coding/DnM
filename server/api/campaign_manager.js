@@ -24,6 +24,7 @@ const {
 const MIN_ALLOWED_PLAYERS = 2;
 const MAX_ALLOWED_PLAYERS = 12;
 const DEFAULT_MAX_PLAYERS = 6;
+const DEFAULT_CHARACTER_MOVEMENT = 30;
 const MAX_AUTO_SAVE_HISTORY = 5;
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const JOIN_CODE_LENGTH = 6;
@@ -83,6 +84,24 @@ const normalizeAngle = (value) => {
     while (angle > 180) angle -= 360;
     while (angle < -180) angle += 360;
     return angle;
+};
+
+const normalizeTerrainType = (value) => {
+    const terrain = String(value || "")
+        .trim()
+        .toLowerCase();
+    if (terrain === "floor" || terrain === "wall" || terrain === "obstacle") {
+        return terrain;
+    }
+    return "obstacle";
+};
+
+const isLightBlockingObject = (obj = {}) =>
+    normalizeTerrainType(obj?.terrainType) !== "floor";
+
+const buildMapGeometry = (snapshot = {}) => {
+    const mapObjects = Array.isArray(snapshot?.mapObjects) ? snapshot.mapObjects : [];
+    return mapObjects.filter((obj) => isLightBlockingObject(obj));
 };
 
 const readCampaignSetting = (campaign, key) => {
@@ -218,10 +237,12 @@ const filterSnapshotForFOV = (snapshot = {}, options = {}) => {
     const safeSnapshot = toPlainObject(snapshot);
     const characters = Array.isArray(safeSnapshot.characters) ? safeSnapshot.characters : [];
     const mapObjects = Array.isArray(safeSnapshot.mapObjects) ? safeSnapshot.mapObjects : [];
+    const mapGeometry = buildMapGeometry(safeSnapshot);
     const { sources: fovSources, sourceIdSet } = resolveFovSources(characters, options);
     if (fovSources.length === 0) {
         return {
             ...safeSnapshot,
+            mapGeometry,
             characters: [],
             mapObjects: [],
         };
@@ -241,6 +262,7 @@ const filterSnapshotForFOV = (snapshot = {}, options = {}) => {
 
     return {
         ...safeSnapshot,
+        mapGeometry,
         characters: filteredCharacters,
         mapObjects: filteredMapObjects,
     };
@@ -418,6 +440,10 @@ const ensureCampaignCharactersInSnapshot = async (campaign, runtimeState) => {
                 token.hp = hp;
                 tokenChanged = true;
             }
+            if (!Number.isFinite(Number(token?.movement))) {
+                token.movement = DEFAULT_CHARACTER_MOVEMENT;
+                tokenChanged = true;
+            }
 
             if (tokenChanged) changed = true;
             return;
@@ -431,6 +457,7 @@ const ensureCampaignCharactersInSnapshot = async (campaign, runtimeState) => {
             visionDistance: 150,
             rotation: 0,
             visionArc: 90,
+            movement: DEFAULT_CHARACTER_MOVEMENT,
             team: "player",
             kind: "character",
         };
@@ -1144,11 +1171,16 @@ module.exports = (socket) => {
                     visionDistance: 150,
                     rotation: 0,
                     visionArc: 90,
+                    movement: DEFAULT_CHARACTER_MOVEMENT,
                     team: isDM ? resolvedTeam : "player",
                 };
                 if (maxHP != null) characterToken.maxHP = maxHP;
                 if (hp != null) characterToken.hp = hp;
                 runtimeState.snapshot.characters.push(characterToken);
+            }
+
+            if (!Number.isFinite(Number(characterToken?.movement))) {
+                characterToken.movement = DEFAULT_CHARACTER_MOVEMENT;
             }
 
             const nextX = Math.round(toNumber(positionPatch?.x ?? data?.x, 0));
@@ -1463,6 +1495,23 @@ module.exports = (socket) => {
                     z: toNumber(characterToken.position?.z, 0),
                 };
             }
+            if (characterToken?.STA && typeof characterToken.STA === "object") {
+                const tokenSTA = characterToken.STA;
+                if (characterInstance._baseSTA) {
+                    if (Number.isFinite(Number(tokenSTA.current))) {
+                        characterInstance._baseSTA.current = Number(tokenSTA.current);
+                    }
+                    if (Number.isFinite(Number(tokenSTA.max))) {
+                        characterInstance._baseSTA.max = Number(tokenSTA.max);
+                    }
+                    if (Number.isFinite(Number(tokenSTA.temp))) {
+                        characterInstance._baseSTA.temp = Number(tokenSTA.temp);
+                    }
+                }
+            }
+            if (Number.isFinite(Number(characterToken?.movement))) {
+                characterInstance.movement = Number(characterToken.movement);
+            }
 
             const params = toPlainObject(data?.params);
             let actionResult;
@@ -1476,6 +1525,51 @@ module.exports = (socket) => {
             }
 
             let didUpdateSnapshot = false;
+
+            if (actionResult?.STA && typeof actionResult.STA === "object") {
+                const incomingSTA = actionResult.STA;
+                const nextSTA =
+                    characterToken.STA && typeof characterToken.STA === "object"
+                        ? { ...characterToken.STA }
+                        : {};
+                let staChanged = false;
+
+                if (Number.isFinite(Number(incomingSTA.max))) {
+                    const value = Number(incomingSTA.max);
+                    if (nextSTA.max !== value) {
+                        nextSTA.max = value;
+                        staChanged = true;
+                    }
+                }
+                if (Number.isFinite(Number(incomingSTA.current))) {
+                    const value = Number(incomingSTA.current);
+                    if (nextSTA.current !== value) {
+                        nextSTA.current = value;
+                        staChanged = true;
+                    }
+                }
+                if (Number.isFinite(Number(incomingSTA.temp))) {
+                    const value = Number(incomingSTA.temp);
+                    if (nextSTA.temp !== value) {
+                        nextSTA.temp = value;
+                        staChanged = true;
+                    }
+                }
+
+                if (staChanged) {
+                    characterToken.STA = nextSTA;
+                    didUpdateSnapshot = true;
+                }
+            }
+
+            if (!Number.isFinite(Number(characterToken?.movement))) {
+                const movementValue = Number(characterInstance.movement);
+                if (Number.isFinite(movementValue)) {
+                    characterToken.movement = movementValue;
+                    didUpdateSnapshot = true;
+                }
+            }
+
             if (
                 actionResult?.position &&
                 Number.isFinite(Number(actionResult.position?.x)) &&

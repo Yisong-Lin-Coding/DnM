@@ -6,6 +6,14 @@ const TEAM_COLORS = {
   neutral: { fill: "#A855F7", stroke: "#D8B4FE", label: "#F3E8FF" },
 };
 
+const FACE_DOT_OFFSET_PX = 10;
+const FACE_DOT_RADIUS_PX = 4;
+const GRID_SIZE = 50;
+const FEET_PER_GRID = 5;
+const WORLD_UNITS_PER_FT = GRID_SIZE / FEET_PER_GRID;
+const DEFAULT_MOVEMENT_FT = 30;
+const ATTACK_RADIUS_FT = 5;
+
 const getTeamColors = (team) =>
   TEAM_COLORS[String(team || "").toLowerCase()] || TEAM_COLORS.neutral;
 
@@ -35,6 +43,31 @@ const drawCharacter = (ctx, char, camera, options = {}) => {
     ctx.restore();
   }
 
+  // -- Movement + attack ranges (selected) ----------------------------------
+  if (isSelected) {
+    const movementFt = Math.max(0, Number(char?.movement) || DEFAULT_MOVEMENT_FT);
+    const movementR = movementFt * WORLD_UNITS_PER_FT * camera.zoom;
+    const attackR = ATTACK_RADIUS_FT * WORLD_UNITS_PER_FT * camera.zoom;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, movementR, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(34,197,94,0.65)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, attackR, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(239,68,68,0.85)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // ── Selection ring ──────────────────────────────────────────────────────
   if (isSelected) {
     ctx.save();
@@ -60,15 +93,25 @@ const drawCharacter = (ctx, char, camera, options = {}) => {
 
   // ── Direction indicator ─────────────────────────────────────────────────
   const rotRad = ((Number(char?.rotation) || 0) - 90) * (Math.PI / 180);
+  const dotDistance = radius + FACE_DOT_OFFSET_PX;
+  const dotX = screen.x + Math.cos(rotRad) * dotDistance;
+  const dotY = screen.y + Math.sin(rotRad) * dotDistance;
+  const dotRadius = isSelected ? FACE_DOT_RADIUS_PX + 2 : FACE_DOT_RADIUS_PX;
+
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(screen.x, screen.y);
-  ctx.lineTo(
-    screen.x + Math.cos(rotRad) * radius,
-    screen.y + Math.sin(rotRad) * radius
-  );
-  ctx.strokeStyle = "#ffffff";
+  ctx.lineTo(dotX, dotY);
+  ctx.strokeStyle = "rgba(255,255,255,0.7)";
   ctx.lineWidth   = 2;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, dotRadius, 0, Math.PI * 2);
+  ctx.fillStyle   = "#ffffff";
+  ctx.strokeStyle = "rgba(0,0,0,0.6)";
+  ctx.lineWidth   = 1.5;
+  ctx.fill();
   ctx.stroke();
   ctx.restore();
 
@@ -148,7 +191,7 @@ export const mapCharactersLayer = {
           const vd  = Number(pc?.visionDistance) || 150;
           if (d2 > vd * vd) return false;
           const ang    = (Math.atan2(dy, dx) * 180) / Math.PI;
-          let diff     = ang - (Number(pc?.rotation) || 0);
+          let diff     = ang - ((Number(pc?.rotation) || 0) - 90);
           while (diff >  180) diff -= 360;
           while (diff < -180) diff += 360;
           return Math.abs(diff) <= (Number(pc?.visionArc) || 90) / 2;
@@ -156,9 +199,10 @@ export const mapCharactersLayer = {
         if (!visible) return;
       }
 
+      const isSelected = toEntityID(char?.id) === toEntityID(selectedId);
       drawCharacter(ctx, char, camera, {
-        isSelected: toEntityID(char?.id) === toEntityID(selectedId),
-        showVision: isDM || controlledIds.has(toEntityID(char?.id)),
+        isSelected,
+        showVision: isSelected || isDM || controlledIds.has(toEntityID(char?.id)),
       });
     });
   },

@@ -11,11 +11,17 @@ export const mapFloorLayer = {
   id: "mapFloors",
 
   shouldRedraw(state, prevState) {
-    return shouldRedrawMapLayer(state, prevState, { includeSelection: true });
+    return shouldRedrawMapLayer(state, prevState, {
+      includeSelection: true,
+      includeVisibility: true,
+    });
   },
 
   draw(ctx, canvas, state, frame) {
-    const renderData = getMapRenderData(state, frame);
+    const renderData = getMapRenderData(state, frame, {
+      mapObjects: state?.visibleMapObjects,
+      cacheKey: "mapRenderDataVisible",
+    });
     const {
       camera,
       floorTypesByID,

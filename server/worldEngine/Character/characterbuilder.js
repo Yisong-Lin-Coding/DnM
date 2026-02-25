@@ -464,8 +464,25 @@ class CharacterBuilder {
         ).trim();
         if (!name) return null;
 
+        const actionId = String(source.id || fallback.id || this._toActionId(name));
+        const hook = String(source.hook || fallback.hook || '').trim();
+        const defaultHook = `onAction_${this._toActionId(actionId)}`;
+        const hookId = hook || defaultHook;
+        const rawModifiers = Array.isArray(source.modifiers) ? source.modifiers : [];
+        const modifiers = rawModifiers
+            .map((modifier) =>
+                this._normalizeModifier(
+                    {
+                        ...modifier,
+                        hook: modifier?.hook || hookId
+                    },
+                    actionId || name
+                )
+            )
+            .filter(Boolean);
+
         return {
-            id: String(source.id || fallback.id || this._toActionId(name)),
+            id: actionId,
             name,
             actionType: this._normalizeActionType(source.actionType || source.type || fallback.actionType),
             source: String(source.source || source.sourceType || fallback.source || 'custom'),
@@ -473,7 +490,12 @@ class CharacterBuilder {
             description: String(source.description || fallback.description || ''),
             cost: String(source.cost || fallback.cost || ''),
             requirements: this._toStringArray(source.requirements || fallback.requirements),
-            enabled: source.enabled !== false
+            enabled: source.enabled !== false,
+            path: source.path ?? fallback.path,
+            group: source.group ?? fallback.group,
+            hook,
+            payload: source.payload ?? fallback.payload,
+            modifiers
         };
     }
 
@@ -510,6 +532,17 @@ class CharacterBuilder {
         }
 
         return [];
+    }
+
+    _collectActionModifiers(actions = []) {
+        const modifiers = [];
+        (actions || []).forEach((action) => {
+            if (!action || action.enabled === false || !Array.isArray(action.modifiers)) return;
+            action.modifiers.forEach((modifier) => {
+                if (modifier) modifiers.push(modifier);
+            });
+        });
+        return modifiers;
     }
 
     _extractSkillActions(activeSkills) {
@@ -780,6 +813,11 @@ class CharacterBuilder {
             // Base modifiers
             modifiers: []
         };
+
+        const actionModifiers = this._collectActionModifiers(this.data.actions);
+        if (actionModifiers.length > 0) {
+            this.data.modifiers.push(...actionModifiers);
+        }
         
         return this;
     }

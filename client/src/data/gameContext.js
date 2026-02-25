@@ -467,6 +467,7 @@ const normalizeMapObject = (raw = {}, fallbackId = 1) => {
         y: Math.round(toNumber(raw.y, 0)),
         z: Math.round(toNumber(raw.z, 0)),
         zLevel: clampZLevel(raw.zLevel),
+        rotation: toNumber(raw.rotation, 0),
         terrainType,
         floorTypeId,
         color: normalizeHexColor(raw.color),
@@ -566,6 +567,7 @@ const normalizeCharacter = (raw = {}, fallback = {}) => {
         rotation: toNumber(source.rotation, 0),
         visionArc: toPositiveNumber(source.visionArc, 90),
         team: String(source.team || fallback.team || "player"),
+        movement: toPositiveNumber(source.movement ?? source.speed, 30),
         hp,
         maxHP,
     };
@@ -580,9 +582,11 @@ export const GameProvider = ({ children }) => {
     const camera = useRef({ x: 0, y: 0, zoom: 1, bgImage: null });
 
     const [mapObjects, setMapObjects] = useState(DEFAULT_MAP_OBJECTS);
+    const [mapGeometry, setMapGeometry] = useState(null);
     const [currentMapId, setCurrentMapId] = useState("default_map");
     const [backgroundKey, setBackgroundKey] = useState(DEFAULT_BACKGROUND_KEY);
     const [mapObjectPlacement, setMapObjectPlacement] = useState(null);
+    const [characterPlacement, setCharacterPlacement] = useState(null);
     const [currentZLevel, setCurrentZLevel] = useState(0);
     const [floorTypes, setFloorTypes] = useState(DEFAULT_FLOOR_TYPES);
     const [lighting, setLighting] = useState(DEFAULT_LIGHTING);
@@ -745,6 +749,8 @@ export const GameProvider = ({ children }) => {
                 ? null
                 : Math.max(0, Math.min(maxHP, Math.round(toNumber(config.hp, maxHP))));
 
+        setCharacterPlacement(null);
+        setLightPlacement(null);
         setMapObjectPlacement({
             type,
             terrainType,
@@ -753,6 +759,7 @@ export const GameProvider = ({ children }) => {
             color: normalizeHexColor(config.color),
             mapAssetKey: normalizeMapAssetKey(config.mapAssetKey || config.mapKey || config.mapImageKey),
             z: Math.round(toNumber(config.z, 0)),
+            rotation: toNumber(config.rotation, 0),
             size: toPositiveNumber(config.size, type === "triangle" ? 40 : 30),
             width: toPositiveNumber(config.width, 50),
             height: toPositiveNumber(config.height, 40),
@@ -889,6 +896,10 @@ export const GameProvider = ({ children }) => {
                 replaceAllMapObjects(snapshot.mapObjects);
             }
 
+            if (Array.isArray(snapshot.mapGeometry)) {
+                setMapGeometry(snapshot.mapGeometry);
+            }
+
             if (Number.isFinite(Number(snapshot.currentZLevel))) {
                 setCurrentZLevel(clampZLevel(snapshot.currentZLevel));
             }
@@ -971,6 +982,8 @@ export const GameProvider = ({ children }) => {
 
 // Add these functions
 const armLightPlacement = useCallback((config = {}) => {
+  setMapObjectPlacement(null);
+  setCharacterPlacement(null);
   setLightPlacement({
     type: "point",
     color: String(config.color || "#ffffff"),
@@ -1003,6 +1016,42 @@ const placeLightAt = useCallback((worldX, worldY) => {
   clearLightPlacement();
 }, [lightPlacement, lighting, addLightSource, clearLightPlacement]);
 
+const armCharacterPlacement = useCallback((config = {}) => {
+  const rawId = config.characterId ?? config.id ?? config.characterID;
+  const characterId = String(rawId || "").trim();
+  if (!characterId) return;
+
+  setMapObjectPlacement(null);
+  setLightPlacement(null);
+  setCharacterPlacement({
+    kind: "character",
+    id: characterId,
+    name: String(config.name || config.characterName || "").trim(),
+    size: Number(config.size) || null,
+    team: String(config.team || "").trim(),
+  });
+}, []);
+
+const armEnemyPlacement = useCallback((config = {}) => {
+  const rawId = config.enemyId ?? config.id ?? config.enemyID;
+  const enemyId = String(rawId || "").trim();
+  if (!enemyId) return;
+
+  setMapObjectPlacement(null);
+  setLightPlacement(null);
+  setCharacterPlacement({
+    kind: "enemy",
+    id: enemyId,
+    name: String(config.name || config.enemyName || "").trim(),
+    size: Number(config.size) || null,
+    team: "enemy",
+  });
+}, []);
+
+const clearCharacterPlacement = useCallback(() => {
+  setCharacterPlacement(null);
+}, []);
+
 
 
 
@@ -1022,6 +1071,7 @@ const placeLightAt = useCallback((worldX, worldY) => {
 
         mapObjects,
         setMapObjects,
+        mapGeometry,
         currentMapId,
         setCurrentMapId,
         backgroundKey,
@@ -1037,6 +1087,7 @@ const placeLightAt = useCallback((worldX, worldY) => {
         updateLightSource,
         removeLightSource,
         mapObjectPlacement,
+        characterPlacement,
         currentZLevel,
         setCurrentZLevel,
         stepZLevelUp,
@@ -1057,6 +1108,9 @@ const placeLightAt = useCallback((worldX, worldY) => {
         armMapObjectPlacement,
         clearMapObjectPlacement,
         placePendingMapObjectAt,
+        armCharacterPlacement,
+        armEnemyPlacement,
+        clearCharacterPlacement,
         saveMapToDatabase,
         loadMapFromDatabase,
         loadGameSnapshot,

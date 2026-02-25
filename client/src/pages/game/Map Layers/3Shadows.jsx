@@ -19,7 +19,7 @@ export const mapShadowsLayer = {
   id: "mapShadows",
 
   shouldRedraw(state, prevState) {
-    return shouldRedrawMapLayer(state, prevState, { includeLighting: true });
+    return shouldRedrawMapLayer(state, prevState, { includeLighting: true, includeGeometry: true });
   },
 
   draw(ctx, canvas, state, frame) {
@@ -27,7 +27,14 @@ export const mapShadowsLayer = {
     if (!ctx || !canvas || canvas.width === 0 || canvas.height === 0) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const renderData = getMapRenderData(state, frame);
+    const geometryObjects = Array.isArray(state?.mapGeometry)
+      ? state.mapGeometry
+      : state?.mapObjects || [];
+
+    const renderData = getMapRenderData(state, frame, {
+      mapObjects: geometryObjects,
+      cacheKey: "mapRenderDataGeometry",
+    });
     const { camera, currentZLevel, lowerLevelSolids, activeSolids } = renderData;
 
     if (!camera) return;

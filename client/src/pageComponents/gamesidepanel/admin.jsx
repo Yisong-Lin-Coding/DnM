@@ -68,6 +68,10 @@ function Admin() {
     camera,
     loadGameSnapshot = () => {},
     replaceFloorTypes = () => {},
+    characterPlacement,
+    armCharacterPlacement,
+    armEnemyPlacement,
+    clearCharacterPlacement,
   } = useGame() || {};
 
   const [manualSaves, setManualSaves] = useState([]);
@@ -274,30 +278,18 @@ function Admin() {
   );
 
   const spawnCharacterAtCursor = useCallback(
-    async (characterId) => {
-      if (!socket || !playerID || !gameID) return;
+    (characterId, characterName) => {
       if (!characterId) return;
-
-      const payload = {
-        playerID,
-        campaignID: gameID,
-        characterID: characterId,
-        position: {
-          x: Math.round(worldMouseCoords?.x || 0),
-          y: Math.round(worldMouseCoords?.y || 0),
-        },
-      };
-
-      const response = await emitWithAck(socket, "campaign_moveCharacter", payload);
-      if (!response?.success) {
-        setAssignmentError(response?.message || "Failed to place character");
-        return;
-      }
-
-      applySnapshotFromResponse(response);
-      setAssignmentStatus("Character placed on map.");
+      setAssignmentError("");
+      armCharacterPlacement({
+        characterId,
+        name: characterName,
+      });
+      setAssignmentStatus(
+        `Placement armed for ${characterName || "Character"}. Click the map to place.`
+      );
     },
-    [socket, playerID, gameID, worldMouseCoords, applySnapshotFromResponse]
+    [armCharacterPlacement]
   );
 
   const loadEnemies = useCallback(async () => {
@@ -364,27 +356,19 @@ function Admin() {
   );
 
   const spawnEnemyAtCursor = useCallback(
-    async (enemyId) => {
-      if (!socket || !playerID || !gameID || !enemyId) return;
-      const response = await emitWithAck(socket, "campaign_spawnEnemy", {
-        playerID,
-        campaignID: gameID,
-        enemyID: enemyId,
-        position: {
-          x: Math.round(worldMouseCoords?.x || 0),
-          y: Math.round(worldMouseCoords?.y || 0),
-        },
+    (enemyId, enemyName, enemySize) => {
+      if (!enemyId) return;
+      setEnemyError("");
+      armEnemyPlacement({
+        enemyId,
+        name: enemyName,
+        size: enemySize,
       });
-
-      if (!response?.success) {
-        setEnemyError(response?.message || "Failed to spawn enemy");
-        return;
-      }
-
-      applySnapshotFromResponse(response);
-      setEnemyStatus("Enemy spawned on map.");
+      setEnemyStatus(
+        `Placement armed for ${enemyName || "Enemy"}. Click the map to place.`
+      );
     },
-    [socket, playerID, gameID, worldMouseCoords, applySnapshotFromResponse]
+    [armEnemyPlacement]
   );
 
   useEffect(() => {
@@ -419,6 +403,21 @@ function Admin() {
           World: X:{Math.round(worldMouseCoords?.x || 0)} Y:{Math.round(worldMouseCoords?.y || 0)}
         </p>
       </div>
+
+      {characterPlacement && (
+        <div className="text-xs rounded border border-emerald-600 bg-emerald-900/40 p-3 flex items-center justify-between gap-2">
+          <span className="text-emerald-200">
+            Placing {characterPlacement.name || (characterPlacement.kind === "enemy" ? "Enemy" : "Character")}. Click the map to place.
+          </span>
+          <button
+            type="button"
+            onClick={clearCharacterPlacement}
+            className="text-[11px] px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       <div className="text-sm space-y-1 rounded border border-gray-700 bg-gray-900/70 p-3">
         <p className="font-semibold">Camera</p>
@@ -563,10 +562,10 @@ function Admin() {
                       )}
                       <button
                         type="button"
-                        onClick={() => spawnCharacterAtCursor(characterId)}
+                        onClick={() => spawnCharacterAtCursor(characterId, characterName)}
                         className="text-xs px-2 py-1 rounded bg-blue-700 hover:bg-blue-600"
                       >
-                        Place at Cursor
+                        Place on Map
                       </button>
                     </div>
                   </div>
@@ -723,10 +722,12 @@ function Admin() {
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       type="button"
-                      onClick={() => spawnEnemyAtCursor(enemy._id)}
+                      onClick={() =>
+                        spawnEnemyAtCursor(enemy._id, enemy?.name, enemy?.size)
+                      }
                       className="text-xs px-2 py-1 rounded bg-blue-700 hover:bg-blue-600"
                     >
-                      Spawn
+                      Place on Map
                     </button>
                     <button
                       type="button"

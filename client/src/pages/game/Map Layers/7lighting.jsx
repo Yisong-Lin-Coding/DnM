@@ -1,3 +1,5 @@
+import { shouldRedrawMapLayer } from "./mapLayerShared";
+
 // 7lighting.jsx
 // Lighting layer for Michelangelo engine with proper point-light visibility
 
@@ -22,6 +24,27 @@ const DEFAULT_LIGHTING = {
 // ─── UTILITY FUNCTIONS ────────────────────────────
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
+const SCRATCH_POOL = {
+  off: null,
+  tint: null,
+  width: 0,
+  height: 0,
+};
+
+const getScratchCanvases = (width, height) => {
+  if (!SCRATCH_POOL.off) SCRATCH_POOL.off = document.createElement("canvas");
+  if (!SCRATCH_POOL.tint) SCRATCH_POOL.tint = document.createElement("canvas");
+  if (SCRATCH_POOL.width !== width || SCRATCH_POOL.height !== height) {
+    SCRATCH_POOL.width = width;
+    SCRATCH_POOL.height = height;
+    SCRATCH_POOL.off.width = width;
+    SCRATCH_POOL.off.height = height;
+    SCRATCH_POOL.tint.width = width;
+    SCRATCH_POOL.tint.height = height;
+  }
+  return SCRATCH_POOL;
+};
+
 const hexToRgb = (hex) => {
   const normalized = String(hex || "#ffffff").trim();
   const match = normalized.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
@@ -40,6 +63,12 @@ const normalizeDirectionalVector = (value = {}) => {
   if (mag === 0 || mag <= 1) return { x, y };
   return { x: x / mag, y: y / mag };
 };
+
+const normalizeTerrainType = (value) =>
+  String(value || "obstacle").trim().toLowerCase();
+
+const getObjectRotationRad = (obj) =>
+  (Number(obj?.rotation) || 0) * (Math.PI / 180);
 
 // ─── LIGHT SOURCE NORMALIZATION ───────────────────
 const normalizeLightingSource = (raw = {}, fallbackIndex = 0) => {
@@ -123,6 +152,9 @@ export const getObjectSegmentsWorld = (obj, circleSegments = 16) => {
   const objectType = String(obj?.type || "circle").toLowerCase();
   const cx = Number(obj?.x) || 0;
   const cy = Number(obj?.y) || 0;
+  const rotation = getObjectRotationRad(obj);
+  const cos = rotation ? Math.cos(rotation) : 1;
+  const sin = rotation ? Math.sin(rotation) : 0;
   const segs = [];
 
   const buildPolySegs = (pts) => {
@@ -130,13 +162,27 @@ export const getObjectSegmentsWorld = (obj, circleSegments = 16) => {
       segs.push([pts[i], pts[(i + 1) % pts.length]]);
   };
 
+  const rotatePoint = (x, y) => ({
+    x: cx + x * cos - y * sin,
+    y: cy + x * sin + y * cos,
+  });
+
   if (objectType === "rect") {
     const hw = Math.max(1, Number(obj?.width)  || 0) / 2;
     const hh = Math.max(1, Number(obj?.height) || 0) / 2;
-    buildPolySegs([
-      { x: cx - hw, y: cy - hh }, { x: cx + hw, y: cy - hh },
-      { x: cx + hw, y: cy + hh }, { x: cx - hw, y: cy + hh },
-    ]);
+    if (rotation) {
+      buildPolySegs([
+        rotatePoint(-hw, -hh),
+        rotatePoint(hw, -hh),
+        rotatePoint(hw, hh),
+        rotatePoint(-hw, hh),
+      ]);
+    } else {
+      buildPolySegs([
+        { x: cx - hw, y: cy - hh }, { x: cx + hw, y: cy - hh },
+        { x: cx + hw, y: cy + hh }, { x: cx - hw, y: cy + hh },
+      ]);
+    }
     return segs;
   }
 
@@ -152,9 +198,17 @@ export const getObjectSegmentsWorld = (obj, circleSegments = 16) => {
   }
 
   const s = Math.max(1, Number(obj?.size) || 0);
-  buildPolySegs([
-    { x: cx, y: cy - s }, { x: cx - s, y: cy + s }, { x: cx + s, y: cy + s },
-  ]);
+  if (rotation) {
+    buildPolySegs([
+      rotatePoint(0, -s),
+      rotatePoint(-s, s),
+      rotatePoint(s, s),
+    ]);
+  } else {
+    buildPolySegs([
+      { x: cx, y: cy - s }, { x: cx - s, y: cy + s }, { x: cx + s, y: cy + s },
+    ]);
+  }
   return segs;
 };
 
@@ -196,6 +250,17 @@ export const computeVisibilityPolygon = (lx, ly, segments, range) => {
   return points; // world-space {angle, x, y}[]
 };
 
+const buildObjectsByZLevel = (objects = []) => {
+  const byZ = new Map();
+  for (const obj of objects) {
+    if (normalizeTerrainType(obj?.terrainType) === "floor") continue;
+    const zl = Math.round(Number(obj?.zLevel) || 0);
+    if (!byZ.has(zl)) byZ.set(zl, []);
+    byZ.get(zl).push(obj);
+  }
+  return byZ;
+};
+
 // ─── POINT LIGHT ─────────────────────────────────
 //
 // Approach:
@@ -219,10 +284,11 @@ const drawPointLight = (ctx, width, height, source, worldPoints, camera) => {
   const rgb         = hexToRgb(source.color);
   const intensity   = clamp(source.intensity, 0, 2);
 
-  const off = document.createElement("canvas");
-  off.width = width;
-  off.height = height;
+  const { off, tint } = getScratchCanvases(width, height);
   const oc = off.getContext("2d");
+  oc.setTransform(1, 0, 0, 1, 0, 0);
+  oc.globalCompositeOperation = "source-over";
+  oc.clearRect(0, 0, width, height);
 
   // ── Step 1: Fill the full radial gradient (no clip yet) ──────────────────
   // Steeper falloff so walls far from the source receive little light,
@@ -268,10 +334,10 @@ const drawPointLight = (ctx, width, height, source, worldPoints, camera) => {
 
   // ── Colored tint (non-white lights only) ─────────────────────────────────
   if (!(rgb.r === 255 && rgb.g === 255 && rgb.b === 255)) {
-    const tint = document.createElement("canvas");
-    tint.width = width;
-    tint.height = height;
     const tc = tint.getContext("2d");
+    tc.setTransform(1, 0, 0, 1, 0, 0);
+    tc.globalCompositeOperation = "source-over";
+    tc.clearRect(0, 0, width, height);
 
     tc.beginPath();
     tc.moveTo(sp[0].x, sp[0].y);
@@ -296,8 +362,13 @@ const drawPointLight = (ctx, width, height, source, worldPoints, camera) => {
 // ─── LIGHTING LAYER ──────────────────────────────
 export const lightingLayer = {
   id: "lighting",
-  shouldRedraw() {
-    return true;
+  shouldRedraw(state, prevState) {
+    if (!prevState) return true;
+    if (state?.lighting?.enabled !== prevState?.lighting?.enabled) return true;
+    return shouldRedrawMapLayer(state, prevState, {
+      includeLighting: true,
+      includeGeometry: true,
+    });
   },
   draw(ctx, canvas, state) {
     if (!ctx || !canvas || canvas.width === 0 || canvas.height === 0) return;
@@ -325,20 +396,46 @@ export const lightingLayer = {
     ctx.fillRect(0, 0, width, height);
 
     // ── Build obstacle segments ───────────────────────────────────────────
-    const objects = state?.mapObjects || [];
+    const cache =
+      state?.lightingCache && typeof state.lightingCache === "object"
+        ? state.lightingCache
+        : null;
+    const hasPointLights = lighting.sources.some(
+      (source) => source.enabled && source.type === "point"
+    );
 
-    // Pre-bucket all objects by z-level so each light only occludes against
-    // geometry on its own floor — lights on level 1 don't cast shadows for
-    // objects on level 0 and vice versa.
-    const objectsByZLevel = new Map();
-    for (const obj of objects) {
-      const zl = Math.round(Number(obj?.zLevel) || 0);
-      if (!objectsByZLevel.has(zl)) objectsByZLevel.set(zl, []);
-      objectsByZLevel.get(zl).push(obj);
+    let objectsByZLevel = new Map();
+    let segmentsByZLevel = new Map();
+    let polygonCache = cache?.polygons || null;
+    let objectsVersion = 0;
+
+    if (hasPointLights) {
+      const objects = Array.isArray(state?.mapGeometry)
+        ? state.mapGeometry
+        : state?.mapObjects || [];
+
+      if (cache) {
+        if (cache.objectsRef !== objects) {
+          cache.objectsRef = objects;
+          cache.objectsVersion = (cache.objectsVersion || 0) + 1;
+          cache.objectsByZLevel = null;
+          cache.segmentsByZLevel = null;
+          cache.polygons = new Map();
+        }
+        objectsVersion = cache.objectsVersion || 0;
+        if (!cache.objectsByZLevel) {
+          cache.objectsByZLevel = buildObjectsByZLevel(objects);
+        }
+        objectsByZLevel = cache.objectsByZLevel;
+        if (!cache.segmentsByZLevel) cache.segmentsByZLevel = new Map();
+        segmentsByZLevel = cache.segmentsByZLevel;
+        if (!cache.polygons) cache.polygons = new Map();
+        polygonCache = cache.polygons;
+      } else {
+        objectsByZLevel = buildObjectsByZLevel(objects);
+        segmentsByZLevel = new Map();
+      }
     }
-
-    // ── Point lights: carve lit areas out of the darkness ─────────────────
-    const polygonCache = state?.lightingCache?.polygons;
 
     const currentZLevel = Math.round(Number(state?.currentZLevel) || 0);
 
@@ -348,15 +445,22 @@ export const lightingLayer = {
       const lightZLevel = Math.round(Number(source.zLevel) || 0);
       if (lightZLevel !== currentZLevel) return;
 
-      const zLevelObjs    = objectsByZLevel.get(lightZLevel) || [];
-      const lightSegments = [];
-      for (const obj of zLevelObjs) lightSegments.push(...getObjectSegmentsWorld(obj));
+      const zLevelObjs = objectsByZLevel.get(lightZLevel) || [];
+      let lightSegments = segmentsByZLevel.get(lightZLevel);
+      if (!lightSegments) {
+        lightSegments = [];
+        for (const obj of zLevelObjs) lightSegments.push(...getObjectSegmentsWorld(obj));
+        segmentsByZLevel.set(lightZLevel, lightSegments);
+      }
 
-      let worldPoints = polygonCache?.get?.(source.id);
+      const cacheKey = `${source.worldX}|${source.worldY}|${source.range}|${lightZLevel}|${objectsVersion}`;
+      const cached = polygonCache ? polygonCache.get(source.id) : null;
+      let worldPoints = cached && cached.key === cacheKey ? cached.points : null;
       if (!worldPoints) {
         worldPoints = computeVisibilityPolygon(
           source.worldX, source.worldY, lightSegments, source.range
         );
+        if (polygonCache) polygonCache.set(source.id, { key: cacheKey, points: worldPoints });
       }
       if (!worldPoints || worldPoints.length < 3) return;
 

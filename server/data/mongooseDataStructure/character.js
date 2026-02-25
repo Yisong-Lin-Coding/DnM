@@ -14,7 +14,12 @@ const characterActionSchema = new mongoose.Schema({
     description: { type: String, default: "" },
     cost: { type: String, default: "" },
     requirements: { type: [String], default: [] },
-    enabled: { type: Boolean, default: true }
+    enabled: { type: Boolean, default: true },
+    path: { type: mongoose.Schema.Types.Mixed, default: "" },
+    group: { type: String, default: "" },
+    hook: { type: String, default: "" },
+    payload: { type: mongoose.Schema.Types.Mixed, default: null },
+    modifiers: { type: [mongoose.Schema.Types.Mixed], default: [] }
 }, { _id: false });
 
 const characterSchema   = new mongoose.Schema({

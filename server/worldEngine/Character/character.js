@@ -1,4 +1,56 @@
 const gameEvents = require('../../handlers/gameEventEmitter');
+const DEFAULT_WORLD_UNITS_PER_FOOT = 10;
+const MOVEMENT_MODE_CONFIG = {
+    walk: {
+        name: 'Walk',
+        speedMultiplier: 1,
+        staPer10Ft: 1,
+        description: 'Move your position normally.'
+    },
+    jog: {
+        name: 'Jog',
+        speedMultiplier: 2,
+        staPer10Ft: 5,
+        description: 'Move at a brisk pace.'
+    },
+    run: {
+        name: 'Run',
+        speedMultiplier: 3,
+        staPer10Ft: 25,
+        description: 'Move quickly (high effort).'
+    },
+    sprint: {
+        name: 'Sprint',
+        speedMultiplier: 4,
+        staPer10Ft: 125,
+        description: 'All-out burst of speed.'
+    },
+    jump: {
+        name: 'Jump',
+        speedMultiplier: 1,
+        staPer10Ft: 1,
+        description: 'Move with vertical displacement.'
+    }
+};
+
+const getMovementModeConfig = (mode) => {
+    const key = String(mode || '').trim().toLowerCase();
+    return MOVEMENT_MODE_CONFIG[key] || null;
+};
+
+const formatMovementCost = (config) => {
+    if (!config) return '';
+    const staCost = Number(config.staPer10Ft) || 0;
+    const speed = Number(config.speedMultiplier) || 1;
+    const parts = [];
+    if (staCost > 0) {
+        parts.push(`${staCost} STA per 10 ft`);
+    }
+    if (speed > 0) {
+        parts.push(`${speed}x speed`);
+    }
+    return parts.length > 0 ? `Cost: ${parts.join(', ')}.` : '';
+};
 
 class CHARACTER {
     constructor(data) {
@@ -586,43 +638,32 @@ class CHARACTER {
     }
 
     _buildCoreActionDefinitions() {
+        const movementModes = ['walk', 'jog', 'run', 'sprint', 'jump'];
+        const movementDefs = movementModes
+            .map((mode) => {
+                const config = getMovementModeConfig(mode);
+                if (!config) return null;
+                const cost = formatMovementCost(config);
+                const descriptionParts = [];
+                if (config.description) descriptionParts.push(config.description);
+                if (cost) descriptionParts.push(`${cost}.`);
+                const description = descriptionParts.join(' ').trim();
+
+                return {
+                    id: `movement_${mode}`,
+                    name: config.name,
+                    path: ['movement', mode],
+                    actionType: 'movement',
+                    source: 'core',
+                    description,
+                    cost,
+                    execute: (params = {}) => this._executeMovementMode(mode, params)
+                };
+            })
+            .filter(Boolean);
+
         return [
-            {
-                id: 'movement_walk',
-                name: 'Walk',
-                path: ['movement', 'walk'],
-                actionType: 'movement',
-                source: 'core',
-                description: 'Move your position normally.',
-                execute: (params = {}) => this._executeMovementMode('walk', params)
-            },
-            {
-                id: 'movement_run',
-                name: 'Run',
-                path: ['movement', 'run'],
-                actionType: 'movement',
-                source: 'core',
-                description: 'Move quickly (higher movement commitment).',
-                execute: (params = {}) => this._executeMovementMode('run', params)
-            },
-            {
-                id: 'movement_dash',
-                name: 'Dash',
-                path: ['movement', 'dash'],
-                actionType: 'movement',
-                source: 'core',
-                description: 'Double movement for this action.',
-                execute: (params = {}) => this._executeMovementMode('dash', params)
-            },
-            {
-                id: 'movement_jump',
-                name: 'Jump',
-                path: ['movement', 'jump'],
-                actionType: 'movement',
-                source: 'core',
-                description: 'Move with vertical displacement.',
-                execute: (params = {}) => this._executeMovementMode('jump', params)
-            },
+            ...movementDefs,
             {
                 id: 'main_attack',
                 name: 'Attack',
@@ -967,43 +1008,123 @@ class CHARACTER {
     }
 
     _executeMovementMode(mode, params = {}) {
+        const movementMode = String(mode || '').trim().toLowerCase();
+        const config = getMovementModeConfig(movementMode);
+        if (!config) {
+            throw new Error(`Unknown movement mode: ${mode}`);
+        }
+
         const previousPosition = { ...(this.position || { x: 0, y: 0, z: 0 }) };
         const nextPosition = { ...previousPosition };
+        const rawUnitsPerFoot = Number(
+            params.unitsPerFoot ||
+            params.worldUnitsPerFoot ||
+            DEFAULT_WORLD_UNITS_PER_FOOT
+        );
         const context = {
             character: this,
-            mode,
+            mode: movementMode,
             params,
             previousPosition,
             nextPosition,
-            distanceMultiplier: mode === 'dash' ? 2 : (mode === 'run' ? 1.5 : 1),
+            distanceMultiplier: Number(config.speedMultiplier) || 1,
+            staPer10Ft: Number(config.staPer10Ft) || 0,
+            unitsPerFoot:
+                Number.isFinite(rawUnitsPerFoot) && rawUnitsPerFoot > 0
+                    ? rawUnitsPerFoot
+                    : DEFAULT_WORLD_UNITS_PER_FOOT,
             heightDelta: Number(params.height || 0)
         };
 
         this.applyModifierPipeline('onMovementAction', context);
-        this.applyModifierPipeline(`onMovement_${mode}`, context);
+        this.applyModifierPipeline(`onMovement_${movementMode}`, context);
+
+        let hasPositionUpdate = false;
 
         if (params.position && typeof params.position === 'object') {
-            if (Number.isFinite(Number(params.position.x))) context.nextPosition.x = Number(params.position.x);
-            if (Number.isFinite(Number(params.position.y))) context.nextPosition.y = Number(params.position.y);
-            if (Number.isFinite(Number(params.position.z))) context.nextPosition.z = Number(params.position.z);
+            if (Number.isFinite(Number(params.position.x))) {
+                context.nextPosition.x = Number(params.position.x);
+                hasPositionUpdate = true;
+            }
+            if (Number.isFinite(Number(params.position.y))) {
+                context.nextPosition.y = Number(params.position.y);
+                hasPositionUpdate = true;
+            }
+            if (Number.isFinite(Number(params.position.z))) {
+                context.nextPosition.z = Number(params.position.z);
+                hasPositionUpdate = true;
+            }
         } else {
-            if (Number.isFinite(Number(params.x))) context.nextPosition.x = Number(params.x);
-            if (Number.isFinite(Number(params.y))) context.nextPosition.y = Number(params.y);
-            if (Number.isFinite(Number(params.z))) context.nextPosition.z = Number(params.z);
+            if (Number.isFinite(Number(params.x))) {
+                context.nextPosition.x = Number(params.x);
+                hasPositionUpdate = true;
+            }
+            if (Number.isFinite(Number(params.y))) {
+                context.nextPosition.y = Number(params.y);
+                hasPositionUpdate = true;
+            }
+            if (Number.isFinite(Number(params.z))) {
+                context.nextPosition.z = Number(params.z);
+                hasPositionUpdate = true;
+            }
         }
 
-        if (mode === 'jump' && Number.isFinite(context.heightDelta)) {
+        if (movementMode === 'jump' && Number.isFinite(context.heightDelta)) {
             context.nextPosition.z = (context.nextPosition.z || 0) + context.heightDelta;
+            hasPositionUpdate = true;
+        }
+
+        if (!hasPositionUpdate) {
+            throw new Error('Movement requires a target position.');
+        }
+
+        const dx = (Number(context.nextPosition.x) || 0) - (Number(previousPosition.x) || 0);
+        const dy = (Number(context.nextPosition.y) || 0) - (Number(previousPosition.y) || 0);
+        const distanceWorld = Math.hypot(dx, dy);
+        const unitsPerFoot = Number(context.unitsPerFoot) || DEFAULT_WORLD_UNITS_PER_FOOT;
+        const distanceFt = distanceWorld / unitsPerFoot;
+
+        const baseMovement = Number(this.movement) || 0;
+        const speedMultiplier = Number(context.distanceMultiplier) || 1;
+        const maxDistanceFt = Math.max(0, baseMovement * speedMultiplier);
+
+        if (distanceFt > maxDistanceFt + 1e-6) {
+            throw new Error(
+                `Target is too far for ${config.name}. Max ${maxDistanceFt.toFixed(1)} ft.`
+            );
+        }
+
+        const staPer10Ft = Math.max(0, Number(context.staPer10Ft) || 0);
+        const staCost = staPer10Ft > 0 ? Math.ceil(distanceFt / 10) * staPer10Ft : 0;
+        const currentSta = Number(this._baseSTA?.current ?? this.STA?.current ?? 0);
+
+        if (staCost > currentSta) {
+            throw new Error(`Not enough STA (${staCost} required, ${currentSta} available).`);
+        }
+
+        if (staCost > 0 && this._baseSTA) {
+            this._baseSTA.current = Math.max(0, currentSta - staCost);
         }
 
         this.position = context.nextPosition;
 
         const result = {
             success: true,
-            mode,
+            mode: movementMode,
             previousPosition,
             position: { ...this.position },
-            distanceMultiplier: context.distanceMultiplier
+            distanceMultiplier: speedMultiplier,
+            distanceFt,
+            maxDistanceFt,
+            staCost,
+            staRemaining: this._baseSTA?.current ?? currentSta,
+            STA: this._baseSTA
+                ? {
+                      max: this.STA.max,
+                      current: this._baseSTA.current,
+                      temp: this._baseSTA.temp
+                  }
+                : undefined
         };
 
         gameEvents.emitGameEvent('movementAction', {
@@ -1145,9 +1266,13 @@ class CHARACTER {
             attack: 'main.attack',
             cast: 'main.cast',
             useitem: 'main.useItem',
+            move: 'movement.walk',
             walk: 'movement.walk',
+            jog: 'movement.jog',
             run: 'movement.run',
-            dash: 'movement.dash',
+            sprint: 'movement.sprint',
+            dash: 'movement.sprint',
+            movement_dash: 'movement.sprint',
             jump: 'movement.jump'
         };
 
