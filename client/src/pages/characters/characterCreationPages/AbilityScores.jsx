@@ -267,9 +267,9 @@ export function AbilityScores({ values, onChange }) {
                 </div>
                 <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
                   {CORE_STATS.map((s) => (
-                    <div key={s} className='flex flex-col'>
-                      <label className='text-sm text-website-default-300 mb-1'>{LABELS[s]}</label>
-                      <input type='number' min='1' max='30' className='rounded border border-website-specials-500 bg-website-default-900 px-3 py-2 focus:outline-none' value={stats[s] ?? ''} onChange={(e) => updateStat(s, e.target.value)} />
+                    <div key={s} className='flex items-center justify-between p-2 bg-website-default-900 border border-website-default-700 rounded'>
+                      <div className='text-website-default-100 text-sm'>{LABELS[s]}</div>
+                      <div className='text-white text-lg font-semibold'>{stats[s] ?? 0}</div>
                     </div>
                   ))}
                 </div>
