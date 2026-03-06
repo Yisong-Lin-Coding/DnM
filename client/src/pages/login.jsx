@@ -78,117 +78,139 @@ function Login() {
         });
     }
 
-useEffect(() => {
-    let cancelled = false;
+    useEffect(() => {
+        let cancelled = false;
 
-    function autoLogin() {
-        const playerID = (localStorage.getItem("player_ID") || "");
-        
-        const lastLocation = (sessionStorage.getItem("lastLocation") || "")
-        if (!playerID) {
-            return;
-        }
+        function autoLogin() {
+            const playerID = (localStorage.getItem("player_ID") || "");
+            const lastLocation = (sessionStorage.getItem("lastLocation") || "");
 
-        waitForSessionID().then((sessionID) => {
-            if (cancelled || !sessionID) {
+            if (!playerID) {
                 return;
             }
 
-            socket.emit("login_tokenSave", { playerID, sessionID }, (response) => {
-                if (cancelled) return;
-
-                if (response.success) {
-                    socket.emit("playerData_logOn", { playerID });
-                    if(lastLocation){
-                        navigate(`/ISK/${sessionID}/${lastLocation}`)
-                    }else {
-                        navigate(`/ISK/${sessionID}/home`);
-                    }
-                } 
-                else {
-                    console.log(response?.error || response?.message || "Autologin failed");
-                    localStorage.removeItem("player_ID");
-                    localStorage.removeItem("player_username");
-                    sessionStorage.removeItem("lastLocation");
+            waitForSessionID().then((sessionID) => {
+                if (cancelled || !sessionID) {
+                    return;
                 }
+
+                socket.emit("login_tokenSave", { playerID, sessionID }, (response) => {
+                    if (cancelled) return;
+
+                    if (response.success) {
+                        socket.emit("playerData_logOn", { playerID });
+                        if (lastLocation) {
+                            navigate(`/ISK/${sessionID}/${lastLocation}`);
+                        } else {
+                            navigate(`/ISK/${sessionID}/home`);
+                        }
+                    } else {
+                        console.log(response?.error || response?.message || "Autologin failed");
+                        localStorage.removeItem("player_ID");
+                        localStorage.removeItem("player_username");
+                        sessionStorage.removeItem("lastLocation");
+                    }
+                });
             });
-        });
-    }
-    
-    autoLogin();
-    return () => {
-        cancelled = true;
-    };
-}, [socket, navigate, waitForSessionID]);
+        }
 
-return( 
+        autoLogin();
+        return () => {
+            cancelled = true;
+        };
+    }, [socket, navigate, waitForSessionID]);
 
-     <div className="relative min-h-screen w-full">
-         <div
+    return (
+        <div className="relative min-h-screen w-full overflow-hidden bg-website-default-900 text-website-neutral-50">
+            <div
                 className="absolute inset-0 bg-cover bg-center"
                 style={{ backgroundImage: `url(${getImage("loginpage_background")})` }}
-              />
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-website-default-900/80 via-website-default-900/60 to-website-default-900" />
 
-    <div className="absolute w-1/3 p-16 bg-black/85 h-screen">
-        <div className="flex flex-col text-white h-full">
-            <div className="text-2xl">
-                Login
-            </div>
-            <div className="flex space-y-6 flex-col pt-8">
-                <div className="flex space-y-1 flex-col">
-                    <div>Username</div>
-                    <div>
-                        <input 
-                            type="text"
-                            placeholder="Username..."
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            className="bg-transparent border-b border-b-white text-white w-full focus:outline-none focus:ring-0"
-                            />
+            <div className="relative min-h-screen flex items-center justify-center px-6 py-12">
+                <div className="w-full max-w-md rounded-2xl border border-website-default-700 bg-website-default-900/85 p-8 shadow-2xl backdrop-blur-md">
+                    <div className="text-center">
+                        <p className="text-xs uppercase tracking-[0.35em] text-website-neutral-400">
+                            Return to the realm
+                        </p>
+                        <h1 className="mt-3 text-3xl font-semibold text-website-neutral-50">Login</h1>
+                        <p className="mt-2 text-sm text-website-neutral-300">
+                            Enter your credentials to continue your campaign.
+                        </p>
                     </div>
-                </div>
-                <div className="flex space-y-1 flex-col">
-                    <div>Password </div>
-                    <div>
-                        <input 
-                            type="password" 
-                            placeholder="Password..."
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="bg-transparent border-b border-b-white text-white w-full focus:outline-none focus:ring-0 "
+
+                    <div className="mt-8 space-y-5">
+                        <div>
+                            <label className="block text-xs uppercase tracking-wider text-website-neutral-400 mb-2">
+                                Username
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="Username..."
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                className="w-full rounded-lg border border-website-default-600 bg-website-default-900 px-3 py-2 text-sm text-website-neutral-100 focus:outline-none focus:ring-2 focus:ring-website-highlights-500"
                             />
+                        </div>
+                        <div>
+                            <label className="block text-xs uppercase tracking-wider text-website-neutral-400 mb-2">
+                                Password
+                            </label>
+                            <input
+                                type="password"
+                                placeholder="Password..."
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full rounded-lg border border-website-default-600 bg-website-default-900 px-3 py-2 text-sm text-website-neutral-100 focus:outline-none focus:ring-2 focus:ring-website-highlights-500"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleLogin}
+                            className="w-full rounded-lg bg-website-specials-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-website-specials-600"
+                        >
+                            Log In
+                        </button>
                     </div>
-                </div>
-                <button 
-                    onClick={handleLogin} 
-                    className="relative bg-blue-500 text-white px-4 py-2 rounded-full w-full">
-                        Log In
-                </button>
-                <div className="text-center">
-                    <p>Don't have an account? <Link to="/signup">Sign up here</Link>.</p>
-                </div>
-            </div>
-            
-            <div className="mt-auto flex flex-row justify-center text-xs space-x-2">
-                <div>
-                    <Link to="/">Home</Link>
-                </div>
-                <div>|</div>
-                <div>
-                    <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer">About</a>
-                </div>
-                <div>|</div>
-                <div>
-                    <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">Github</a>
+
+                    <div className="mt-6 text-center text-sm text-website-neutral-300">
+                        <p>
+                            Don&apos;t have an account?{" "}
+                            <Link to="/signup" className="text-website-specials-400 hover:text-website-specials-300">
+                                Sign up here
+                            </Link>
+                            .
+                        </p>
+                    </div>
+
+                    <div className="mt-8 flex items-center justify-center gap-3 text-xs text-website-neutral-400">
+                        <Link to="/" className="hover:text-website-specials-400">
+                            Home
+                        </Link>
+                        <span className="text-website-default-700">|</span>
+                        <a
+                            href={LINKEDIN_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-website-specials-400"
+                        >
+                            About
+                        </a>
+                        <span className="text-website-default-700">|</span>
+                        <a
+                            href={GITHUB_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-website-specials-400"
+                        >
+                            Github
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
-         
-        
-        
-    </div>
-    </div>
-)
+    );
 }
 
 

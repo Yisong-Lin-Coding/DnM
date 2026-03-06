@@ -13,6 +13,8 @@ export const mapSolidsLayer = {
   id: "mapSolids",
 
   shouldRedraw(state, prevState) {
+    if (!prevState) return true;
+    if (state?.ghostMapObjects !== prevState?.ghostMapObjects) return true;
     return shouldRedrawMapLayer(state, prevState, {
       includeSelection: true,
       includeVisibility: true,
@@ -24,6 +26,11 @@ export const mapSolidsLayer = {
       mapObjects: state?.visibleMapObjects,
       cacheKey: "mapRenderDataVisible",
     });
+    const ghostObjects = Array.isArray(state?.ghostMapObjects) ? state.ghostMapObjects : [];
+    const ghostRenderData = getMapRenderData(state, frame, {
+      mapObjects: ghostObjects,
+      cacheKey: "mapRenderDataGhost",
+    });
     const {
       camera,
       floorTypesByID,
@@ -33,6 +40,7 @@ export const mapSolidsLayer = {
       tallSolidsFromBelow,
       topVisibleSolids,
     } = renderData;
+    const ghostSolids = ghostRenderData?.activeSolids || [];
 
 
 
@@ -42,9 +50,18 @@ export const mapSolidsLayer = {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-const HEIGHT_UNITS_PER_ZLEVEL = 3;
+    ghostSolids.forEach((obj) => {
+      drawMapObject(ctx, obj, camera, {
+        isGhost: true,
+        showLabel: false,
+        baseOpacity: 0.45,
+        isSelected: false,
+        floorVisualType: resolveFloorVisualType(obj, floorTypesByID),
+        drawShadows: false,
+      });
+    });
 
-(topVisibleSolids || []).forEach((obj) => {
+    (topVisibleSolids || []).forEach((obj) => {
       const level        = getObjectZLevel(obj);
       const elevHeight   = Number(obj?.elevationHeight) || 0;
       const topZLevel    = level + Math.floor(elevHeight / HEIGHT_UNITS_PER_ZLEVEL);

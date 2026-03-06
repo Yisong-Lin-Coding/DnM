@@ -8,9 +8,11 @@ module.exports = [
     "modifiers": [
       {
         "name": "Abyssal Arcana Modifier",
-        "hook": "onStatCalc_STR",
+        "hook": "onLongRest",
         "priority": 50,
-        "action": (context) => { /* TODO: Implement */ }
+        "action": (context) => {
+          context
+         }
       }
     ]
   },

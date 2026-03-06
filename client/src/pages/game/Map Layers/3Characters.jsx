@@ -1,5 +1,63 @@
 import { worldToScreen } from "./mapLayerShared";
 
+// ── Status-effect dot colours by school ──────────────────────────────────────
+const EFFECT_SCHOOL_COLORS = {
+  fire:        "#f97316",
+  poison:      "#22c55e",
+  necrotic:    "#a855f7",
+  condition:   "#eab308",
+  buff:        "#06b6d4",
+  enchantment: "#ec4899",
+  magic:       "#3b82f6",
+};
+
+const getEffectColor = (effect) => {
+  const school = typeof effect === "object" ? String(effect?.school || "") : "";
+  return EFFECT_SCHOOL_COLORS[school.toLowerCase()] || "#6b7280";
+};
+
+const MAX_EFFECT_DOTS = 6;
+
+const drawStatusEffects = (ctx, char, camera, screenX, screenY, radius) => {
+  const effects = Array.isArray(char?.statusEffects) ? char.statusEffects : [];
+  if (effects.length === 0) return;
+
+  const dotR  = Math.max(2.5, 3.5 * Math.min(camera.zoom, 1.5));
+  const gap   = 2;
+  const pitch = dotR * 2 + gap;
+  const count = Math.min(effects.length, MAX_EFFECT_DOTS);
+  // sit below the HP bar (barY = radius + 5, barH = 4) with 4px breathing room
+  const dotsY = screenY + radius + 13 + dotR;
+  const startX = screenX - ((count - 1) * pitch) / 2;
+
+  for (let i = 0; i < count; i++) {
+    const isOverflow = i === MAX_EFFECT_DOTS - 1 && effects.length > MAX_EFFECT_DOTS;
+    const cx    = startX + i * pitch;
+    const color = isOverflow ? "#94a3b8" : getEffectColor(effects[i]);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, dotsY, dotR, 0, Math.PI * 2);
+    ctx.fillStyle   = color;
+    ctx.strokeStyle = "rgba(0,0,0,0.7)";
+    ctx.lineWidth   = 0.8;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    if (isOverflow) {
+      const fs = Math.max(6, Math.round(6.5 * Math.min(camera.zoom, 1.5)));
+      ctx.save();
+      ctx.font         = `bold ${fs}px Arial`;
+      ctx.textAlign    = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle    = "#fff";
+      ctx.fillText(`+${effects.length - MAX_EFFECT_DOTS + 1}`, cx, dotsY);
+      ctx.restore();
+    }
+  }
+};
+
 const TEAM_COLORS = {
   player:  { fill: "#3B82F6", stroke: "#93C5FD", label: "#DBEAFE" },
   enemy:   { fill: "#EF4444", stroke: "#FCA5A5", label: "#FEE2E2" },
@@ -18,30 +76,12 @@ const getTeamColors = (team) =>
   TEAM_COLORS[String(team || "").toLowerCase()] || TEAM_COLORS.neutral;
 
 const drawCharacter = (ctx, char, camera, options = {}) => {
-  const { isSelected = false, showVision = false } = options;
+  const { isSelected = false } = options;
   const x      = Number(char?.position?.x) || 0;
   const y      = Number(char?.position?.y) || 0;
   const radius = Math.max(4, (Number(char?.size) || 30) / 2 * camera.zoom);
   const screen = worldToScreen(camera, x, y);
   const colors = getTeamColors(char?.team);
-
-  // ── Vision arc (faint) ──────────────────────────────────────────────────
-  if (showVision) {
-    const visionR   = (Number(char?.visionDistance) || 150) * camera.zoom;
-    const rotRad    = ((Number(char?.rotation) || 0) - 90) * (Math.PI / 180);
-    const arcHalf   = ((Number(char?.visionArc) || 90) / 2) * (Math.PI / 180);
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(screen.x, screen.y);
-    ctx.arc(screen.x, screen.y, visionR, rotRad - arcHalf, rotRad + arcHalf);
-    ctx.closePath();
-    ctx.fillStyle   = `${colors.fill}18`;
-    ctx.strokeStyle = `${colors.stroke}40`;
-    ctx.lineWidth   = 1;
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  }
 
   // -- Movement + attack ranges (selected) ----------------------------------
   if (isSelected) {
@@ -68,7 +108,7 @@ const drawCharacter = (ctx, char, camera, options = {}) => {
     ctx.restore();
   }
 
-  // ── Selection ring ──────────────────────────────────────────────────────
+  // -- Selection ring -------------------------------------------------------
   if (isSelected) {
     ctx.save();
     ctx.beginPath();
@@ -80,7 +120,7 @@ const drawCharacter = (ctx, char, camera, options = {}) => {
     ctx.restore();
   }
 
-  // ── Body ────────────────────────────────────────────────────────────────
+  // -- Body -----------------------------------------------------------------
   ctx.save();
   ctx.beginPath();
   ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
@@ -91,7 +131,7 @@ const drawCharacter = (ctx, char, camera, options = {}) => {
   ctx.stroke();
   ctx.restore();
 
-  // ── Direction indicator ─────────────────────────────────────────────────
+  // -- Direction indicator --------------------------------------------------
   const rotRad = ((Number(char?.rotation) || 0) - 90) * (Math.PI / 180);
   const dotDistance = radius + FACE_DOT_OFFSET_PX;
   const dotX = screen.x + Math.cos(rotRad) * dotDistance;
@@ -115,7 +155,7 @@ const drawCharacter = (ctx, char, camera, options = {}) => {
   ctx.stroke();
   ctx.restore();
 
-  // ── HP bar ──────────────────────────────────────────────────────────────
+  // -- HP bar ---------------------------------------------------------------
   if (char?.maxHP != null && char?.hp != null) {
     const ratio  = Math.max(0, Math.min(1, char.hp / char.maxHP));
     const barW   = radius * 2;
@@ -134,7 +174,7 @@ const drawCharacter = (ctx, char, camera, options = {}) => {
     ctx.restore();
   }
 
-  // ── Name label ──────────────────────────────────────────────────────────
+  // -- Name label -----------------------------------------------------------
   ctx.save();
   ctx.font      = `bold ${Math.max(10, Math.round(11 * camera.zoom))}px Arial`;
   ctx.textAlign = "center";
@@ -143,6 +183,36 @@ const drawCharacter = (ctx, char, camera, options = {}) => {
   ctx.shadowBlur    = 3;
   const labelY = screen.y - radius - 6;
   ctx.fillText(String(char?.name || ""), screen.x, labelY);
+  ctx.restore();
+
+  // -- Status-effect dots ---------------------------------------------------
+  drawStatusEffects(ctx, char, camera, screen.x, screen.y, radius);
+};
+
+const drawGhostCharacter = (ctx, char, camera) => {
+  if (!char || !camera) return;
+  const x = Number(char?.position?.x ?? char?.x) || 0;
+  const y = Number(char?.position?.y ?? char?.y) || 0;
+  const radius = Math.max(4, (Number(char?.size) || 30) / 2 * camera.zoom);
+  const screen = worldToScreen(camera, x, y);
+
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(160,160,160,0.9)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(110,110,110,0.9)";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.font = `bold ${Math.max(10, Math.round(11 * camera.zoom))}px Arial`;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(220,220,220,0.85)";
+  ctx.fillText(String(char?.name || ""), screen.x, screen.y - radius - 6);
   ctx.restore();
 };
 
@@ -156,9 +226,12 @@ export const mapCharactersLayer = {
     if (c.x !== p.x || c.y !== p.y || c.zoom !== p.zoom) return true;
     if (state.characters    !== prevState.characters)    return true;
     if (state.selectedChar  !== prevState.selectedChar)  return true;
+    if (state.selectedCharacterIds !== prevState.selectedCharacterIds) return true;
     if (state.fogEnabled    !== prevState.fogEnabled)    return true;
     if (state.isDM          !== prevState.isDM)          return true;
     if (state.controlledCharacterIDs !== prevState.controlledCharacterIDs) return true;
+    if (state.ghostCharacters !== prevState.ghostCharacters) return true;
+    if (state.visionVisibility !== prevState.visionVisibility) return true;
     return false;
   },
 
@@ -169,44 +242,35 @@ export const mapCharactersLayer = {
     const camera      = state?.camera;
     const characters  = state?.characters || [];
     const selectedId  = state?.selectedChar || null;
+    const selectedIds = state?.selectedCharacterIds || new Set();
     const isDM        = state?.isDM        || false;
     const fogEnabled  = state?.fogEnabled  || false;
-    const controlledIds = new Set(
-      (state?.controlledCharacterIDs || []).map((id) => toEntityID(id))
-    );
 
     if (!camera) return;
 
-    characters.forEach((char) => {
-      const x  = Number(char?.position?.x) || 0;
-      const y  = Number(char?.position?.y) || 0;
+    const ghostCharacters = Array.isArray(state?.ghostCharacters) ? state.ghostCharacters : [];
+    const visionVisibility = state?.visionVisibility || {};
 
+    ghostCharacters.forEach((ghost) => {
+      drawGhostCharacter(ctx, ghost, camera);
+    });
+
+    characters.forEach((char) => {
       // Fog of war: hide enemy characters not in any player's vision cone
       if (fogEnabled && !isDM && String(char?.team || "").toLowerCase() === "enemy") {
-        const playerChars = characters.filter((c) => c.team === "player");
-        const visible = playerChars.some((pc) => {
-          const dx  = x - (Number(pc?.position?.x) || 0);
-          const dy  = y - (Number(pc?.position?.y) || 0);
-          const d2  = dx * dx + dy * dy;
-          const vd  = Number(pc?.visionDistance) || 150;
-          if (d2 > vd * vd) return false;
-          const ang    = (Math.atan2(dy, dx) * 180) / Math.PI;
-          let diff     = ang - ((Number(pc?.rotation) || 0) - 90);
-          while (diff >  180) diff -= 360;
-          while (diff < -180) diff += 360;
-          return Math.abs(diff) <= (Number(pc?.visionArc) || 90) / 2;
-        });
+        const key = makeEntityKey("character", char?.id);
+        const visible = (visionVisibility[key]?.visibility || 0) > 0;
         if (!visible) return;
       }
 
-      const isSelected = toEntityID(char?.id) === toEntityID(selectedId);
-      drawCharacter(ctx, char, camera, {
-        isSelected,
-        showVision: isSelected || isDM || controlledIds.has(toEntityID(char?.id)),
-      });
+      const isSelected =
+        toEntityID(char?.id) === toEntityID(selectedId) ||
+        selectedIds.has(toEntityID(char?.id));
+      drawCharacter(ctx, char, camera, { isSelected });
     });
   },
 };
 
-// Tiny helper — mirrors the one in GameComponent without importing it
+// Tiny helper â€” mirrors the one in GameComponent without importing it
 const toEntityID = (v) => String(v ?? "").trim();
+const makeEntityKey = (type, id) => `${String(type || "unknown")}:${toEntityID(id)}`;

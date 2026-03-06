@@ -4,457 +4,553 @@ import { michelangeloEngine } from "./michelangeloEngine";
 import { GAME_LAYER_REGISTRY, bindLayerCanvases } from "./Map Layers/layerRegistry";
 import getImage from "../../handlers/getImage";
 import GameSidePanel from "../../pageComponents/game_sidepanel";
+import InfoWindows from "./infoWindows";
 import { useGame } from "../../data/gameContext";
 import { SocketContext } from "../../socket.io/context";
 import { emitWithAck } from "../campaign/socketEmit";
+import { useGameActions } from "../../hooks/useGameActions";
+import DiceRollGallery from "../../pageComponents/DiceRollGallery";
 import { HEIGHT_UNITS_PER_ZLEVEL } from "./Map Layers/mapLayerShared";
+import { calculateLightAtPoint } from "./Map Layers/7lighting";
+import { MAP_VIEWS, getActiveMapView } from "./mapFilters";
+import {
+    MIN_SIDE_WIDTH,
+    MAX_SIDE_WIDTH,
+    ZOOM_FACTOR,
+    MIN_ZOOM,
+    MAX_ZOOM,
+    MAX_CANVAS_DPR,
+    PAN_SPEED,
+    CLICK_DRAG_THRESHOLD_PX,
+    MIN_RECT_WORLD_SIZE,
+    MIN_SHAPE_WORLD_SIZE,
+    AUTO_SAVE_DEBOUNCE_MS,
+    INFO_PANEL_WIDTH,
+    INFO_PANEL_MIN_LEFT,
+    INFO_PANEL_MIN_TOP,
+    INFO_PANEL_MAX_BOTTOM_PADDING,
+    RESIZE_HANDLE_HIT_RADIUS_PX,
+    HEIGHT_HANDLE_OFFSET_PX,
+    FACE_DOT_OFFSET_PX,
+    FACE_DOT_RADIUS_PX,
+    FACE_DOT_HIT_RADIUS_PX,
+    WORLD_UNITS_PER_FOOT,
+    TEAM_PREVIEW_COLORS,
+    DEFAULT_MAX_HP_BY_TERRAIN
+} from "./gameConstants";
+ 
 
-const MIN_SIDE_WIDTH = 200;
-const MAX_SIDE_WIDTH = 800;
-const ZOOM_FACTOR = 1.1;
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 4;
-const MAX_CANVAS_DPR = 1.5;
-const PAN_SPEED = 13;
-const CLICK_DRAG_THRESHOLD_PX = 6;
-const MIN_RECT_WORLD_SIZE = 8;
-const MIN_SHAPE_WORLD_SIZE = 4;
-const AUTO_SAVE_DEBOUNCE_MS = 900;
-const INFO_PANEL_WIDTH = 320;
-const INFO_PANEL_MIN_LEFT = 12;
-const INFO_PANEL_MIN_TOP = 12;
-const INFO_PANEL_MAX_BOTTOM_PADDING = 120;
-const RESIZE_HANDLE_HIT_RADIUS_PX = 15;
-const HEIGHT_HANDLE_OFFSET_PX = 32;
-const FACE_DOT_OFFSET_PX = 10;
-const FACE_DOT_RADIUS_PX = 4;
-const FACE_DOT_HIT_RADIUS_PX = 12;
-const TEAM_PREVIEW_COLORS = {
-    player: "#3B82F6",
-    enemy: "#EF4444",
-    neutral: "#A855F7",
+import { ANIMATION_REGISTRY } from "./animationRegistry";
+import {
+    normalizeAngleDegrees,
+    getFacingAngle,
+    getObjectVisibilityRadius,
+    isPointInsideMapObject,
+    findTopMapObjectAt,
+    wouldCharacterCollideWithObstacles,
+    getClosestBlockingCharacter,
+    adjustPositionBeforeCollision,
+    toEntityID,
+    getCharacterTokenId,
+    getCharacterOwnerId,
+    extractOwnedCharacterIdsFromSnapshot,
+    extractOwnedCharacterIdsFromOwnershipMap,
+    mergeUniqueIds,
+    isSameEntity,
+    getObjectZLevel,
+    getMapObjectBounds,
+    doBoundsOverlap,
+    isSolidObject,
+    doPreciseOverlap,
+    wouldObjectOverlapAtPosition,
+    worldToScreenWithCamera,
+    buildResizeHandlesForObject,
+    findResizeHandleAtScreenPoint,
+    getResizeAnchorForHandle,
+    isTypingTarget,
+    resolveDMPermission,
+    buildPlacementFromDrag
+} from "./gameUtils";
+import {
+    groupActionsByTab,
+    buildContextActionMenu,
+    getContextActionItems
+} from "./gameActions";
+
+const MOVEMENT_MULTIPLIERS = {
+    walk: 1,
+    jog: 2,
+    run: 3,
+    sprint: 4,
+    jump: 1,
 };
 
-const DEFAULT_MAX_HP_BY_TERRAIN = {
-    floor: 500,
-    wall: 1200,
-    obstacle: 700,
-};
+const VISION_MAP_MIN_MOVE = WORLD_UNITS_PER_FOOT;
+const VISION_MAP_MIN_ROT = 8;
 
-function isPointInsideTriangle(worldX, worldY, objX, objY, size) {
-    const p0 = { x: objX, y: objY - size };
-    const p1 = { x: objX - size, y: objY + size };
-    const p2 = { x: objX + size, y: objY + size };
+const makeVisionEntityKey = (type, id) =>
+    `${String(type || "unknown")}:${toEntityID(id)}`;
 
-    const area = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-    const p = { x: worldX, y: worldY };
-    const s1 = area(p, p0, p1);
-    const s2 = area(p, p1, p2);
-    const s3 = area(p, p2, p0);
-    const hasNeg = s1 < 0 || s2 < 0 || s3 < 0;
-    const hasPos = s1 > 0 || s2 > 0 || s3 > 0;
-    return !(hasNeg && hasPos);
-}
+const normalizeVisionMapsFromSnapshot = (snapshot = {}) => {
+    const rawMaps =
+        snapshot?.visionMaps && typeof snapshot.visionMaps === "object" && !Array.isArray(snapshot.visionMaps)
+            ? snapshot.visionMaps
+            : null;
 
-function normalizeAngleDegrees(value) {
-    const raw = Number(value) || 0;
-    const normalized = raw % 360;
-    return normalized < 0 ? normalized + 360 : normalized;
-}
-
-function getFacingAngle(rotation) {
-    return (Number(rotation) || 0) - 90;
-}
-
-function getObjectVisibilityRadius(obj) {
-    if (!obj) return 8;
-    const type = String(obj?.type || "circle").toLowerCase();
-    if (type === "rect") {
-        const halfW = Math.max(1, Number(obj?.width) || 0) / 2;
-        const halfH = Math.max(1, Number(obj?.height) || 0) / 2;
-        return Math.max(8, Math.hypot(halfW, halfH));
-    }
-    return Math.max(8, Number(obj?.size) || 0);
-}
-
-function isPointInsideMapObject(worldX, worldY, obj) {
-    if (!obj) return false;
-
-    const type = String(obj?.hitbox?.type || obj.type || "circle").toLowerCase();
-    const hitboxScale = Math.max(0.1, Number(obj?.hitbox?.scale) || 1);
-    const x = (Number(obj.x) || 0) + (Number(obj?.hitbox?.offsetX) || 0);
-    const y = (Number(obj.y) || 0) + (Number(obj?.hitbox?.offsetY) || 0);
-    const rotation = Number(obj?.rotation) || 0;
-    const rotationRad = rotation ? (-rotation * Math.PI) / 180 : 0;
-    let localX = worldX - x;
-    let localY = worldY - y;
-
-    if (rotationRad) {
-        const cos = Math.cos(rotationRad);
-        const sin = Math.sin(rotationRad);
-        const rotatedX = localX * cos - localY * sin;
-        const rotatedY = localX * sin + localY * cos;
-        localX = rotatedX;
-        localY = rotatedY;
-    }
-
-    if (type === "rect") {
-        const width = Math.max(1, (Number(obj.width) || 0) * hitboxScale);
-        const height = Math.max(1, (Number(obj.height) || 0) * hitboxScale);
-        return Math.abs(localX) <= width / 2 && Math.abs(localY) <= height / 2;
-    }
-
-    if (type === "triangle") {
-        const size = Math.max(1, (Number(obj.size) || 0) * hitboxScale);
-        return isPointInsideTriangle(localX, localY, 0, 0, size);
-    }
-
-    const radius = Math.max(1, (Number(obj.size) || 0) * hitboxScale);
-    return localX * localX + localY * localY <= radius * radius;
-}
-
-function findTopMapObjectAt(worldX, worldY, mapObjects = []) {
-    const terrainPriority = (terrainType) => {
-        const terrain = String(terrainType || "").toLowerCase();
-        if (terrain === "obstacle") return 3;
-        if (terrain === "wall") return 2;
-        if (terrain === "floor") return 1;
-        return 0;
+    const normalizeLastSeen = (raw = {}) => {
+        const output = {};
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) return output;
+        Object.entries(raw).forEach(([key, value]) => {
+            if (!value || typeof value !== "object") return;
+            const snapshotValue =
+                value.snapshot ||
+                value.obj ||
+                value.entity ||
+                ((value.position || value.x != null) ? value : null);
+            if (!snapshotValue) return;
+            const keyParts = String(key || "").split(":");
+            const keyType = keyParts.length > 1 ? keyParts[0] : "";
+            const keyId = keyParts.length > 1 ? keyParts.slice(1).join(":") : "";
+            const inferredType =
+                value.entityType ||
+                keyType ||
+                (snapshotValue?.position ? "character" : "mapObject");
+            const entityId = toEntityID(snapshotValue?.id || value.id || keyId || key);
+            if (!entityId) return;
+            const visibilityRaw = Number(value.visibility);
+            const visibility =
+                Number.isFinite(visibilityRaw) ? visibilityRaw : (value.visionType === "peripheral" ? 0.5 : 1);
+            const visionType =
+                value.visionType ||
+                (visibility > 0 && visibility < 1 ? "peripheral" : visibility >= 1 ? "main" : "blocked");
+            const entityKey = makeVisionEntityKey(inferredType, entityId);
+            output[entityKey] = {
+                ts: Number(value.ts) || Date.now(),
+                snapshot: snapshotValue,
+                entityType: inferredType,
+                visibility,
+                visionType,
+            };
+        });
+        return output;
     };
-    const sorted = [...mapObjects].sort((a, b) => {
-        const zDiff = (Number(b?.z) || 0) - (Number(a?.z) || 0);
-        if (zDiff !== 0) return zDiff;
-        return terrainPriority(b?.terrainType) - terrainPriority(a?.terrainType);
-    });
-    return sorted.find((obj) => isPointInsideMapObject(worldX, worldY, obj)) || null;
-}
 
-function toEntityID(value) {
-    return String(value ?? "").trim();
-}
+    if (rawMaps) {
+        const output = {};
+        Object.entries(rawMaps).forEach(([charId, map]) => {
+            const normalizedId = toEntityID(charId);
+            if (!normalizedId) return;
+            const exploredAreas = Array.isArray(map?.exploredAreas) ? map.exploredAreas : [];
+            const lastSeenEntities = normalizeLastSeen(map?.lastSeenEntities || map?.lastSeen || {});
+            const visibleEntities =
+                map?.visibleEntities && typeof map.visibleEntities === "object" && !Array.isArray(map.visibleEntities)
+                    ? map.visibleEntities
+                    : {};
+            output[normalizedId] = {
+                exploredAreas,
+                lastSeenEntities,
+                visibleEntities,
+            };
+        });
+        return output;
+    }
 
-function isSameEntity(a, b) {
-    if (!a || !b) return false;
-    return String(a.type || "") === String(b.type || "") && toEntityID(a.id) === toEntityID(b.id);
-}
+    const legacyExplored = Array.isArray(snapshot?.exploredAreas) ? snapshot.exploredAreas : [];
+    const legacyLastSeen = normalizeLastSeen(snapshot?.lastSeenEntities || {});
+    if (legacyExplored.length === 0 && Object.keys(legacyLastSeen).length === 0) {
+        return {};
+    }
 
-function getObjectZLevel(obj) {
-    return Math.round(Number(obj?.zLevel) || 0);
-}
-
-function getMapObjectBounds(obj) {
-    const objectType = String(obj?.type || "circle").toLowerCase();
-    const x = Number(obj?.x) || 0;
-    const y = Number(obj?.y) || 0;
-
-    if (objectType === "rect") {
-        const halfWidth = Math.max(1, Number(obj?.width) || 0) / 2;
-        const halfHeight = Math.max(1, Number(obj?.height) || 0) / 2;
-        return {
-            minX: x - halfWidth,
-            maxX: x + halfWidth,
-            minY: y - halfHeight,
-            maxY: y + halfHeight,
+    const output = {};
+    const legacyCharacters = Array.isArray(snapshot?.characters) ? snapshot.characters : [];
+    legacyCharacters.forEach((char) => {
+        const id = toEntityID(char?.id);
+        if (!id) return;
+        output[id] = {
+            exploredAreas: legacyExplored.slice(),
+            lastSeenEntities: JSON.parse(JSON.stringify(legacyLastSeen)),
+            visibleEntities: {},
         };
-    }
-
-    const radius = Math.max(1, Number(obj?.size) || 0);
-    return {
-        minX: x - radius,
-        maxX: x + radius,
-        minY: y - radius,
-        maxY: y + radius,
-    };
-}
-
-function doBoundsOverlap(a, b) {
-    return a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
-}
-
-function isWallObject(obj) {
-    return String(obj?.terrainType || "").trim().toLowerCase() === "wall";
-}
-
-function wouldWallOverlapAtPosition(candidate, objects = [], ignoreId = null) {
-    if (!isWallObject(candidate)) return false;
-
-    const candidateBounds = getMapObjectBounds(candidate);
-    const candidateLevel = getObjectZLevel(candidate);
-    const ignoreKey = ignoreId == null ? "" : toEntityID(ignoreId);
-
-    return (Array.isArray(objects) ? objects : []).some((obj) => {
-        if (!isWallObject(obj)) return false;
-        if (getObjectZLevel(obj) !== candidateLevel) return false;
-        if (ignoreKey && toEntityID(obj?.id) === ignoreKey) return false;
-        return doBoundsOverlap(candidateBounds, getMapObjectBounds(obj));
     });
-}
+    return output;
+};
 
-function worldToScreenWithCamera(cameraSnapshot, worldX, worldY) {
-    return {
-        x: worldX * cameraSnapshot.zoom - cameraSnapshot.x,
-        y: worldY * cameraSnapshot.zoom - cameraSnapshot.y,
-    };
-}
+const getWisScoreFromStats = (stats = {}) => {
+    if (!stats || typeof stats !== "object") return 0;
+    const wis = stats.WIS ?? stats.wis ?? {};
+    const rawScore = typeof wis === "object" ? (wis.score ?? wis.value ?? 0) : wis;
+    const score = Number(rawScore);
+    return Number.isFinite(score) ? score : 0;
+};
 
-function buildResizeHandlesForObject(obj, cameraSnapshot) {
-    if (!obj || !cameraSnapshot) return [];
-    const bounds = getMapObjectBounds(obj);
-    const topLeft = worldToScreenWithCamera(cameraSnapshot, bounds.minX, bounds.minY);
-    const topRight = worldToScreenWithCamera(cameraSnapshot, bounds.maxX, bounds.minY);
-    const bottomRight = worldToScreenWithCamera(cameraSnapshot, bounds.maxX, bounds.maxY);
-    const bottomLeft = worldToScreenWithCamera(cameraSnapshot, bounds.minX, bounds.maxY);
-    const topCenter = worldToScreenWithCamera(
-        cameraSnapshot,
-        (bounds.minX + bounds.maxX) / 2,
-        bounds.minY
+const getMemoryLimitForChar = (char) => {
+    const explicit = Number(char?.memory?.polygons);
+    if (Number.isFinite(explicit)) {
+        return Math.max(0, Math.floor(explicit));
+    }
+    const wisScore = getWisScoreFromStats(char?.stats);
+    if (!Number.isFinite(wisScore)) return 0;
+    return Math.max(0, Math.floor(wisScore / 2));
+};
+
+const trimExploredAreasForMemory = (areas, sampleLimit) => {
+    if (!Array.isArray(areas)) return [];
+    const safeLimit = Math.max(0, Math.floor(Number(sampleLimit) || 0));
+    if (safeLimit <= 0) return [];
+
+    const entries = areas.map((shape, idx) => ({
+        shape,
+        ts: Number(shape?.ts) || 0,
+        idx,
+    }));
+    const uniqueTs = Array.from(new Set(entries.map((entry) => entry.ts))).sort((a, b) => a - b);
+    if (uniqueTs.length <= safeLimit) return areas;
+
+    const keepTs = new Set(uniqueTs.slice(uniqueTs.length - safeLimit));
+    return entries.filter((entry) => keepTs.has(entry.ts)).map((entry) => entry.shape);
+};
+
+const trimVisionMapsForCharacters = (visionMaps, characters) => {
+    if (!visionMaps || typeof visionMaps !== "object") return {};
+    const output = { ...visionMaps };
+    const charMap = new Map();
+    (Array.isArray(characters) ? characters : []).forEach((char) => {
+        const id = toEntityID(char?.id);
+        if (id) charMap.set(id, char);
+    });
+    Object.entries(output).forEach(([charId, map]) => {
+        const normalizedId = toEntityID(charId);
+        const char = charMap.get(normalizedId);
+        if (!char) return;
+        const limit = getMemoryLimitForChar(char);
+        const exploredAreas = trimExploredAreasForMemory(
+            Array.isArray(map?.exploredAreas) ? map.exploredAreas : [],
+            limit
+        );
+        output[normalizedId] = {
+            ...map,
+            exploredAreas,
+        };
+    });
+    return output;
+};
+
+const resolveVisionSources = (characters = [], ownedIds = [], fovMode = "party") => {
+    const list = Array.isArray(characters) ? characters : [];
+    const playerChars = list.filter(
+        (char) => String(char?.team || "").toLowerCase() === "player"
     );
-
-    return [
-        { id: "nw", x: topLeft.x, y: topLeft.y },
-        { id: "ne", x: topRight.x, y: topRight.y },
-        { id: "se", x: bottomRight.x, y: bottomRight.y },
-        { id: "sw", x: bottomLeft.x, y: bottomLeft.y },
-        { id: "height", x: topCenter.x, y: topCenter.y - HEIGHT_HANDLE_OFFSET_PX },
-    ];
-}
-
-function findResizeHandleAtScreenPoint(screenX, screenY, handles = []) {
-    return handles.find((handle) => {
-        const dx = screenX - handle.x;
-        const dy = screenY - handle.y;
-        return dx * dx + dy * dy <= RESIZE_HANDLE_HIT_RADIUS_PX * RESIZE_HANDLE_HIT_RADIUS_PX;
-    }) || null;
-}
-
-function getResizeAnchorForHandle(handleID, bounds) {
-    if (!bounds) return null;
-    if (handleID === "nw") return { x: bounds.maxX, y: bounds.maxY };
-    if (handleID === "ne") return { x: bounds.minX, y: bounds.maxY };
-    if (handleID === "se") return { x: bounds.minX, y: bounds.minY };
-    if (handleID === "sw") return { x: bounds.maxX, y: bounds.minY };
-    return null;
-}
-
-function isTypingTarget(target) {
-    if (!target || typeof target !== "object") return false;
-    const tag = String(target.tagName || "").toUpperCase();
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-    return Boolean(target.isContentEditable);
-}
-
-function resolveDMPermission(response, playerID) {
-    const explicitPermission = response?.permissions?.isDM;
-    if (typeof explicitPermission === "boolean") return explicitPermission;
-    if (typeof explicitPermission === "string") {
-        const normalized = explicitPermission.trim().toLowerCase();
-        if (normalized === "true") return true;
-        if (normalized === "false") return false;
+    if (String(fovMode || "").toLowerCase() !== "perplayer") {
+        return playerChars;
     }
-
-    const dmID = String(response?.campaign?.dmId || "").trim();
-    const normalizedPlayerID = String(playerID || "").trim();
-    return Boolean(dmID && normalizedPlayerID && dmID === normalizedPlayerID);
-}
-
-const ACTION_TAB_ORDER = [
-    "main",
-    "movement",
-    "bonus",
-    "reaction",
-    "free",
-    "passive",
-    "special",
-];
-
-const ACTION_TAB_LABELS = {
-    main: "Action",
-    movement: "Movement",
-    bonus: "Bonus Action",
-    reaction: "Reaction",
-    free: "Free Action",
-    passive: "Passive",
-    special: "Special",
+    const ownedSet = new Set((ownedIds || []).map((id) => toEntityID(id)));
+    const ownedSources = playerChars.filter((char) => ownedSet.has(toEntityID(char?.id)));
+    return ownedSources.length > 0 ? ownedSources : playerChars;
 };
 
-function groupActionsByTab(actions = []) {
-    const groups = new Map();
-    actions.forEach((action) => {
-        if (!action) return;
-        const tab = String(action.tab || action.actionType || "main").toLowerCase();
-        if (!groups.has(tab)) {
-            groups.set(tab, []);
-        }
-        groups.get(tab).push(action);
-    });
+const normalizeRad = (rad) => {
+    let value = rad;
+    while (value > Math.PI) value -= Math.PI * 2;
+    while (value < -Math.PI) value += Math.PI * 2;
+    return value;
+};
 
-    const ordered = [];
-    ACTION_TAB_ORDER.forEach((tab) => {
-        if (!groups.has(tab)) return;
-        ordered.push({
-            key: tab,
-            label: ACTION_TAB_LABELS[tab] || tab,
-            actions: groups.get(tab).sort((a, b) =>
-                String(a?.name || "").localeCompare(String(b?.name || ""))
-            ),
-        });
-        groups.delete(tab);
-    });
-
-    Array.from(groups.keys())
-        .sort()
-        .forEach((tab) => {
-            ordered.push({
-                key: tab,
-                label: ACTION_TAB_LABELS[tab] || tab,
-                actions: (groups.get(tab) || []).sort((a, b) =>
-                    String(a?.name || "").localeCompare(String(b?.name || ""))
-                ),
-            });
-        });
-
-    return ordered;
-}
-
-const CONTEXT_ACTION_ROOTS = [
-    {
-        key: "action",
-        label: "Action",
-        tabs: ["main", "reaction", "free", "passive", "special"],
-    },
-    { key: "bonus", label: "Bonus Action", tabs: ["bonus"] },
-    { key: "movement", label: "Movement", tabs: ["movement"] },
-];
-
-function toDisplayLabel(value = "") {
-    return String(value || "")
-        .replace(/([a-z])([A-Z])/g, "$1 $2")
-        .replace(/[_-]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function buildContextActionRoot(actionTree, rootConfig) {
-    const children = [];
-    const tabs = Array.isArray(rootConfig?.tabs) ? rootConfig.tabs : [];
-    const [primaryTab, ...extraTabs] = tabs;
-    const primaryNode = primaryTab ? actionTree?.[primaryTab] : null;
-
-    if (primaryNode?.children?.length) {
-        children.push(...primaryNode.children);
-    } else if (primaryNode?.action) {
-        children.push({
-            key: primaryNode.key || primaryTab,
-            label: primaryNode.label || toDisplayLabel(primaryTab),
-            path: primaryNode.path || primaryTab,
-            action: primaryNode.action,
-            children: [],
-        });
-    }
-
-    extraTabs.forEach((tabKey) => {
-        const tabNode = actionTree?.[tabKey];
-        if (!tabNode) return;
-        const tabChildren = Array.isArray(tabNode.children) ? tabNode.children : [];
-        const hasAction = Boolean(tabNode.action) && tabChildren.length === 0;
-        if (tabChildren.length === 0 && !hasAction) return;
-        children.push({
-            key: tabNode.key || tabKey,
-            label: ACTION_TAB_LABELS[tabKey] || tabNode.label || toDisplayLabel(tabKey),
-            path: tabNode.path || tabKey,
-            action: hasAction ? tabNode.action : undefined,
-            children: tabChildren,
-        });
-    });
-
+const splitVisionRays = (rays = []) => {
+    if (!Array.isArray(rays) || rays.length === 0) return { main: [], peripheral: [] };
+    const hasPeripheralFlag = rays.some((ray) => ray?.isPeripheral != null);
+    if (!hasPeripheralFlag) return { main: rays, peripheral: [] };
     return {
-        key: rootConfig.key,
-        label: rootConfig.label,
-        path: rootConfig.key,
-        children,
+        main: rays.filter((ray) => !ray?.isPeripheral),
+        peripheral: rays.filter((ray) => ray?.isPeripheral),
     };
-}
+};
 
-function buildContextActionMenu(actionTree) {
-    if (!actionTree || typeof actionTree !== "object") return null;
-    const root = { key: "root", label: "Actions", children: [] };
-    CONTEXT_ACTION_ROOTS.forEach((rootConfig) => {
-        root.children.push(buildContextActionRoot(actionTree, rootConfig));
+const splitPeripheralRaysBySide = (rays = [], charX, charY, facingRad) => {
+    const left = [];
+    const right = [];
+    if (!Array.isArray(rays) || rays.length === 0) return { left, right };
+    rays.forEach((ray) => {
+        const angleRad = Math.atan2((ray?.endY ?? 0) - charY, (ray?.endX ?? 0) - charX);
+        const rel = normalizeRad(angleRad - facingRad);
+        if (rel < 0) {
+            left.push(ray);
+        } else {
+            right.push(ray);
+        }
     });
-    return root;
-}
+    return { left, right };
+};
 
-function getContextActionItems(node, options = {}) {
-    const includeEmpty = options.includeEmpty === true;
-    const children = Array.isArray(node?.children) ? node.children : [];
-
-    return children
-        .map((child) => {
-            if (!child || typeof child !== "object") return null;
-            const childChildren = Array.isArray(child.children) ? child.children : [];
-            const hasChildren = childChildren.length > 0;
-            const hasAction = Boolean(child.action) && !hasChildren;
-
-            if (hasChildren) {
-                return {
-                    type: "folder",
-                    label: child.label || toDisplayLabel(child.key || ""),
-                    node: child,
-                    disabled: false,
-                };
-            }
-
-            if (hasAction) {
-                return {
-                    type: "action",
-                    label:
-                        child.action?.name ||
-                        child.label ||
-                        toDisplayLabel(child.key || ""),
-                    action: child.action,
-                };
-            }
-
-            if (includeEmpty) {
-                return {
-                    type: "folder",
-                    label: child.label || toDisplayLabel(child.key || ""),
-                    node: child,
-                    disabled: true,
-                };
-            }
-
-            return null;
+const buildRayFan = (rays, charX, charY, facingRad) => {
+    if (!Array.isArray(rays) || rays.length === 0) return [];
+    const sorted = rays
+        .map((ray) => {
+            const angleRad = Math.atan2((ray?.endY ?? 0) - charY, (ray?.endX ?? 0) - charX);
+            return {
+                angle: normalizeRad(angleRad - facingRad),
+                distance: Number(ray?.distance) || 0,
+            };
         })
-        .filter(Boolean);
-}
+        .sort((a, b) => a.angle - b.angle);
 
-function buildPlacementFromDrag(placementConfig, startWorld, endWorld) {
-    const type = String(placementConfig?.type || "circle").toLowerCase();
-    const centerX = (startWorld.x + endWorld.x) / 2;
-    const centerY = (startWorld.y + endWorld.y) / 2;
-    const deltaX = Math.abs(endWorld.x - startWorld.x);
-    const deltaY = Math.abs(endWorld.y - startWorld.y);
+    const deduped = [];
+    const EPS = 1e-4;
+    for (const ray of sorted) {
+        const last = deduped[deduped.length - 1];
+        if (last && Math.abs(ray.angle - last.angle) < EPS) {
+            if (ray.distance > last.distance) {
+                deduped[deduped.length - 1] = ray;
+            }
+            continue;
+        }
+        deduped.push(ray);
+    }
+    return deduped;
+};
 
-    if (type === "rect") {
+const sortRaysForPolygon = (rays, charX, charY, facingRad) => {
+    if (!Array.isArray(rays) || rays.length === 0) return [];
+    const sorted = rays
+        .map((ray) => {
+            const endX = Number(ray?.endX) || 0;
+            const endY = Number(ray?.endY) || 0;
+            const angleRad = Math.atan2(endY - charY, endX - charX);
+            const relAngle = normalizeRad(angleRad - facingRad);
+            const distance = Number(ray?.distance) || Math.hypot(endX - charX, endY - charY);
+            return {
+                endX,
+                endY,
+                relAngle,
+                distance,
+            };
+        })
+        .sort((a, b) => a.relAngle - b.relAngle);
+
+    const deduped = [];
+    const EPS = 1e-4;
+    for (const ray of sorted) {
+        const last = deduped[deduped.length - 1];
+        if (last && Math.abs(ray.relAngle - last.relAngle) < EPS) {
+            if (ray.distance > last.distance) {
+                deduped[deduped.length - 1] = ray;
+            }
+            continue;
+        }
+        deduped.push(ray);
+    }
+    return deduped;
+};
+
+const buildPolygonFromRays = (rays, charX, charY, facingRad) => {
+    const sorted = sortRaysForPolygon(rays, charX, charY, facingRad);
+    if (sorted.length < 2) return null;
+    const points = [{ x: charX, y: charY }];
+    sorted.forEach((ray) => {
+        points.push({ x: ray.endX, y: ray.endY });
+    });
+    return {
+        type: "polygon",
+        points,
+    };
+};
+
+const isPointInRayFan = (relAngle, dist, fan) => {
+    if (!Array.isArray(fan) || fan.length === 0) return false;
+    if (fan.length === 1) return dist <= fan[0].distance;
+    if (relAngle < fan[0].angle || relAngle > fan[fan.length - 1].angle) return false;
+    for (let i = 0; i < fan.length - 1; i += 1) {
+        const a1 = fan[i].angle;
+        const a2 = fan[i + 1].angle;
+        if (relAngle >= a1 && relAngle <= a2) {
+            const span = a2 - a1;
+            if (Math.abs(span) < 1e-6) {
+                return dist <= Math.max(fan[i].distance, fan[i + 1].distance);
+            }
+            const t = (relAngle - a1) / span;
+            const maxDist = fan[i].distance * (1 - t) + fan[i + 1].distance * t;
+            return dist <= maxDist;
+        }
+    }
+    return false;
+};
+
+const getCloseRangeRadiusForChar = (char, fallbackDistance = 0) => {
+    const radius = Number(char?.vision?.radius);
+    if (Number.isFinite(radius) && radius > 0) return radius;
+    const distance = Number(char?.visionDistance) || Number(char?.vision?.distance) || fallbackDistance;
+    return distance > 0 ? distance * 0.2 : 0;
+};
+
+const buildVisionInfoForChar = (char) => {
+    if (!char) return null;
+    const x = Number(char?.position?.x) || 0;
+    const y = Number(char?.position?.y) || 0;
+    const rotation = Number(char?.rotation) || 0;
+    const distance = Number(char?.visionDistance) || Number(char?.vision?.distance) || 0;
+    const angle = Number(char?.visionArc) || Number(char?.vision?.angle) || 0;
+    const closeRadius = getCloseRangeRadiusForChar(char, distance);
+    const rawRays = Array.isArray(char?.visionRays) ? char.visionRays : [];
+    const rays = splitVisionRays(rawRays);
+    const facingRad = (rotation - 90) * (Math.PI / 180);
+    const peripheralSplit = splitPeripheralRaysBySide(rays.peripheral, x, y, facingRad);
+    return {
+        x,
+        y,
+        rotation,
+        distance,
+        angle,
+        closeRadius,
+        facingRad,
+        rays: rawRays,
+        mainFan: buildRayFan(rays.main, x, y, facingRad),
+        peripheralLeftFan: buildRayFan(peripheralSplit.left, x, y, facingRad),
+        peripheralRightFan: buildRayFan(peripheralSplit.right, x, y, facingRad),
+    };
+};
+
+const getVisibilityForPoint = (px, py, info) => {
+    if (!info) return { visibility: 0, visionType: "blocked" };
+    const dx = px - info.x;
+    const dy = py - info.y;
+    const dist = Math.hypot(dx, dy);
+    if (info.closeRadius > 0 && dist <= info.closeRadius) {
+        return { visibility: 1, visionType: "closeRange" };
+    }
+    const relAngle = normalizeRad(Math.atan2(dy, dx) - info.facingRad);
+    if (info.mainFan?.length && isPointInRayFan(relAngle, dist, info.mainFan)) {
+        return { visibility: 1, visionType: "main" };
+    }
+    if (info.peripheralLeftFan?.length && isPointInRayFan(relAngle, dist, info.peripheralLeftFan)) {
+        return { visibility: 0.5, visionType: "peripheral" };
+    }
+    if (info.peripheralRightFan?.length && isPointInRayFan(relAngle, dist, info.peripheralRightFan)) {
+        return { visibility: 0.5, visionType: "peripheral" };
+    }
+    if (info.distance > 0 && dist <= info.distance) {
+        const arc = info.angle > 0 ? info.angle : 360;
+        const halfAngle = arc / 2;
+        const angleToPoint = (Math.atan2(dy, dx) * 180) / Math.PI;
+        let diff = angleToPoint - (info.rotation - 90);
+        while (diff > 180) diff -= 360;
+        while (diff < -180) diff += 360;
+        if (Math.abs(diff) <= halfAngle) {
+            return { visibility: 1, visionType: "main" };
+        }
+        const peripheralHalf = halfAngle / 2;
+        if (Math.abs(diff) > halfAngle && Math.abs(diff) <= halfAngle + peripheralHalf) {
+            return { visibility: 0.5, visionType: "peripheral" };
+        }
+    }
+    return { visibility: 0, visionType: "blocked" };
+};
+
+const getEntityPosition = (entity) => {
+    if (!entity || typeof entity !== "object") return null;
+    const pos = entity.position;
+    if (pos && typeof pos === "object") {
         return {
-            x: Math.round(centerX),
-            y: Math.round(centerY),
-            overrides: {
-                width: Math.max(MIN_RECT_WORLD_SIZE, Math.round(deltaX)),
-                height: Math.max(MIN_RECT_WORLD_SIZE, Math.round(deltaY)),
-            },
+            x: Number(pos.x) || 0,
+            y: Number(pos.y) || 0,
         };
     }
+    if (entity.x != null || entity.y != null) {
+        return {
+            x: Number(entity.x) || 0,
+            y: Number(entity.y) || 0,
+        };
+    }
+    return null;
+};
 
-    const size = Math.max(MIN_SHAPE_WORLD_SIZE, Math.round(Math.max(deltaX, deltaY) / 2));
-    return {
-        x: Math.round(centerX),
-        y: Math.round(centerY),
-        overrides: { size },
-    };
-}
+const getEntitySamplePoints = (entry) => {
+    if (!entry || !entry.obj) return [];
+    if (entry.type === "character") {
+        const pos = getEntityPosition(entry.obj);
+        return pos ? [pos] : [];
+    }
+    if (entry.type === "mapObject") {
+        const bounds = getMapObjectBounds(entry.obj);
+        const centerX = (Number(bounds.minX) + Number(bounds.maxX)) / 2;
+        const centerY = (Number(bounds.minY) + Number(bounds.maxY)) / 2;
+        const points = [
+            { x: centerX, y: centerY },
+            { x: Number(bounds.minX) || centerX, y: Number(bounds.minY) || centerY },
+            { x: Number(bounds.minX) || centerX, y: Number(bounds.maxY) || centerY },
+            { x: Number(bounds.maxX) || centerX, y: Number(bounds.minY) || centerY },
+            { x: Number(bounds.maxX) || centerX, y: Number(bounds.maxY) || centerY },
+        ];
+        return points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+    }
+    const fallback = getEntityPosition(entry.obj);
+    return fallback ? [fallback] : [];
+};
+
+const doesRayHitCircle = (sx, sy, ex, ey, cx, cy, radius) => {
+    const dx = ex - sx;
+    const dy = ey - sy;
+    const lenSq = dx * dx + dy * dy;
+    if (!Number.isFinite(lenSq) || lenSq <= 0) {
+        const distSq = (cx - sx) * (cx - sx) + (cy - sy) * (cy - sy);
+        return distSq <= radius * radius;
+    }
+    const t = ((cx - sx) * dx + (cy - sy) * dy) / lenSq;
+    const clamped = Math.max(0, Math.min(1, t));
+    const px = sx + clamped * dx;
+    const py = sy + clamped * dy;
+    const distSq = (cx - px) * (cx - px) + (cy - py) * (cy - py);
+    return distSq <= radius * radius;
+};
+
+const getRayHitVisibilityForCharacter = (entry, info) => {
+    if (!entry?.obj || !info) return null;
+    const rays = Array.isArray(info?.rays) ? info.rays : [];
+    if (rays.length === 0) return null;
+    const pos = getEntityPosition(entry.obj);
+    if (!pos) return null;
+    const radius = Math.max(1, (Number(entry.obj?.size) || 0) / 2);
+
+    let sawPeripheral = false;
+    for (const ray of rays) {
+        const endX = Number(ray?.endX);
+        const endY = Number(ray?.endY);
+        let ex = endX;
+        let ey = endY;
+        if (!Number.isFinite(ex) || !Number.isFinite(ey)) {
+            const angleDeg = Number(ray?.angle) || 0;
+            const dist = Number(ray?.distance) || 0;
+            const angleRad = (angleDeg * Math.PI) / 180;
+            ex = info.x + Math.cos(angleRad) * dist;
+            ey = info.y + Math.sin(angleRad) * dist;
+        }
+        if (!Number.isFinite(ex) || !Number.isFinite(ey)) continue;
+        if (doesRayHitCircle(info.x, info.y, ex, ey, pos.x, pos.y, radius)) {
+            if (!ray?.isPeripheral) {
+                return { visibility: 1, visionType: "main" };
+            }
+            sawPeripheral = true;
+        }
+    }
+    if (sawPeripheral) return { visibility: 0.5, visionType: "peripheral" };
+    return null;
+};
+
+const getVisibilityForEntity = (entry, info) => {
+    if (entry?.type === "character") {
+        const rayHit = getRayHitVisibilityForCharacter(entry, info);
+        if (rayHit) return rayHit;
+    }
+    const points = getEntitySamplePoints(entry);
+    if (!points.length) return { visibility: 0, visionType: "blocked" };
+    let best = { visibility: 0, visionType: "blocked" };
+    for (const point of points) {
+        const result = getVisibilityForPoint(point.x, point.y, info);
+        if (result.visibility > best.visibility) {
+            best = result;
+            if (best.visibility >= 1) break;
+        }
+    }
+    return best;
+};
 
 function GameComponent() {
     const socket = useContext(SocketContext);
@@ -494,16 +590,66 @@ function GameComponent() {
     placePendingMapObjectAt,
     characterPlacement,
     clearCharacterPlacement,
-    lightPlacement,        // ADD THIS
-    placeLightAt,          // ADD THIS
-    clearLightPlacement,   // ADD THIS
+    lightPlacement,
+    placeLightAt,
+    clearLightPlacement,
     loadGameSnapshot,
     } = useGame();
+
+    // Helper that wraps loadGameSnapshot to also restore fog explored/last-seen data
+    const applyLoadedSnapshot = useCallback((snapshot)  => {
+        try {
+            if (snapshot && typeof snapshot === 'object') {
+                const hasVisionPayload =
+                    Object.prototype.hasOwnProperty.call(snapshot, "visionMaps") ||
+                    Object.prototype.hasOwnProperty.call(snapshot, "exploredAreas") ||
+                    Object.prototype.hasOwnProperty.call(snapshot, "lastSeenEntities");
+
+                if (hasVisionPayload) {
+                    if (Array.isArray(snapshot.exploredAreas)) {
+                        exploredAreasRef.current = snapshot.exploredAreas;
+                    } else {
+                        exploredAreasRef.current = [];
+                    }
+                    if (snapshot.lastSeenEntities && typeof snapshot.lastSeenEntities === 'object') {
+                        lastSeenRef.current = snapshot.lastSeenEntities;
+                    } else {
+                        lastSeenRef.current = {};
+                    }
+                    let normalizedMaps = normalizeVisionMapsFromSnapshot(snapshot);
+                    if (Array.isArray(snapshot.characters)) {
+                        normalizedMaps = trimVisionMapsForCharacters(normalizedMaps, snapshot.characters);
+                    }
+                    visionMapsRef.current = normalizedMaps;
+                }
+
+                const nextFovMode = String(snapshot?.fovMode || "").trim();
+                if (nextFovMode) {
+                    setFovMode(nextFovMode);
+                }
+                const snapshotRayCount = Number(snapshot?.visionRayCount);
+                if (Number.isFinite(snapshotRayCount)) {
+                    setVisionRayCount((prev) => (prev === snapshotRayCount ? prev : snapshotRayCount));
+                }
+                if (snapshot.journalState) {
+                    setJournalState(snapshot.journalState);
+                }
+                if (snapshot.questState && typeof snapshot.questState === "object") {
+                    setQuestState(snapshot.questState);
+                }
+            }
+        } catch (e) {
+            // ignore
+        }
+        loadGameSnapshot(snapshot);
+    }, [loadGameSnapshot]);
 
     const [sideWidth, setSideWidth] = useState(320);
     const [dragging, setDragging] = useState(false);
     const [contextMenu, setContextMenu] = useState(null);
-    const [contextActionTrail, setContextActionTrail] = useState([]);
+    const contextMenuRef = useRef(null);
+    const [contextTabTrails, setContextTabTrails] = useState({});
+    const [activeContextTab, setActiveContextTab] = useState("action");
     const [characterActionCache, setCharacterActionCache] = useState({});
     const [loadingActionCharacterId, setLoadingActionCharacterId] = useState("");
     const [selectedEntity, setSelectedEntity] = useState(null);
@@ -514,12 +660,239 @@ function GameComponent() {
     const [placementDrag, setPlacementDrag] = useState(null);
     const [autoSaveStatus, setAutoSaveStatus] = useState("");
     const [turnNumber, setTurnNumber] = useState(1);
-    const [infoPanelPosition, setInfoPanelPosition] = useState(null);
-    const [infoPanelDrag, setInfoPanelDrag] = useState(null);
+    const [infoPanels, setInfoPanels] = useState({});       // key: "type:id" → { x, y, type, id }
+    const [showStatusPanel, setShowStatusPanel] = useState(false);
+    const [contextMenuPos, setContextMenuPos] = useState(null);
+    const [stagedAction, setStagedAction] = useState(null);
+    const [journalState, setJournalState] = useState({ documents: [], groups: [] });
+    const [questState, setQuestState] = useState({ quests: [] });
+
+    // Top info bar position & drag state (DM can reposition)
+    const [topBarPos, setTopBarPos] = useState({ x: 12, y: 12 });
+    const [activeTopBarDrag, setActiveTopBarDrag] = useState(null);
+
+    const handleStageAction = useCallback(async (characterId, actionMeta, contextWorld) => {
+        if (!socket || !playerID || !gameID) return;
+        
+        const payload = {
+            playerID,
+            campaignID: gameID,
+            characterID: characterId,
+            actionPath: actionMeta.path || actionMeta.actionPath,
+            actionId: actionMeta.id,
+            actionType: actionMeta.actionType || actionMeta.tab,
+            params: {
+                position: contextWorld ? { x: Math.round(contextWorld.x), y: Math.round(contextWorld.y) } : undefined,
+                targetId: contextWorld?.targetId
+            }
+        };
+
+        const response = await emitWithAck(socket, "campaign_stageAction", payload);
+        if (response?.success) {
+            setStagedAction({ characterId, description: actionMeta.name || "Action" });
+        }
+    }, [socket, playerID, gameID]);
+
+    const handleCommitAction = useCallback(async () => {
+        if (!stagedAction || !socket) return;
+        const response = await emitWithAck(socket, "campaign_commitAction", {
+            campaignID: gameID, characterID: stagedAction.characterId
+        });
+
+        if (response?.success) {
+            const snapshot = response?.engineState?.snapshot;
+            if (snapshot) {
+                if (snapshot.lightingPolygons) {
+                    latestSnapshotRef.current.lightingPolygons = snapshot.lightingPolygons;
+                }
+                applyingServerStateRef.current = true;
+                skipNextAutoSaveRef.current = true;
+                applyLoadedSnapshot(snapshot);
+            }
+        } else if (response?.message) {
+            setGameContextError(response.message);
+        }
+
+        setStagedAction(null);
+        setMovementPreview(null);
+    }, [stagedAction, socket, gameID, applyLoadedSnapshot]);
+
+    const handleCancelAction = useCallback(async () => {
+        if (!stagedAction || !socket) return;
+        await emitWithAck(socket, "campaign_cancelAction", {
+            campaignID: gameID, characterID: stagedAction.characterId
+        });
+        setStagedAction(null);
+        setMovementPreview(null);
+    }, [stagedAction, socket, gameID]);
+
+    
+    useEffect(() => {
+        if (!activeTopBarDrag) return undefined;
+        const onMove = (e) => {
+            const x = e.clientX - activeTopBarDrag.offsetX;
+            const y = e.clientY - activeTopBarDrag.offsetY;
+            const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+            const maxX = Math.max(8, window.innerWidth - 160);
+            const maxY = Math.max(8, window.innerHeight - 40);
+            setTopBarPos({ x: clamp(x, 8, maxX), y: clamp(y, 8, maxY) });
+        };
+        const onUp = () => setActiveTopBarDrag(null);
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+        return () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+        };
+    }, [activeTopBarDrag]);
+    // Status & Combat panel positions and drag state
+    const [statusPanelPos, setStatusPanelPos] = useState({ x: 12, y: 48 });
+    const [combatPanelPos, setCombatPanelPos] = useState({ x: 12, y: 120 });
+    const [activeStatusDrag, setActiveStatusDrag] = useState(null);
+    const [activeCombatDrag, setActiveCombatDrag] = useState(null);
+
+    // Load saved positions
+    useEffect(() => {
+        try {
+            const s = localStorage.getItem("cc_statusPanelPos");
+            const c = localStorage.getItem("cc_combatPanelPos");
+            if (s) setStatusPanelPos(JSON.parse(s));
+            if (c) setCombatPanelPos(JSON.parse(c));
+        } catch (e) {
+            // ignore
+        }
+    }, []);
+
+    // Drag handlers for status panel
+    useEffect(() => {
+        if (!activeStatusDrag) return undefined;
+        const onMove = (e) => {
+            const x = e.clientX - activeStatusDrag.offsetX;
+            const y = e.clientY - activeStatusDrag.offsetY;
+            const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+            const maxX = Math.max(8, window.innerWidth - 200);
+            const maxY = Math.max(8, window.innerHeight - 80);
+            setStatusPanelPos({ x: clamp(x, 8, maxX), y: clamp(y, 8, maxY) });
+        };
+        const onUp = () => setActiveStatusDrag(null);
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+        return () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+        };
+    }, [activeStatusDrag]);
+
+    // Drag handlers for combat panel
+    useEffect(() => {
+        if (!activeCombatDrag) return undefined;
+        const onMove = (e) => {
+            const x = e.clientX - activeCombatDrag.offsetX;
+            const y = e.clientY - activeCombatDrag.offsetY;
+            const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+            const maxX = Math.max(8, window.innerWidth - 220);
+            const maxY = Math.max(8, window.innerHeight - 120);
+            setCombatPanelPos({ x: clamp(x, 8, maxX), y: clamp(y, 8, maxY) });
+        };
+        const onUp = () => setActiveCombatDrag(null);
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+        return () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+        };
+    }, [activeCombatDrag]);
+
+    // Persist positions
+    useEffect(() => {
+        try {
+            localStorage.setItem("cc_statusPanelPos", JSON.stringify(statusPanelPos));
+            localStorage.setItem("cc_combatPanelPos", JSON.stringify(combatPanelPos));
+        } catch (e) {
+            // ignore
+        }
+    }, [statusPanelPos, combatPanelPos]);
+    const [contextMenuDragOffset, setContextMenuDragOffset] = useState(null);
     const [blockedMovePreview, setBlockedMovePreview] = useState(null);
+    const [activeDragObject, setActiveDragObject] = useState(null);
     const [resizeTarget, setResizeTarget] = useState(null);
     const [controlledCharacterIDs, setControlledCharacterIDs] = useState([]);
+    const [characterAssignments, setCharacterAssignments] = useState([]);
     const [fps, setFps] = useState(0);
+    const [movementPreview, setMovementPreview] = useState(null); // { characterId, ghostX, ghostY, walkableRadius }
+	    const activeAnimationsRef = useRef({});
+	    const exploredAreasRef = useRef([]);
+	    const lastSeenRef = useRef({});
+	    const visionMapsRef = useRef({});
+
+    const handleExportSave = useCallback(() => {
+        if (!latestSnapshotRef.current) return;
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(latestSnapshotRef.current, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `campaign_save_${new Date().toISOString()}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }, []);
+
+    const handleImportSave = useCallback(async (event) => {
+        const file = event.target.files[0];
+        if (!file || !socket || !playerID || !gameID) return;
+        
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const snapshot = JSON.parse(e.target.result);
+                const response = await emitWithAck(socket, "campaign_saveGame", {
+                    playerID,
+                    campaignID: gameID,
+                    name: `Imported Save ${new Date().toLocaleString()}`,
+                    description: "Imported from file",
+                    snapshot,
+                    makeActive: true
+                });
+                
+                if (response?.success) {
+                    const newSnapshot = response.engineState?.snapshot || snapshot;
+                    if (newSnapshot.lightingPolygons) {
+                        latestSnapshotRef.current.lightingPolygons = newSnapshot.lightingPolygons;
+                    }
+                    applyingServerStateRef.current = true;
+                    skipNextAutoSaveRef.current = true;
+                    applyLoadedSnapshot(newSnapshot);
+                }
+            } catch (err) {
+                console.error("Import failed", err);
+                setGameContextError("Failed to import save file");
+            }
+        };
+        reader.readAsText(file);
+    }, [socket, playerID, gameID]);
+
+
+    
+
+
+    const [cursorLightLevel, setCursorLightLevel] = useState(1);
+    const [selectionBox, setSelectionBox] = useState(null); // { startX, startY, currentX, currentY }
+    const [multiSelectedIds, setMultiSelectedIds] = useState(new Set());
+    const [activeViewId, setActiveViewId] = useState("default");
+    const [viewMenuOpen, setViewMenuOpen] = useState(false);
+    const [lastServerUpdate, setLastServerUpdate] = useState(null);
+    const [visionRayCount, setVisionRayCount] = useState(256); // Number of test rays for vision cone
+    const [fovMode, setFovMode] = useState("party");
+    const [debugLightSample, setDebugLightSample] = useState(null);
+    const [visionDebug, setVisionDebug] = useState(null);
+
+    const lastClickRef = useRef({ time: 0, id: null });
+    const activeDragObjectRef = useRef(null);
+    // Combat state
+    const [combatActive, setCombatActive] = useState(false);
+    const [combatTurnOrder, setCombatTurnOrder] = useState([]);
+    const [currentCombatCharacterId, setCurrentCombatCharacterId] = useState(null);
+    const [combatRound, setCombatRound] = useState(1);
+    const [pendingAction, setPendingAction] = useState(null); // { characterId, action, sourceWorld } for targeting mode
 
     const isPanning = useRef(false);
     const layerRefs = useRef({});
@@ -533,9 +906,13 @@ function GameComponent() {
     const autoSavingRef = useRef(false);
     const autoSaveTimerRef = useRef(null);
     const hasAutoSaveBaselineRef = useRef(false);
+    const lastVisionDebugUpdateRef = useRef(0);
+    const lastExploreSampleRef = useRef({});
     const pendingMoveRef = useRef(null);
     const moveSyncTimerRef = useRef(null);
     const syncingMoveRef = useRef(false);
+    const pendingVisionRayCountRef = useRef(null);
+    const visionRaySyncTimerRef = useRef(null);
     const latestSnapshotRef = useRef({
         mapObjects: [],
         backgroundKey: "",
@@ -543,6 +920,10 @@ function GameComponent() {
         floorTypes: [],
         currentZLevel: 0,
         lighting: null,
+        visionMaps: {},
+        fovMode: "party",
+        visionRayCount: 256,
+        questState: { quests: [] },
     });
     const keysPressed = useRef({
         KeyW: false,
@@ -552,13 +933,101 @@ function GameComponent() {
         KeyQ: false,
         KeyE: false,
     });
+    const characterOwnershipById = useMemo(() => {
+        const byId = new Map();
+        (Array.isArray(characterAssignments) ? characterAssignments : []).forEach(
+            (assignment) => {
+                const characterId = toEntityID(
+                    assignment?.characterId || assignment?.characterID
+                );
+                if (!characterId || byId.has(characterId)) return;
+                byId.set(characterId, assignment);
+            }
+        );
+        return byId;
+    }, [characterAssignments]);
+
+    // Owned = characters the player controls (assigned to them)
+    const ownedCharacterIds = useMemo(() => {
+        const ids = new Set();
+        (controlledCharacterIDs || []).forEach((id) => {
+            const normalized = toEntityID(id);
+            if (normalized) ids.add(normalized);
+        });
+        const playerKey = toEntityID(playerID);
+        if (playerKey) {
+            (Array.isArray(characterAssignments) ? characterAssignments : []).forEach(
+                (assignment) => {
+                    if (
+                        toEntityID(assignment?.playerId || assignment?.playerID) !== playerKey
+                    ) {
+                        return;
+                    }
+                    const charId = toEntityID(
+                        assignment?.characterId || assignment?.characterID
+                    );
+                    if (charId) ids.add(charId);
+                }
+            );
+            extractOwnedCharacterIdsFromSnapshot({ characters }, playerID).forEach((id) => {
+                const normalized = toEntityID(id);
+                if (normalized) ids.add(normalized);
+            });
+        }
+        return Array.from(ids);
+    }, [controlledCharacterIDs, characterAssignments, characters, playerID]);
+
+    // Get first owned character for game actions (initiative rolls, dice, etc.)
+    const primaryCharacterId = ownedCharacterIds?.[0] || null;
+
+    // Dice roll system for combat
+    const { diceRolls, showDiceGallery, closeDiceGallery } = useGameActions(
+        gameID, 
+        primaryCharacterId, 
+        playerID
+    );
+
+    // Viewable = characters the player can see (owns + teammates)
+    const viewableCharacterIds = useMemo(() => {
+        const ids = new Set(ownedCharacterIds);
+        // Add teammate characters - characters on the same team as player's own characters
+        if (Array.isArray(characters)) {
+            const playerCharacterTeams = new Set();
+            ownedCharacterIds.forEach((ownedId) => {
+                const ownedChar = characters.find((c) => toEntityID(c?.id) === ownedId);
+                if (ownedChar?.team) {
+                    playerCharacterTeams.add(String(ownedChar.team).toLowerCase());
+                }
+            });
+            // Add all characters on same teams
+            if (playerCharacterTeams.size > 0) {
+                characters.forEach((char) => {
+                    if (char?.team && playerCharacterTeams.has(String(char.team).toLowerCase())) {
+                        ids.add(toEntityID(char.id));
+                    }
+                });
+            }
+        }
+        return ids;
+    }, [ownedCharacterIds, characters]);
+
     const controlledCharacterIdSet = useMemo(
-        () => new Set((controlledCharacterIDs || []).map((id) => toEntityID(id))),
-        [controlledCharacterIDs]
+        () => new Set((ownedCharacterIds || []).map((id) => toEntityID(id))),
+        [ownedCharacterIds]
     );
     const canControlCharacterId = useCallback(
         (characterId) => isDM || controlledCharacterIdSet.has(toEntityID(characterId)),
         [isDM, controlledCharacterIdSet]
+    );
+
+    const canViewCharacterId = useCallback(
+        (characterId) => isDM || viewableCharacterIds.has(toEntityID(characterId)),
+        [isDM, viewableCharacterIds]
+    );
+
+    const visionSources = useMemo(
+        () => resolveVisionSources(characters, ownedCharacterIds, fovMode),
+        [characters, ownedCharacterIds, fovMode]
     );
 
     const runAutoSave = useCallback(
@@ -576,22 +1045,17 @@ function GameComponent() {
                 campaignID: gameID,
                 name: `Auto Save ${now.toLocaleString()}`,
                 description: "Automatic save from active game session",
+                snapshotPatch: true,
                 snapshot: {
-                    mapObjects: Array.isArray(snapshotSource.mapObjects)
-                        ? snapshotSource.mapObjects
+                    exploredAreas: Array.isArray(snapshotSource.exploredAreas)
+                        ? snapshotSource.exploredAreas
                         : [],
-                    backgroundKey: String(snapshotSource.backgroundKey || ""),
-                    characters: Array.isArray(snapshotSource.characters)
-                        ? snapshotSource.characters
-                        : [],
-                    currentZLevel: Number(snapshotSource.currentZLevel) || 0,
-                    floorTypes: Array.isArray(snapshotSource.floorTypes)
-                        ? snapshotSource.floorTypes
-                        : [],
-                    lighting:
-                        snapshotSource.lighting && typeof snapshotSource.lighting === "object"
-                            ? snapshotSource.lighting
-                            : undefined,
+                    lastSeenEntities: snapshotSource.lastSeenEntities && typeof snapshotSource.lastSeenEntities === 'object'
+                        ? snapshotSource.lastSeenEntities
+                        : {},
+                    visionMaps: snapshotSource.visionMaps && typeof snapshotSource.visionMaps === "object"
+                        ? snapshotSource.visionMaps
+                        : {},
                 },
                 metadata: {
                     source: "autosave",
@@ -610,7 +1074,7 @@ function GameComponent() {
 
             setAutoSaveStatus(`Autosaved (${triggerLabel}) ${now.toLocaleTimeString()}`);
         },
-        [socket, playerID, gameID, isDM, loadingGameContext]
+        [socket, playerID, gameID, isDM, loadingGameContext, visionRayCount]
     );
 
     const scheduleAutoSave = useCallback(
@@ -640,6 +1104,96 @@ function GameComponent() {
         setTurnNumber((prev) => prev + 1);
         scheduleAutoSave("turn_done", { immediate: true });
     }, [isDM, scheduleAutoSave]);
+
+    const handleStartCombat = useCallback(async () => {
+        if (!isDM || !socket || !gameID || !playerID) return;
+
+        try {
+            const response = await emitWithAck(socket, "campaign_startCombat", {
+                playerID,
+                campaignID: gameID,
+            });
+
+            if (response?.success) {
+                const gameState = response.gameState || {};
+                setCombatActive(true);
+                setCombatTurnOrder(gameState.turnOrder || []);
+                setCurrentCombatCharacterId(gameState.currentCharacterId || null);
+                setCombatRound(gameState.round || 1);
+            } else if (response?.message) {
+                setGameContextError((prev) => prev || response.message);
+            }
+        } catch (error) {
+            console.error("Error starting combat:", error);
+            setGameContextError((prev) => prev || "Failed to start combat");
+        }
+    }, [isDM, socket, gameID, playerID]);
+
+    const handleEndTurn = useCallback(async () => {
+        if (!combatActive || !socket || !gameID || !playerID) return;
+
+        try {
+            const response = await emitWithAck(socket, "campaign_endTurn", {
+                playerID,
+                campaignID: gameID,
+            });
+
+            if (response?.success) {
+                const gameState = response.gameState || {};
+                setCombatTurnOrder(gameState.turnOrder || []);
+                setCurrentCombatCharacterId(gameState.currentCharacterId || null);
+                setCombatRound(gameState.round || 1);
+            } else if (response?.message) {
+                setGameContextError((prev) => prev || response.message);
+            }
+        } catch (error) {
+            console.error("Error ending turn:", error);
+            setGameContextError((prev) => prev || "Failed to end turn");
+        }
+    }, [combatActive, socket, gameID, playerID]);
+
+    const handleGetCombatState = useCallback(async () => {
+        if (!socket || !gameID || !playerID) return;
+
+        try {
+            const response = await emitWithAck(socket, "campaign_getCombatState", {
+                playerID,
+                campaignID: gameID,
+            });
+
+            if (response?.success && response?.gameState) {
+                const gameState = response.gameState;
+                setCombatActive(gameState.state === "active");
+                setCombatTurnOrder(gameState.turnOrder || []);
+                setCurrentCombatCharacterId(gameState.currentCharacterId || null);
+                setCombatRound(gameState.round || 1);
+            }
+        } catch (error) {
+            console.error("Error getting combat state:", error);
+        }
+    }, [socket, gameID, playerID]);
+
+    // Sync combat state on load
+    useEffect(() => {
+        if (socket && gameID && playerID) {
+            handleGetCombatState();
+        }
+    }, [socket, gameID, playerID, handleGetCombatState]);
+
+    useEffect(() => {
+        if (!socket) return;
+        const handleRemoteAnimation = (payload) => {
+            const id = `net_anim_${Date.now()}_${Math.random()}`;
+            activeAnimationsRef.current[id] = {
+                ...payload,
+                startTime: performance.now(),
+                duration: payload.duration || 300,
+                entityType: payload.entityType || 'character'
+            };
+        };
+        socket.on("campaign_animation", handleRemoteAnimation);
+        return () => socket.off("campaign_animation", handleRemoteAnimation);
+    }, [socket]);
 
     useEffect(
         () => () => {
@@ -696,6 +1250,7 @@ function GameComponent() {
                 return;
             }
 
+            setLastServerUpdate(new Date());
             const canEdit = resolveDMPermission(response, playerID);
             setIsDM(canEdit);
             setGameContextError("");
@@ -704,11 +1259,7 @@ function GameComponent() {
             const assignments = Array.isArray(response?.campaign?.characterAssignments)
                 ? response.campaign.characterAssignments
                 : [];
-            const assignedIds = assignments
-                .filter((assignment) => toEntityID(assignment?.playerId) === toEntityID(playerID))
-                .map((assignment) => toEntityID(assignment?.characterId))
-                .filter(Boolean);
-            setControlledCharacterIDs(assignedIds);
+            setCharacterAssignments(assignments);
 
             if (Array.isArray(response?.floorTypes)) {
                 replaceFloorTypes(response.floorTypes);
@@ -718,9 +1269,42 @@ function GameComponent() {
                 response?.engineState?.snapshot && typeof response.engineState.snapshot === "object"
                     ? response.engineState.snapshot
                     : response?.snapshot || {};
+            if (initialSnapshot.lightingPolygons) {
+                latestSnapshotRef.current.lightingPolygons = initialSnapshot.lightingPolygons;
+            }
+            if (initialSnapshot.journalState) {
+                setJournalState(initialSnapshot.journalState);
+            }
+            if (initialSnapshot.questState && typeof initialSnapshot.questState === "object") {
+                setQuestState(initialSnapshot.questState);
+            }
+            const assignedIds = assignments
+                .filter(
+                    (assignment) =>
+                        toEntityID(assignment?.playerId || assignment?.playerID) ===
+                        toEntityID(playerID)
+                )
+                .map((assignment) =>
+                    toEntityID(assignment?.characterId || assignment?.characterID)
+                )
+                .filter(Boolean);
+            const ownershipMap =
+                response?.engineState?.playerOwnership ||
+                response?.engineState?.snapshot?.playerOwnership;
+            const ownedFromOwnership = extractOwnedCharacterIdsFromOwnershipMap(
+                ownershipMap,
+                playerID
+            );
+            const ownedFromSnapshot = extractOwnedCharacterIdsFromSnapshot(
+                initialSnapshot,
+                playerID
+            );
+            setControlledCharacterIDs(
+                mergeUniqueIds(assignedIds, ownedFromOwnership, ownedFromSnapshot)
+            );
             applyingServerStateRef.current = true;
             skipNextAutoSaveRef.current = true;
-            loadGameSnapshot(initialSnapshot);
+            applyLoadedSnapshot(initialSnapshot);
         }
 
         bootstrapGameContext();
@@ -741,19 +1325,64 @@ function GameComponent() {
                     : null;
             if (!snapshot) return;
 
+            console.log('[CLIENT] Received server state update (revision:', payload?.engineState?.revision, ')');
+            setLastServerUpdate(new Date());
+
+            const ownershipMap =
+                payload?.engineState?.playerOwnership ||
+                payload?.engineState?.snapshot?.playerOwnership;
+            const ownedFromOwnership = extractOwnedCharacterIdsFromOwnershipMap(
+                ownershipMap,
+                playerID
+            );
+            const ownedFromSnapshot = extractOwnedCharacterIdsFromSnapshot(
+                snapshot,
+                playerID
+            );
+            if (ownedFromOwnership.length || ownedFromSnapshot.length) {
+                setControlledCharacterIDs((prev) =>
+                    mergeUniqueIds(prev, ownedFromOwnership, ownedFromSnapshot)
+                );
+            }
+
             if (Array.isArray(payload?.floorTypes)) {
                 replaceFloorTypes(payload.floorTypes);
             }
+            if (snapshot.lightingPolygons) {
+                latestSnapshotRef.current.lightingPolygons = snapshot.lightingPolygons;
+            }
+            
+            // Force client to use server data as authoritative source
             applyingServerStateRef.current = true;
             skipNextAutoSaveRef.current = true;
-            loadGameSnapshot(snapshot);
+            
+            // Apply server snapshot - this replaces all client state with server data
+            applyLoadedSnapshot(snapshot);
+            
+            console.log('[CLIENT] Applied server snapshot - characters:', snapshot.characters?.length);
         };
 
         socket.on("campaign_gameStateUpdated", handleServerWorldUpdate);
         return () => {
             socket.off("campaign_gameStateUpdated", handleServerWorldUpdate);
         };
-    }, [socket, gameID, loadGameSnapshot, replaceFloorTypes]);
+    }, [socket, gameID, playerID, loadGameSnapshot, replaceFloorTypes]);
+
+    useEffect(() => {
+        if (!socket || !gameID) return undefined;
+
+        const handleJournalUpdate = (payload = {}) => {
+            if (String(payload?.campaignID || "") !== String(gameID)) return;
+            if (payload?.journalState && typeof payload.journalState === "object") {
+                setJournalState(payload.journalState);
+            }
+        };
+
+        socket.on("campaign_journalStateUpdated", handleJournalUpdate);
+        return () => {
+            socket.off("campaign_journalStateUpdated", handleJournalUpdate);
+        };
+    }, [socket, gameID]);
 
     useEffect(() => {
         if (!socket || !playerID || !gameID || !isDM || loadingGameContext) return undefined;
@@ -775,6 +1404,8 @@ function GameComponent() {
                     characters,
                     floorTypes,
                     lighting,
+                    journalState,
+                    questState,
                 },
             });
             syncingWorldRef.current = false;
@@ -797,9 +1428,12 @@ function GameComponent() {
             if (Array.isArray(response?.floorTypes)) {
                 replaceFloorTypes(response.floorTypes);
             }
+            if (snapshot.lightingPolygons) {
+                latestSnapshotRef.current.lightingPolygons = snapshot.lightingPolygons;
+            }
             applyingServerStateRef.current = true;
             skipNextAutoSaveRef.current = true;
-            loadGameSnapshot(snapshot);
+            applyLoadedSnapshot(snapshot);
         }, 160);
 
         return () => clearTimeout(timer);
@@ -814,6 +1448,8 @@ function GameComponent() {
         characters,
         floorTypes,
         lighting,
+        questState,
+        journalState,
         loadGameSnapshot,
         replaceFloorTypes,
     ]);
@@ -845,6 +1481,8 @@ function GameComponent() {
         floorTypes,
         lighting,
         currentZLevel,
+        journalState,
+        questState,
         scheduleAutoSave,
     ]);
 
@@ -901,25 +1539,13 @@ function GameComponent() {
 
     const isVisible = (x, y) => {
         if (!fogEnabled) return true;
+        if (!Array.isArray(visionSources) || visionSources.length === 0) return false;
 
-        const playerChars = characters.filter((c) => c.team === "player");
-
-        for (const char of playerChars) {
-            const dx = x - char.position.x;
-            const dy = y - char.position.y;
-            const distSq = dx * dx + dy * dy;
-
-            if (distSq <= char.visionDistance * char.visionDistance) {
-                const angleToPoint = (Math.atan2(dy, dx) * 180) / Math.PI;
-                let angleDiff = angleToPoint - getFacingAngle(char.rotation);
-
-                while (angleDiff > 180) angleDiff -= 360;
-                while (angleDiff < -180) angleDiff += 360;
-
-                if (Math.abs(angleDiff) <= char.visionArc / 2) {
-                    return true;
-                }
-            }
+        for (const char of visionSources) {
+            const info = buildVisionInfoForChar(char);
+            if (!info) continue;
+            const result = getVisibilityForPoint(Number(x) || 0, Number(y) || 0, info);
+            if (result.visibility > 0) return true;
         }
 
         return false;
@@ -927,17 +1553,26 @@ function GameComponent() {
 
     const visibleMapObjects = useMemo(() => {
         if (!fogEnabled || isDM) return mapObjects;
-        const playerChars = characters.filter(
-            (c) => String(c.team || "").toLowerCase() === "player"
-        );
-        if (!playerChars.length) return [];
+        const sources = Array.isArray(visionSources) ? visionSources : [];
+        if (!sources.length) return [];
 
         return mapObjects.filter((obj) => {
+            // Trust server visibility if available (handles complex occlusion/lighting)
+            if (obj._visionData?.isVisible || (obj._visionData?.visibility || 0) > 0) return true;
+
+            // Check if object is hit by any vision ray from any player character
+            const hitByRay = sources.some((char) =>
+                (char.visionRays || []).some((ray) => 
+                    isPointInsideMapObject(ray.endX, ray.endY, obj, 10)
+                )
+            );
+            if (hitByRay) return true;
+
             const objX = Number(obj?.x) || 0;
             const objY = Number(obj?.y) || 0;
             const objRadius = getObjectVisibilityRadius(obj);
 
-            return playerChars.some((char) => {
+            return sources.some((char) => {
                 const cx = Number(char?.position?.x) || 0;
                 const cy = Number(char?.position?.y) || 0;
                 const dx = objX - cx;
@@ -951,15 +1586,16 @@ function GameComponent() {
                 while (angleDiff > 180) angleDiff -= 360;
                 while (angleDiff < -180) angleDiff += 360;
 
-                const arc = Number(char?.visionArc) || 90;
+                const arc = Math.max(0, Number(char?.visionArc) || 0);
+                const peripheralArc = arc / 4;
                 const arcPadding =
                     dist > 0
                         ? (Math.asin(Math.min(objRadius / dist, 1)) * 180) / Math.PI
                         : 180;
-                return Math.abs(angleDiff) <= arc / 2 + arcPadding;
+                return Math.abs(angleDiff) <= arc / 2 + peripheralArc + arcPadding;
             });
         });
-    }, [mapObjects, characters, fogEnabled, isDM]);
+    }, [mapObjects, visionSources, fogEnabled, isDM]);
 
     const geometryObjects = useMemo(() => {
         if (isDM) return mapObjects;
@@ -968,7 +1604,25 @@ function GameComponent() {
     }, [isDM, mapObjects, mapGeometry]);
 
     const findCharacterAt = (worldX, worldY, includeHidden = false) => {
-        const list = includeHidden ? characters : characters.filter((char) => isVisible(char.position.x, char.position.y));
+        const controlledIds = new Set((ownedCharacterIds || []).map((id) => toEntityID(id)));
+        
+        const list = includeHidden 
+            ? characters 
+            : characters.filter((char) => {
+                // DMs can always select everything
+                if (isDM) return true;
+                
+                // Players can always select their own characters (allows placement and control)
+                if (controlledIds.has(toEntityID(char.id))) return true;
+                
+                // On initial load (no owned characters yet), allow selecting any character
+                // This prevents players from being stuck unable to place their first character
+                if (controlledIds.size === 0 && characters.length > 0) return true;
+                
+                // For other cases, check fog of war visibility
+                return isVisible(char.position.x, char.position.y);
+            });
+        
         for (let i = list.length - 1; i >= 0; i -= 1) {
             const char = list[i];
             const dx = worldX - char.position.x;
@@ -1010,6 +1664,26 @@ function GameComponent() {
         () => visibleMapObjects.filter((obj) => getObjectZLevel(obj) === currentZLevel),
         [visibleMapObjects, currentZLevel]
     );
+
+    const collisionObjects = useMemo(() => {
+        return mapObjects.filter((obj) => {
+            const terrainType = String(obj?.terrainType || "").toLowerCase();
+            if (terrainType === "floor") return false;
+
+            const level = getObjectZLevel(obj);
+            // Objects on current level block
+            if (level === currentZLevel) return true;
+
+            // Objects from below block if they are tall enough
+            if (level < currentZLevel) {
+                const elevHeight = Math.max(0, Number(obj?.elevationHeight) || 0);
+                const topZLevel = level + Math.floor(elevHeight / HEIGHT_UNITS_PER_ZLEVEL);
+                return topZLevel >= currentZLevel;
+            }
+
+            return false;
+        });
+    }, [mapObjects, currentZLevel]);
 
 const tallSolidsFromBelow = useMemo(() => {
     return visibleMapObjects.filter((obj) => {
@@ -1084,6 +1758,8 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         return null;
     }, [selectedEntity, characters, mapObjects, floorTypesByID]);
 
+    const hiddenMapObjectIds = useMemo(() => new Set(), []);
+
     useEffect(() => {
         latestSnapshotRef.current = {
             mapObjects,
@@ -1091,9 +1767,17 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
             characters,
             floorTypes,
             currentZLevel,
+            lightingPolygons: latestSnapshotRef.current.lightingPolygons,
             lighting,
+            exploredAreas: exploredAreasRef.current,
+            lastSeenEntities: lastSeenRef.current,
+            visionMaps: visionMapsRef.current,
+            fovMode,
+            visionRayCount,
+            journalState,
+            questState,
         };
-    }, [mapObjects, backgroundKey, characters, floorTypes, currentZLevel, lighting]);
+    }, [mapObjects, backgroundKey, characters, floorTypes, currentZLevel, lighting, journalState, questState, fovMode, visionRayCount]);
 
     useEffect(() => {
         if (!selectedEntity) return;
@@ -1119,62 +1803,46 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         [sideWidth]
     );
 
+
+// Sync position when context menu first opens
+useEffect(() => {
+    if (!contextMenu) { setContextMenuPos(null); return; }
+    setContextMenuPos({ x: contextMenu.x, y: contextMenu.y });
+}, [contextMenu]);
+
+// Context menu dragging
+useEffect(() => {
+    if (!contextMenuDragOffset) return undefined;
+    const onMouseMove = (e) => {
+        setContextMenuPos({
+            x: e.clientX - contextMenuDragOffset.x,
+            y: e.clientY - contextMenuDragOffset.y,
+        });
+    };
+    const onMouseUp = () => setContextMenuDragOffset(null);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+    };
+}, [contextMenuDragOffset]);
+
+    // Update light level when scene changes (even if mouse is static)
     useEffect(() => {
-        if (!selectedEntityData?.type) {
-            setInfoPanelDrag(null);
-            return;
+        if (!lastMouse || (lastMouse.x === 0 && lastMouse.y === 0)) return;
+        if (!layerRefs.current.background) return;
+
+        const world = getWorldFromMouseEvent({ clientX: lastMouse.x, clientY: lastMouse.y });
+        if (world) {
+            const lightVal = calculateLightAtPoint(world.x, world.y, {
+                lighting,
+                currentZLevel,
+                lightingPolygons: latestSnapshotRef.current.lightingPolygons
+            });
+            setCursorLightLevel(lightVal);
         }
-        setInfoPanelPosition((prev) => {
-            if (prev && Number.isFinite(prev.x) && Number.isFinite(prev.y)) {
-                return clampInfoPanelPosition(prev.x, prev.y);
-            }
-            return clampInfoPanelPosition(
-                window.innerWidth - sideWidth - INFO_PANEL_WIDTH - INFO_PANEL_MIN_LEFT,
-                INFO_PANEL_MIN_TOP
-            );
-        });
-    }, [selectedEntityData, sideWidth, clampInfoPanelPosition]);
-
-    useEffect(() => {
-        const onResize = () => {
-            setInfoPanelPosition((prev) =>
-                prev ? clampInfoPanelPosition(prev.x, prev.y) : prev
-            );
-        };
-        window.addEventListener("resize", onResize);
-        return () => window.removeEventListener("resize", onResize);
-    }, [clampInfoPanelPosition]);
-
-    useEffect(() => {
-        if (!infoPanelDrag) return undefined;
-
-        const onMouseMove = (event) => {
-            const next = clampInfoPanelPosition(
-                event.clientX - infoPanelDrag.offsetX,
-                event.clientY - infoPanelDrag.offsetY
-            );
-            setInfoPanelPosition(next);
-        };
-
-        const onMouseUp = () => setInfoPanelDrag(null);
-
-        window.addEventListener("mousemove", onMouseMove);
-        window.addEventListener("mouseup", onMouseUp);
-
-        return () => {
-            window.removeEventListener("mousemove", onMouseMove);
-            window.removeEventListener("mouseup", onMouseUp);
-        };
-    }, [infoPanelDrag, clampInfoPanelPosition]);
-
-    useEffect(() => {
-        if (!selectedChar) return;
-        setSelectedEntity((prev) => {
-            const next = { type: "character", id: selectedChar };
-            if (isSameEntity(prev, next)) return prev;
-            return next;
-        });
-    }, [selectedChar]);
+    }, [lighting, currentZLevel, mapObjects, lastMouse]);
 
     useEffect(() => {
         let raf;
@@ -1244,28 +1912,353 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 visibleMapObjects,
                 characters,
                 selectedChar,
+                selectedCharacterIds: multiSelectedIds,
                 fogEnabled,
                 isDM,
-                controlledCharacterIDs,
+                controlledCharacterIDs: ownedCharacterIds,
                 floorTypes,
                 currentZLevel,
                 selectedMapObjectID,
-                blockedMovePreview,
+                blockedMovePreview: null, // Rendered via SVG instead of canvas
+                activeDragObject,
+                hiddenMapObjectIds,
+                lightingPolygons: latestSnapshotRef.current.lightingPolygons,
                 lighting,
                 lightingCache: lightingCacheRef.current,
                 showResizeHandles: isDM,
+                visionRayCount,
+                debugLightSample,
             };
+
+            let animatedCharacters = currentState.characters;
+            const activeAnims = activeAnimationsRef.current;
+            const animKeys = Object.keys(activeAnims);
+
+            if (animKeys.length > 0) {
+                const charMap = new Map(animatedCharacters.map(c => [toEntityID(c.id), c]));
+                
+                animKeys.forEach(key => {
+                    const anim = activeAnims[key];
+                    const elapsed = now - anim.startTime;
+                    const progress = Math.min(1, elapsed / (anim.duration || 300));
+                    
+                    if (anim.entityType === 'character') {
+                        const char = charMap.get(toEntityID(anim.entityId));
+                        if (char) {
+                            const handler = ANIMATION_REGISTRY[anim.type] || ANIMATION_REGISTRY.movement;
+                            const updatedChar = handler(char, progress, anim.params || {});
+                            charMap.set(toEntityID(anim.entityId), updatedChar);
+                        }
+                    }
+                    
+                    if (progress >= 1) {
+                        delete activeAnims[key];
+                    }
+                });
+                
+                animatedCharacters = Array.from(charMap.values());
+            }
+
+            let activeVisionSources = [];
+            let activeVisionVisibility = {};
+            let ghostCharacters = [];
+            let ghostMapObjects = [];
+
+            // Update per-character vision maps and combine for current view
+            try {
+                const allCharacters = Array.isArray(animatedCharacters) ? animatedCharacters : [];
+                const allMapObjects = Array.isArray(mapObjects) ? mapObjects : [];
+                const allEntities = [];
+                allCharacters.forEach((char) => {
+                    const id = toEntityID(char?.id);
+                    if (!id) return;
+                    allEntities.push({
+                        type: "character",
+                        id,
+                        key: makeVisionEntityKey("character", id),
+                        obj: char,
+                    });
+                });
+                allMapObjects.forEach((obj) => {
+                    const id = toEntityID(obj?.id);
+                    if (!id) return;
+                    allEntities.push({
+                        type: "mapObject",
+                        id,
+                        key: makeVisionEntityKey("mapObject", id),
+                        obj,
+                    });
+                });
+
+                const visionMaps =
+                    visionMapsRef.current && typeof visionMapsRef.current === "object"
+                        ? visionMapsRef.current
+                        : {};
+                const nowTs = Date.now();
+                const visionInfoCache = new Map();
+
+                const getVisionInfo = (char) => {
+                    const charId = toEntityID(char?.id);
+                    if (!charId) return null;
+                    if (visionInfoCache.has(charId)) return visionInfoCache.get(charId);
+                    const info = buildVisionInfoForChar(char);
+                    visionInfoCache.set(charId, info);
+                    return info;
+                };
+
+                allCharacters.forEach((char) => {
+                    const charId = toEntityID(char?.id);
+                    if (!charId) return;
+                    const info = getVisionInfo(char);
+                    if (!info) return;
+                    const memoryLimit = getMemoryLimitForChar(char);
+
+                    const map =
+                        visionMaps[charId] && typeof visionMaps[charId] === "object"
+                            ? visionMaps[charId]
+                            : {};
+                    if (!Array.isArray(map.exploredAreas)) map.exploredAreas = [];
+                    if (!map.lastSeenEntities || typeof map.lastSeenEntities !== "object") map.lastSeenEntities = {};
+
+                    const exploredArc = info.angle > 0 ? info.angle : 360;
+                    if (info.distance > 0 && exploredArc > 0) {
+                        const lastSample = lastExploreSampleRef.current[charId];
+                        const dx = info.x - (Number.isFinite(lastSample?.x) ? lastSample.x : info.x);
+                        const dy = info.y - (Number.isFinite(lastSample?.y) ? lastSample.y : info.y);
+                        const distMoved = Math.hypot(dx, dy);
+                        const rawRotDelta = Math.abs(
+                            normalizeAngleDegrees(info.rotation - (Number.isFinite(lastSample?.rotation) ? lastSample.rotation : info.rotation))
+                        );
+                        const rotDelta = Math.min(rawRotDelta, 360 - rawRotDelta);
+                        const shouldSample =
+                            !lastSample || distMoved >= VISION_MAP_MIN_MOVE || rotDelta >= VISION_MAP_MIN_ROT;
+
+                        if (shouldSample) {
+                            const rays = Array.isArray(char?.visionRays) ? char.visionRays : [];
+                            const { main, peripheral } = splitVisionRays(rays);
+                            const peripheralSplit = splitPeripheralRaysBySide(
+                                peripheral,
+                                info.x,
+                                info.y,
+                                info.facingRad
+                            );
+
+                            const mainPoly = buildPolygonFromRays(main, info.x, info.y, info.facingRad);
+                            if (mainPoly) {
+                                map.exploredAreas.push({ ...mainPoly, ts: nowTs });
+                            } else {
+                                map.exploredAreas.push({
+                                    x: info.x,
+                                    y: info.y,
+                                    r: info.distance,
+                                    rot: info.rotation,
+                                    arc: exploredArc,
+                                    ts: nowTs,
+                                });
+                            }
+
+                            const leftPoly = buildPolygonFromRays(
+                                peripheralSplit.left,
+                                info.x,
+                                info.y,
+                                info.facingRad
+                            );
+                            if (leftPoly) map.exploredAreas.push({ ...leftPoly, ts: nowTs });
+                            const rightPoly = buildPolygonFromRays(
+                                peripheralSplit.right,
+                                info.x,
+                                info.y,
+                                info.facingRad
+                            );
+                            if (rightPoly) map.exploredAreas.push({ ...rightPoly, ts: nowTs });
+
+                            if (info.closeRadius > 0) {
+                                map.exploredAreas.push({
+                                    type: "circle",
+                                    x: info.x,
+                                    y: info.y,
+                                    r: info.closeRadius,
+                                    ts: nowTs,
+                                });
+                            }
+
+                            lastExploreSampleRef.current[charId] = {
+                                x: info.x,
+                                y: info.y,
+                                rotation: info.rotation,
+                                ts: nowTs,
+                            };
+                        }
+                    }
+
+                    // Memory limit is applied per sample (all shapes with the same ts count as one).
+                    map.exploredAreas = trimExploredAreasForMemory(map.exploredAreas, memoryLimit);
+
+                    const visibleEntities = {};
+                    allEntities.forEach((entry) => {
+                        const result = getVisibilityForEntity(entry, info);
+                        if (result.visibility > 0) {
+                            visibleEntities[entry.key] = {
+                                ...result,
+                                ts: nowTs,
+                            };
+                            map.lastSeenEntities[entry.key] = {
+                                ts: nowTs,
+                                snapshot: JSON.parse(JSON.stringify(entry.obj)),
+                                entityType: entry.type,
+                                visibility: result.visibility,
+                                visionType: result.visionType,
+                            };
+                        }
+                    });
+                    map.visibleEntities = visibleEntities;
+                    visionMaps[charId] = map;
+                });
+
+                visionMapsRef.current = visionMaps;
+
+                activeVisionSources = resolveVisionSources(allCharacters, ownedCharacterIds, fovMode);
+                const combinedExplored = [];
+                const combinedLastSeen = {};
+                const combinedVisibility = {};
+
+                activeVisionSources.forEach((char) => {
+                    const charId = toEntityID(char?.id);
+                    if (!charId) return;
+                    const map = visionMaps[charId];
+                    if (!map) return;
+                    if (Array.isArray(map.exploredAreas)) {
+                        combinedExplored.push(...map.exploredAreas);
+                    }
+                    if (map.lastSeenEntities && typeof map.lastSeenEntities === "object") {
+                        Object.entries(map.lastSeenEntities).forEach(([key, entry]) => {
+                            if (!entry) return;
+                            const existing = combinedLastSeen[key];
+                            if (!existing || Number(entry.ts) > Number(existing.ts)) {
+                                combinedLastSeen[key] = entry;
+                            }
+                        });
+                    }
+                    if (map.visibleEntities && typeof map.visibleEntities === "object") {
+                        Object.entries(map.visibleEntities).forEach(([key, entry]) => {
+                            if (!entry) return;
+                            const existing = combinedVisibility[key];
+                            if (!existing || (entry.visibility || 0) > (existing.visibility || 0)) {
+                                combinedVisibility[key] = entry;
+                            }
+                        });
+                    }
+                });
+
+                exploredAreasRef.current = combinedExplored;
+                lastSeenRef.current = combinedLastSeen;
+                activeVisionVisibility = combinedVisibility;
+
+                if (fogEnabled && !isDM) {
+                    const visibleKeys = new Set(
+                        Object.keys(combinedVisibility).filter(
+                            (key) => (combinedVisibility[key]?.visibility || 0) > 0
+                        )
+                    );
+
+                    Object.entries(combinedLastSeen).forEach(([key, entry]) => {
+                        if (!entry || !entry.snapshot) return;
+                        if (visibleKeys.has(key)) return;
+                        const type =
+                            entry.entityType || (entry.snapshot?.position ? "character" : "mapObject");
+                        if (type === "character") {
+                            const team = String(entry.snapshot?.team || "").toLowerCase();
+                            if (team !== "enemy") return;
+                            ghostCharacters.push({
+                                ...entry.snapshot,
+                                _visionGhost: true,
+                                _visionData: {
+                                    visibility: entry.visibility,
+                                    visionType: entry.visionType,
+                                },
+                            });
+                        } else {
+                            ghostMapObjects.push({
+                                ...entry.snapshot,
+                                _visionGhost: true,
+                                _visionData: {
+                                    visibility: entry.visibility,
+                                    visionType: entry.visionType,
+                                },
+                            });
+                        }
+                    });
+                }
+
+                if (isDM) {
+                    const nowStamp =
+                        typeof performance !== "undefined" && typeof performance.now === "function"
+                            ? performance.now()
+                            : Date.now();
+                    if (nowStamp - lastVisionDebugUpdateRef.current > 500) {
+                        lastVisionDebugUpdateRef.current = nowStamp;
+                        const perCharacter = allCharacters.map((char) => {
+                            const charId = toEntityID(char?.id);
+                            const map = charId ? visionMaps[charId] : null;
+                            const exploredCount = Array.isArray(map?.exploredAreas)
+                                ? map.exploredAreas.length
+                                : 0;
+                            const lastSeenCount =
+                                map?.lastSeenEntities && typeof map.lastSeenEntities === "object"
+                                    ? Object.keys(map.lastSeenEntities).length
+                                    : 0;
+                            const visibleCount =
+                                map?.visibleEntities && typeof map.visibleEntities === "object"
+                                    ? Object.keys(map.visibleEntities).length
+                                    : 0;
+                            return {
+                                id: charId,
+                                name: String(char?.name || charId || "Unknown"),
+                                explored: exploredCount,
+                                lastSeen: lastSeenCount,
+                                visible: visibleCount,
+                            };
+                        });
+                        setVisionDebug({
+                            updatedAt: Date.now(),
+                            characterCount: allCharacters.length,
+                            sourceCount: activeVisionSources.length,
+                            combinedExplored: combinedExplored.length,
+                            combinedLastSeen: Object.keys(combinedLastSeen).length,
+                            combinedVisible: Object.keys(combinedVisibility).length,
+                            perCharacter,
+                        });
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+
+            const renderState = {
+                ...currentState,
+                characters: animatedCharacters,
+                exploredAreas: exploredAreasRef.current,
+                lastSeenEntities: lastSeenRef.current,
+                visionVisibility: activeVisionVisibility,
+                visionSources: activeVisionSources,
+                ghostCharacters,
+                ghostMapObjects,
+                fovMode,
+            };
+
+            const view = getActiveMapView(activeViewId);
+            const filteredState = view.apply(renderState);
 
             michelangeloEngine({
                 layers,
                 frame: {
-                    state: currentState,
+                    state: filteredState,
                     prevState: prevStateRef.current,
                     cache: {},
                 },
             });
 
-            prevStateRef.current = currentState;
+            prevStateRef.current = filteredState;
             raf = requestAnimationFrame(loop);
         };
 
@@ -1278,14 +2271,20 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         characters,
         selectedChar,
         fogEnabled,
-        controlledCharacterIDs,
+        ownedCharacterIds,
         floorTypes,
         currentZLevel,
         selectedEntity,
         blockedMovePreview,
+        activeDragObject,
+        hiddenMapObjectIds,
         lighting,
         backgroundKey,
         isDM,
+        activeViewId,
+        visionRayCount,
+        debugLightSample,
+        fovMode,
     ]);
 
     useEffect(() => {
@@ -1377,16 +2376,31 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         };
     }, [camera, stepZLevelDown, stepZLevelUp]);
 
+const openInfoPanel = useCallback((type, id, spawnX, spawnY) => {
+    const key = `${type}:${id}`;
+    setInfoPanels(prev => {
+        if (prev[key]) return prev;
+        const clamped = clampInfoPanelPosition(spawnX ?? INFO_PANEL_MIN_LEFT, spawnY ?? INFO_PANEL_MIN_TOP);
+        return { ...prev, [key]: { ...clamped, type, id } };
+    });
+}, [clampInfoPanelPosition]);
+
     useEffect(() => {
         const onEscape = (event) => {
             if (event.key !== "Escape") return;
             setContextMenu(null);
+            setContextMenuPos(null);
+            setInfoPanels({});
             setDragTarget(null);
             setResizeTarget(null);
             setPlacementDrag(null);
             setRotationDrag(null);
             setBlockedMovePreview(null);
+            setActiveDragObject(null);
+            setMovementPreview(null);
             setSelectedEntity(null);
+            setSelectionBox(null);
+            setPendingAction(null);
             selectCharacter(null);
             clearMapObjectPlacement();
             clearLightPlacement();
@@ -1404,35 +2418,69 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
     }, [mapObjectPlacement]);
 
     const selectEntity = useCallback(
-        (target) => {
-            if (!target?.type) {
-                setSelectedEntity(null);
-                selectCharacter(null);
-                return;
-            }
+    (target) => {
+        if (!target?.type) {
+            setSelectedEntity(null);
+            selectCharacter(null);
+            return;
+        }
+        const next = { type: target.type, id: target.id };
+            setSelectedEntity((prev) => (isSameEntity(prev, next) ? prev : next));
+            if (target.type === "character") {
+                setMultiSelectedIds(new Set([toEntityID(target.id)]));
+                selectCharacter(target.id);
 
-            const next = { type: target.type, id: target.id };
-            setSelectedEntity(next);
-            if (next.type === "character") {
-                selectCharacter(next.id);
             } else {
                 selectCharacter(null);
             }
-        },
-        [selectCharacter]
-    );
 
-    const handleMouseDown = (event) => {
+    },
+    [selectCharacter, openInfoPanel]
+);
+
+
+
+
+
+
+const closeInfoPanel = useCallback((key) => {
+    setInfoPanels(prev => { const n = { ...prev }; delete n[key]; return n; });
+}, []);
+
+const handleMouseDown = async (event) => {
         const world = getWorldFromMouseEvent(event);
         if (!world) return;
         setBlockedMovePreview(null);
+        setContextMenu(null);
+        setActiveDragObject(null);
+        setMovementPreview(null);
 
+        // --- RIGHT CLICK (Context Menu) ---
         if (event.button === 2) {
             event.preventDefault();
+            
+            if (pendingAction) {
+                setPendingAction(null);
+                setMovementPreview(null);
+                return;
+            }
+
             const target =
                 findInteractionTargetAt(world.x, world.y, isDM) ||
                 (selectedEntity?.type ? selectedEntity : null);
-            if (target) {
+
+            // If right-clicking on empty space, show a context menu for the selected character if one exists
+            if (!target && selectedEntityData?.type === 'character') {
+                setContextMenu({
+                    x: event.clientX,
+                    y: event.clientY,
+                    world: { x: world.x, y: world.y },
+                    target: {
+                        type: selectedEntityData.type,
+                        id: selectedEntityData.id,
+                    },
+                });
+            } else if (target) {
                 setContextMenu({
                     x: event.clientX,
                     y: event.clientY,
@@ -1448,132 +2496,253 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
             return;
         }
 
+        // --- MIDDLE CLICK (Panning) ---
         if (event.button === 1) {
             event.preventDefault();
             isPanning.current = true;
             return;
         }
 
-        if (event.button !== 0) {
-            return;
-        }
+        // --- LEFT CLICK ---
+        if (event.button === 0) {
+            event.preventDefault();
 
-        setContextMenu(null);
-
-        if (isDM && characterPlacement) {
-            placeCharacterFromPlacement(world);
-            return;
-        }
-
-        if (isDM && !mapObjectPlacement && !lightPlacement && !characterPlacement) {
-            const screen = getScreenFromMouseEvent(event);
-            const facingTarget = screen
-                ? findFacingHandleAtScreenPoint(screen.x, screen.y)
-                : null;
-            if (facingTarget) {
-                setPlacementDrag(null);
-                setDragTarget(null);
-                setRotationDrag({ characterId: facingTarget.id });
-                selectEntity({ type: "character", id: facingTarget.id });
+            // Debug: Alt + Shift + Click to sample server lighting at cursor
+            if (isDM && event.altKey && event.ctrlKey) {
+                if (socket && playerID && gameID) {
+                    const payload = {
+                        playerID,
+                        campaignID: gameID,
+                        worldX: Math.round(Number(world.x) || 0),
+                        worldY: Math.round(Number(world.y) || 0),
+                    };
+                    try {
+                        const response = await emitWithAck(socket, "campaign_debugLightAtPoint", payload);
+                        if (response?.success) {
+                            setDebugLightSample({
+                                worldX: response.worldX,
+                                worldY: response.worldY,
+                                lightLevel: response.lightLevel,
+                                lightingEnabled: response.lightingEnabled,
+                                ambient: response.ambient,
+                                currentZLevel: response.currentZLevel,
+                                timestamp: Date.now(),
+                            });
+                        } else {
+                            setDebugLightSample({
+                                worldX: payload.worldX,
+                                worldY: payload.worldY,
+                                error: response?.message || "Debug light query failed",
+                                timestamp: Date.now(),
+                            });
+                        }
+                    } catch (error) {
+                        setDebugLightSample({
+                            worldX: payload.worldX,
+                            worldY: payload.worldY,
+                            error: error?.message || "Debug light query failed",
+                            timestamp: Date.now(),
+                        });
+                    }
+                }
                 return;
             }
-        }
 
-        if (isDM && mapObjectPlacement) {
-            setPlacementDrag({
-                startWorld: { x: world.x, y: world.y },
-                currentWorld: { x: world.x, y: world.y },
-                startClient: { x: event.clientX, y: event.clientY },
-            });
-            return;
-        }
-        if (isDM && lightPlacement) {
-            placeLightAt(world.x, world.y);
-            return;
-        }
+            // 1. Handle pending actions (e.g., from context menu)
+            if (pendingAction) {
+                const actionType = String(pendingAction.actionMeta?.actionType || pendingAction.actionMeta?.tab || "").toLowerCase();
+                const isMovement = actionType === "movement" || String(pendingAction.actionMeta?.path || "").startsWith("movement.");
+                if (isMovement) {
+                event.stopPropagation();
+                    executeCharacterAction(pendingAction.characterId, pendingAction.actionMeta, { x: world.x, y: world.y });
+                    setPendingAction(null);
+                    setMovementPreview(null);
+                    return;
+                }
+            }
 
-        if (isDM && selectedEntityData?.type === "mapObject") {
-            const selectedObject = selectedEntityData.entity;
-            if (selectedObject && getObjectZLevel(selectedObject) === currentZLevel) {
+            // 2. Handle DM placement modes
+            if (isDM) {
+                if (characterPlacement) {
+                    placeCharacterFromPlacement(world);
+                    return;
+                }
+                if (mapObjectPlacement) {
+                    setPlacementDrag({
+                        startWorld: { x: world.x, y: world.y },
+                        currentWorld: { x: world.x, y: world.y },
+                        startClient: { x: event.clientX, y: event.clientY },
+                    });
+                    return;
+                }
+                if (lightPlacement) {
+                    placeLightAt(world.x, world.y);
+                    return;
+                }
+            }
+
+            // 3. Handle DM special interactions (resize, rotate)
+            if (isDM) {
                 const screen = getScreenFromMouseEvent(event);
-                const cameraSnapshot = {
-                    x: Number(camera.current?.x) || 0,
-                    y: Number(camera.current?.y) || 0,
-                    zoom: Number(camera.current?.zoom) || 1,
-                };
-                const handles = buildResizeHandlesForObject(selectedObject, cameraSnapshot);
-                const hitHandle = screen
-                    ? findResizeHandleAtScreenPoint(screen.x, screen.y, handles)
-                    : null;
-                if (hitHandle) {
-                    setDragTarget(null);
-                    setBlockedMovePreview(null);
-                    if (hitHandle.id === "height") {
-                        setResizeTarget({
-                            type: "height",
-                            id: selectedObject.id,
-                            startClientY: event.clientY,
-                            startHeight: Math.round(Number(selectedObject?.elevationHeight) || 0),
-                        });
-                        return;
-                    }
-
-                    const bounds = getMapObjectBounds(selectedObject);
-                    const anchor = getResizeAnchorForHandle(hitHandle.id, bounds);
-                    if (anchor) {
-                        setResizeTarget({
-                            type: "shape",
-                            id: selectedObject.id,
-                            handle: hitHandle.id,
-                            anchorX: anchor.x,
-                            anchorY: anchor.y,
-                        });
+                if (screen) {
+                    const facingTarget = findFacingHandleAtScreenPoint(screen.x, screen.y);
+                    if (facingTarget) {
+                        setRotationDrag({ characterId: facingTarget.id });
+                        selectEntity({ type: "character", id: facingTarget.id });
                         return;
                     }
                 }
+                if (selectedEntityData?.type === "mapObject") {
+                    const selectedObject = selectedEntityData.entity;
+                    if (selectedObject && getObjectZLevel(selectedObject) === currentZLevel) {
+                        const cameraSnapshot = {
+                            x: Number(camera.current?.x) || 0,
+                            y: Number(camera.current?.y) || 0,
+                            zoom: Number(camera.current?.zoom) || 1,
+                        };
+                        const handles = buildResizeHandlesForObject(selectedObject, cameraSnapshot);
+                        const hitHandle = screen ? findResizeHandleAtScreenPoint(screen.x, screen.y, handles) : null;
+                        if (hitHandle) {
+                            setDragTarget(null);
+                            if (hitHandle.id === "height") {
+                                setResizeTarget({
+                                    type: "height",
+                                    id: selectedObject.id,
+                                    startClientY: event.clientY,
+                                    startHeight: Math.round(Number(selectedObject?.elevationHeight) || 0),
+                                });
+                            } else {
+                                const bounds = getMapObjectBounds(selectedObject);
+                                const anchor = getResizeAnchorForHandle(hitHandle.id, bounds);
+                                if (anchor) {
+                                    setResizeTarget({
+                                        type: "shape",
+                                        id: selectedObject.id,
+                                        handle: hitHandle.id,
+                                        anchorX: anchor.x,
+                                        anchorY: anchor.y,
+                                    });
+                                }
+                            }
+                            return;
+                        }
+                    }
+                }
             }
-        }
 
-        const target = findInteractionTargetAt(world.x, world.y, isDM);
-        if (!target) {
-            selectEntity(null);
-            return;
-        }
+            // 4. Find what was clicked on
+            const target = findInteractionTargetAt(world.x, world.y, isDM);
 
-        selectEntity(target);
+            // 5. Handle double-click to open info panel
+            const now = Date.now();
+            if (isSameEntity(target, selectedEntity) && lastClickRef.current.id === target?.id && now - lastClickRef.current.time < 300) {
+                openInfoPanel(target.type, target.id, event.clientX, event.clientY);
+                // Fall through to start drag
+            }
+            lastClickRef.current = { time: now, id: target?.id };
 
-        if (target.type === "mapObject") {
-            if (!isDM) return;
-            const objectTarget = activeMapObjects.find(
-                (obj) => toEntityID(obj?.id) === toEntityID(target.id)
-            );
-            if (!objectTarget) return;
-            setDragTarget({
-                type: "mapObject",
-                id: objectTarget.id,
-                offsetX: world.x - (Number(objectTarget.x) || 0),
-                offsetY: world.y - (Number(objectTarget.y) || 0),
-            });
-            return;
-        }
+            // 6. Select or deselect entity
+            if (target) {
+                selectEntity(target);
+                setMultiSelectedIds(new Set([toEntityID(target.id)]));
+            } else {
+                if (!isPanning.current && !placementDrag && !mapObjectPlacement && !lightPlacement && !characterPlacement) {
+                    const screen = getScreenFromMouseEvent(event);
+                    if (screen) {
+                        setSelectionBox({ startX: screen.x, startY: screen.y, currentX: screen.x, currentY: screen.y });
+                        selectEntity(null);
+                        setMultiSelectedIds(new Set());
+                    }
+                }
+                return; // Clicked on empty space, do nothing else
+            }
 
-        if (target.type === "character") {
-            const characterTarget = characters.find(
-                (char) => toEntityID(char?.id) === toEntityID(target.id)
-            );
-            if (!characterTarget) return;
-            if (!canControlCharacterId(characterTarget.id)) return;
-            setDragTarget({
-                type: "character",
-                id: characterTarget.id,
-                offsetX: world.x - (Number(characterTarget?.position?.x) || 0),
-                offsetY: world.y - (Number(characterTarget?.position?.y) || 0),
-            });
+            // 7. Start drag operation for the selected target
+            if (target.type === "character") {
+                const characterTarget = characters.find(c => toEntityID(c?.id) === toEntityID(target.id));
+                if (characterTarget && canControlCharacterId(characterTarget.id)) {
+                    setDragTarget({
+                        type: "character",
+                        id: characterTarget.id,
+                        offsetX: world.x - (Number(characterTarget?.position?.x) || 0),
+                        offsetY: world.y - (Number(characterTarget?.position?.y) || 0),
+                    });
+                }
+            } else if (target.type === "mapObject" && isDM) {
+                const objectTarget = activeMapObjects.find(obj => toEntityID(obj?.id) === toEntityID(target.id));
+                if (objectTarget) {
+                    setDragTarget({
+                        type: "mapObject",
+                        id: objectTarget.id,
+                        offsetX: world.x - (Number(objectTarget.x) || 0),
+                        offsetY: world.y - (Number(objectTarget.y) || 0),
+                        originalX: Number(objectTarget.x) || 0,
+                        originalY: Number(objectTarget.y) || 0,
+                    });
+                }
+            }
         }
     };
 
     const handleMouseMove = (event) => {
         setLastMouse({ x: event.clientX, y: event.clientY });
+
+        if (selectionBox) {
+            const screen = getScreenFromMouseEvent(event);
+            if (screen) {
+                setSelectionBox(prev => ({ ...prev, currentX: screen.x, currentY: screen.y }));
+            }
+        }
+
+        // Calculate light level at cursor
+        const world = getWorldFromMouseEvent(event);
+        if (world) {
+            const lightVal = calculateLightAtPoint(world.x, world.y, {
+                lighting,
+                currentZLevel,
+                lightingPolygons: latestSnapshotRef.current.lightingPolygons
+            });
+            setCursorLightLevel(lightVal);
+        }
+
+        // ── Movement targeting mode: show ghost at cursor with range circle ──────
+        if (pendingAction) {
+            const pendingType = String(pendingAction.actionMeta?.actionType || "").toLowerCase();
+            const pendingPath = String(pendingAction.actionMeta?.path || "");
+            const isPendingMovement = pendingType === "movement" || pendingPath.startsWith("movement.");
+            if (isPendingMovement) {
+                if (world) {
+                    const movingChar = characters.find(
+                        (c) => toEntityID(c?.id) === toEntityID(pendingAction.characterId)
+                    );
+                    if (movingChar) {
+                        const charRadius = Math.max(1, (Number(movingChar?.size) || 0) / 2);
+                        const startX = Number(movingChar.position.x) || 0;
+                        const startY = Number(movingChar.position.y) || 0;
+                        const actionPath = String(pendingAction.actionMeta?.path || "");
+                        const mode = actionPath.split('.')[1] || "walk";
+                        const multiplier = MOVEMENT_MULTIPLIERS[mode] || 1;
+                        const maxMove = (Number(movingChar.movement) || 0) * WORLD_UNITS_PER_FOOT * multiplier;
+                        
+                        const dist = Math.hypot(world.x - startX, world.y - startY);
+                        const outOfRange = maxMove > 0 && dist > maxMove;
+                        const collides = wouldCharacterCollideWithObstacles(
+                            world.x, world.y, charRadius, collisionObjects, []
+                        );
+                        setMovementPreview({
+                            characterId: movingChar.id,
+                            ghostX: world.x,
+                            ghostY: world.y,
+                            walkableRadius: charRadius,
+                            maxMoveRadius: maxMove,
+                            blocked: outOfRange || collides,
+                            isTargeting: true,
+                        });
+                    }
+                }
+                return; // don't run drag/pan logic during targeting
+            }
+        }
 
         if (rotationDrag && isDM) {
             const world = getWorldFromMouseEvent(event);
@@ -1629,11 +2798,19 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
             const objectType = String(objectTarget?.type || "circle").toLowerCase();
 
             if (objectType === "rect") {
+                const rad = -(Number(objectTarget.rotation) || 0) * Math.PI / 180;
+                const cos = Math.cos(rad);
+                const sin = Math.sin(rad);
+                const dx = world.x - anchorX;
+                const dy = world.y - anchorY;
+                const localWidth = Math.abs(dx * cos - dy * sin);
+                const localHeight = Math.abs(dx * sin + dy * cos);
+
                 updateMapObject(resizeTarget.id, {
                     x: Math.round(centerX),
                     y: Math.round(centerY),
-                    width: Math.max(MIN_RECT_WORLD_SIZE, Math.round(maxX - minX)),
-                    height: Math.max(MIN_RECT_WORLD_SIZE, Math.round(maxY - minY)),
+                    width: Math.max(MIN_RECT_WORLD_SIZE, Math.round(localWidth)),
+                    height: Math.max(MIN_RECT_WORLD_SIZE, Math.round(localHeight)),
                 });
                 return;
             }
@@ -1643,7 +2820,7 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 y: Math.round(centerY),
                 size: Math.max(
                     MIN_SHAPE_WORLD_SIZE,
-                    Math.round(Math.max(maxX - minX, maxY - minY) / 2)
+                    Math.round(Math.max(maxX - minX, maxY - minY))
                 ),
             });
             return;
@@ -1677,6 +2854,8 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 );
                 if (!objectTarget) {
                     setBlockedMovePreview(null);
+                    setActiveDragObject(null);
+                    activeDragObjectRef.current = null;
                     return;
                 }
                 const candidate = {
@@ -1684,22 +2863,88 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                     x: Math.round(targetX),
                     y: Math.round(targetY),
                 };
-                if (wouldWallOverlapAtPosition(candidate, mapObjects, objectTarget.id)) {
-                    setBlockedMovePreview(candidate);
-                    return;
-                }
+
+                setDragTarget(prev => ({
+                    ...prev,
+                    currentWorld: { x: candidate.x, y: candidate.y }
+                }));
+
+                const isBlocked = wouldObjectOverlapAtPosition(candidate, mapObjects, objectTarget.id);
+                const nextDragObj = { ...candidate, _blocked: isBlocked };
+                activeDragObjectRef.current = nextDragObj;
+                setActiveDragObject(nextDragObj);
                 setBlockedMovePreview(null);
-                updateMapObject(dragTarget.id, {
-                    x: candidate.x,
-                    y: candidate.y,
-                });
                 return;
             }
 
             if (dragTarget.type === "character") {
-                setBlockedMovePreview(null);
                 if (!canControlCharacterId(dragTarget.id)) return;
-                queueCharacterMove(dragTarget.id, Math.round(targetX), Math.round(targetY));
+                
+                const draggingChar = characters.find(
+                    (char) => toEntityID(char?.id) === toEntityID(dragTarget.id)
+                );
+                if (!draggingChar) return;
+                
+                const charRadius = Math.max(1, (Number(draggingChar?.size) || 0) / 2);
+                let finalX = Math.round(targetX);
+                let finalY = Math.round(targetY);
+
+                // Clamp to max movement distance
+                const startX = Number(draggingChar.position.x) || 0;
+                const startY = Number(draggingChar.position.y) || 0;
+                const maxMove = (Number(draggingChar.movement) || 0) * WORLD_UNITS_PER_FOOT;
+                const distRaw = Math.hypot(finalX - startX, finalY - startY);
+
+                const hasMovementAction = isDM || (draggingChar.actionPoints?.movement ?? 1) > 0;
+
+                if (!isDM && (maxMove <= 0 || !hasMovementAction)) {
+                    setMovementPreview({
+                        characterId: dragTarget.id,
+                        ghostX: draggingChar.position.x,
+                        ghostY: draggingChar.position.y,
+                        walkableRadius: charRadius,
+                        blocked: true,
+                    });
+                    return;
+                }
+
+                if (!isDM && distRaw > maxMove) {
+                    const ratio = maxMove / distRaw;
+                    finalX = startX + (finalX - startX) * ratio;
+                    finalY = startY + (finalY - startY) * ratio;
+                }
+                
+                // Check collision with obstacles
+                if (wouldCharacterCollideWithObstacles(finalX, finalY, charRadius, collisionObjects, [])) {
+                    // Position would collide with obstacle - don't move to colliding position
+                    // Show movement preview but don't actually move
+                    setMovementPreview({
+                        characterId: dragTarget.id,
+                        ghostX: finalX,
+                        ghostY: finalY,
+                        walkableRadius: charRadius,
+                        blocked: true,
+                    });
+                    return;
+                }
+                
+                // Check collision with other characters
+                const blocker = getClosestBlockingCharacter(finalX, finalY, charRadius, characters, dragTarget.id);
+                if (blocker) {
+                    // Adjust to be just before the blocking character
+                    const adjusted = adjustPositionBeforeCollision(finalX, finalY, charRadius, blocker);
+                    finalX = Math.round(adjusted.x);
+                    finalY = Math.round(adjusted.y);
+                }
+                
+                // Show movement preview with ghost character
+                setMovementPreview({
+                    characterId: dragTarget.id,
+                    ghostX: finalX,
+                    ghostY: finalY,
+                    walkableRadius: charRadius,
+                    blocked: false,
+                });
                 return;
             }
         }
@@ -1712,12 +2957,115 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         }
     };
 
-    const handleMouseUp = (event) => {
-        if (rotationDrag) {
-            setRotationDrag(null);
-            setBlockedMovePreview(null);
+    const handleMouseUp = async (event) => {
+        if (selectionBox) {
+            const x1 = Math.min(selectionBox.startX, selectionBox.currentX);
+            const x2 = Math.max(selectionBox.startX, selectionBox.currentX);
+            const y1 = Math.min(selectionBox.startY, selectionBox.currentY);
+            const y2 = Math.max(selectionBox.startY, selectionBox.currentY);
+            
+            if (Math.abs(x2 - x1) > 2 || Math.abs(y2 - y1) > 2) {
+                const newSelection = new Set();
+                characters.forEach(char => {
+                    if (!isVisible(char.position.x, char.position.y) && !isDM) return;
+                    const screen = worldToScreen(char.position.x, char.position.y);
+                    if (screen.x >= x1 && screen.x <= x2 && screen.y >= y1 && screen.y <= y2) {
+                        newSelection.add(toEntityID(char.id));
+                    }
+                });
+                
+                setMultiSelectedIds(newSelection);
+                if (newSelection.size > 0) {
+                    const firstId = newSelection.values().next().value;
+                    setSelectedEntity({ type: 'character', id: firstId });
+                    selectCharacter(firstId);
+                }
+            }
+            setSelectionBox(null);
             return;
         }
+
+        if (rotationDrag) {
+            const rotationTargetId = rotationDrag.characterId;
+            setRotationDrag(null);
+            setBlockedMovePreview(null);
+
+            if (isDM && socket && playerID && gameID && rotationTargetId) {
+                const targetChar = characters.find(
+                    (char) => toEntityID(char?.id) === toEntityID(rotationTargetId)
+                );
+                if (targetChar) {
+                    const response = await emitWithAck(socket, "campaign_moveCharacter", {
+                        playerID,
+                        campaignID: gameID,
+                        characterID: rotationTargetId,
+                        rotation: Number(targetChar.rotation) || 0,
+                    });
+
+                    if (!response?.success) {
+                        if (response?.message) {
+                            setGameContextError((prev) => prev || response.message);
+                        }
+                        return;
+                    }
+
+                    const snapshot =
+                        response?.engineState?.snapshot && typeof response.engineState.snapshot === "object"
+                            ? response.engineState.snapshot
+                            : null;
+                    if (snapshot) {
+                        if (snapshot.lightingPolygons) {
+                            latestSnapshotRef.current.lightingPolygons = snapshot.lightingPolygons;
+                        }
+                        applyingServerStateRef.current = true;
+                        skipNextAutoSaveRef.current = true;
+                        applyLoadedSnapshot(snapshot);
+                        setGameContextError("");
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if (dragTarget?.type === "mapObject" && isDM) {
+            const dragSnapshot = activeDragObjectRef.current;
+            if (dragSnapshot && !dragSnapshot._blocked) {
+                const original = mapObjects.find((obj) => toEntityID(obj.id) === toEntityID(dragTarget.id));
+                if (!original || original.x !== dragSnapshot.x || original.y !== dragSnapshot.y) {
+                    updateMapObject(dragTarget.id, { x: dragSnapshot.x, y: dragSnapshot.y });
+                }
+            }
+            setActiveDragObject(null);
+            activeDragObjectRef.current = null;
+            setBlockedMovePreview(null);
+        }
+
+        if (dragTarget?.type === 'character' && movementPreview) {
+            if (!movementPreview.blocked) {
+                if (isDM) {
+                    queueCharacterMove(dragTarget.id, movementPreview.ghostX, movementPreview.ghostY);
+                } else {
+                    // Stage action instead of executing immediately
+                    await handleStageAction(dragTarget.id, {
+                        path: "movement.walk",
+                        actionType: "movement",
+                        name: "Move"
+                    }, {
+                        x: movementPreview.ghostX,
+                        y: movementPreview.ghostY,
+                    });
+                }
+            } else if (!isDM) {
+                const char = characters.find(c => toEntityID(c.id) === toEntityID(dragTarget.id));
+                const maxMove = (Number(char?.movement) || 0);
+                if (maxMove <= 0) {
+                    setGameContextError("No movement remaining.");
+                    setTimeout(() => setGameContextError(""), 2000);
+                }
+            }
+        }
+
         if (placementDrag && isDM && mapObjectPlacement) {
             const fallbackWorld = placementDrag.currentWorld || placementDrag.startWorld;
             const releaseWorld = getWorldFromMouseEvent(event) || fallbackWorld;
@@ -1757,6 +3105,8 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         setDragTarget(null);
         setResizeTarget(null);
         setBlockedMovePreview(null);
+        setActiveDragObject(null);
+        setMovementPreview(null);
     };
 
     const handleResizerMouseDown = (event) => {
@@ -1800,9 +3150,12 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 ? response.engineState.snapshot
                 : null;
         if (!snapshot) return;
+        if (snapshot.lightingPolygons) {
+            latestSnapshotRef.current.lightingPolygons = snapshot.lightingPolygons;
+        }
         applyingServerStateRef.current = true;
         skipNextAutoSaveRef.current = true;
-        loadGameSnapshot(snapshot);
+        applyLoadedSnapshot(snapshot);
         setGameContextError("");
     };
 
@@ -1838,10 +3191,19 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 ? response.engineState.snapshot
                 : null;
         if (snapshot) {
+            if (snapshot.lightingPolygons) {
+                latestSnapshotRef.current.lightingPolygons = snapshot.lightingPolygons;
+            }
+            if (snapshot.journalState) {
+                setJournalState(snapshot.journalState);
+            }
             applyingServerStateRef.current = true;
             skipNextAutoSaveRef.current = true;
-            loadGameSnapshot(snapshot);
+            applyLoadedSnapshot(snapshot);
             setGameContextError("");
+            if (isDM) {
+                scheduleAutoSave("move_character");
+            }
         }
 
         if (pendingMoveRef.current) {
@@ -1851,10 +3213,10 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         }
     }, [socket, playerID, gameID, loadGameSnapshot]);
 
+    
     const queueCharacterMove = useCallback(
         (characterId, x, y) => {
             moveCharacter(characterId, x, y);
-            if (isDM) return;
             if (!socket || !playerID || !gameID) return;
 
             pendingMoveRef.current = { characterId, x, y };
@@ -1864,8 +3226,72 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 flushPendingMove();
             }, 120);
         },
-        [moveCharacter, isDM, socket, playerID, gameID, flushPendingMove]
+        [moveCharacter, socket, playerID, gameID, flushPendingMove]
     );
+
+    const flushVisionRayCount = useCallback(async () => {
+        if (!socket || !playerID || !gameID || !isDM) return;
+        const pending = pendingVisionRayCountRef.current;
+        if (pending == null) return;
+
+        pendingVisionRayCountRef.current = null;
+        const response = await emitWithAck(socket, "campaign_setVisionRayCount", {
+            playerID,
+            campaignID: gameID,
+            rayCount: pending,
+        });
+
+        visionRaySyncTimerRef.current = null;
+
+        if (!response?.success) {
+            if (response?.message) {
+                setGameContextError((prev) => prev || response.message);
+            }
+            return;
+        }
+
+        const snapshot =
+            response?.engineState?.snapshot && typeof response.engineState.snapshot === "object"
+                ? response.engineState.snapshot
+                : null;
+        if (snapshot) {
+            if (snapshot.lightingPolygons) {
+                latestSnapshotRef.current.lightingPolygons = snapshot.lightingPolygons;
+            }
+            if (snapshot.journalState) {
+                setJournalState(snapshot.journalState);
+            }
+            applyingServerStateRef.current = true;
+            skipNextAutoSaveRef.current = true;
+            applyLoadedSnapshot(snapshot);
+            setGameContextError("");
+        }
+    }, [socket, playerID, gameID, isDM]);
+
+    const queueVisionRayCount = useCallback(
+        (nextCount) => {
+            if (!isDM) return;
+            pendingVisionRayCountRef.current = nextCount;
+            if (visionRaySyncTimerRef.current) return;
+            visionRaySyncTimerRef.current = setTimeout(() => {
+                flushVisionRayCount();
+            }, 120);
+        },
+        [flushVisionRayCount, isDM]
+    );
+
+    const handleVisionRayCountChange = useCallback(
+        (nextCount) => {
+            setVisionRayCount(nextCount);
+            queueVisionRayCount(nextCount);
+        },
+        [queueVisionRayCount]
+    );
+
+    const handleForceVisionRerender = useCallback(() => {
+        // Re-run server raycasting with the current ray count (no local state mutation).
+        queueVisionRayCount(visionRayCount);
+    }, [queueVisionRayCount, visionRayCount]);
 
     const placeCharacterFromPlacement = useCallback(
         async (worldPosition) => {
@@ -1908,9 +3334,12 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                     ? response.engineState.snapshot
                     : null;
             if (snapshot) {
+            if (snapshot.lightingPolygons) {
+                latestSnapshotRef.current.lightingPolygons = snapshot.lightingPolygons;
+            }
                 applyingServerStateRef.current = true;
                 skipNextAutoSaveRef.current = true;
-                loadGameSnapshot(snapshot);
+                applyLoadedSnapshot(snapshot);
             }
             setGameContextError("");
             clearCharacterPlacement();
@@ -1972,19 +3401,22 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
     );
 
     useEffect(() => {
-        if (!contextMenu || contextMenu?.target?.type !== "character") {
-            setContextActionTrail([]);
-            return;
-        }
-        setContextActionTrail([]);
-    }, [contextMenu]);
+        if (!contextMenu) return;
+        setContextTabTrails({});
+        setActiveContextTab("action");
+        console.log("[ContextMenuDebug] Menu opened for target:", contextMenu?.target);
+}, [contextMenu]);
 
     useEffect(() => {
         if (!contextMenu || contextMenu?.target?.type !== "character") return;
         const targetId = toEntityID(contextMenu.target.id);
         if (!targetId) return;
         if (!isDM && !canControlCharacterId(targetId)) return;
-        if (characterActionCache[targetId]) return;
+        if (characterActionCache[targetId]) {
+            console.log("[ContextMenuDebug] Using cached actions for", targetId, characterActionCache[targetId]);
+            return;
+        }
+        console.log("[ContextMenuDebug] Fetching actions for character", targetId);
         fetchCharacterActions(targetId);
     }, [
         contextMenu,
@@ -1993,6 +3425,20 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         characterActionCache,
         fetchCharacterActions,
     ]);
+
+    useEffect(() => {
+    if (!contextMenu) return undefined;
+
+    const onPointerDown = (event) => {
+        if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
+            setContextMenu(null);
+        }
+    };
+
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => window.removeEventListener("pointerdown", onPointerDown, true);
+}, [contextMenu]);
+
 
     const executeCharacterAction = useCallback(
         async (characterId, actionMeta, contextWorld) => {
@@ -2006,12 +3452,38 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
 
             const actionType = String(actionMeta?.actionType || actionMeta?.tab || "").toLowerCase();
             const actionPathHint = String(actionMeta?.path || "");
+            
+            // Check if this is an attack or cast action that needs target selection
+            const isAttack = String(actionRef).startsWith("main.attack") || actionType === "action";
+            const isCast = String(actionRef).startsWith("main.cast") || actionType === "action";
+            
+            if ((isAttack || isCast) && !contextWorld?.targetId) {
+                // Enter targeting mode
+                setPendingAction({
+                    characterId: safeId,
+                    actionMeta,
+                    sourceWorld: contextWorld,
+                });
+                return;
+            }
+
             const params = {};
             if ((actionType === "movement" || actionPathHint.startsWith("movement.")) && contextWorld) {
                 params.position = {
                     x: Math.round(contextWorld.x),
                     y: Math.round(contextWorld.y),
                 };
+            }
+            
+            // Add target ID if in targeting mode
+            if (contextWorld?.targetId) {
+                params.targetId = contextWorld.targetId;
+            }
+
+            if (!isDM) {
+                await handleStageAction(safeId, actionMeta, contextWorld);
+                setPendingAction(null);
+                return;
             }
 
             const response = await emitWithAck(socket, "campaign_executeCharacterAction", {
@@ -2030,21 +3502,121 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 return;
             }
 
-            const snapshot =
-                response?.engineState?.snapshot && typeof response.engineState.snapshot === "object"
-                    ? response.engineState.snapshot
-                    : null;
+            const snapshot = response?.engineState?.snapshot;
             if (snapshot) {
+                const oldChars = new Map();
+                if (snapshot.lightingPolygons) {
+                    latestSnapshotRef.current.lightingPolygons = snapshot.lightingPolygons;
+                }
+                (latestSnapshotRef.current.characters || []).forEach(c => oldChars.set(toEntityID(c.id), c));
+                const snapshotForLoad = JSON.parse(JSON.stringify(snapshot));
+
+                const actionIsMovement = response.actionResult?.mode && response.actionResult?.distanceFt > 0;
+
+                if (actionIsMovement) {
+                    const charId = toEntityID(characterId);
+                    const oldChar = oldChars.get(charId);
+                    const newCharInSnapshot = (snapshotForLoad.characters || []).find(c => toEntityID(c.id) === charId);
+
+                    if (oldChar && newCharInSnapshot) {
+                        const oldPos = oldChar.position || { x: 0, y: 0 };
+                        const newPos = newCharInSnapshot.position || { x: 0, y: 0 };
+                        
+                        const animId = `move_${charId}_${Date.now()}`;
+                        activeAnimationsRef.current[animId] = {
+                            type: "movement",
+                            entityId: charId,
+                            entityType: "character",
+                            startTime: performance.now(),
+                            duration: 300, // ms
+                            params: { startX: oldPos.x, startY: oldPos.y, targetX: newPos.x, targetY: newPos.y }
+                        };
+                    }
+                }
+
                 applyingServerStateRef.current = true;
                 skipNextAutoSaveRef.current = true;
-                loadGameSnapshot(snapshot);
+                applyLoadedSnapshot(snapshotForLoad);
             }
             setGameContextError("");
+            setPendingAction(null); // Clear targeting mode after execution
+        }, [socket, playerID, gameID, isDM, handleStageAction, applyLoadedSnapshot]
+    );
+
+    const handleDeleteEntity = useCallback(
+        async (target) => {
+            if (!isDM || !target) return;
+
+            if (target.type === "mapObject") {
+                deleteMapObject(target.id);
+                setSelectedEntity(null);
+                setMultiSelectedIds(new Set());
+                return;
+            }
+
+            if (target.type === "character") {
+                const char = characters.find(
+                    (c) => toEntityID(c?.id) === toEntityID(target.id)
+                );
+                if (!char) {
+                    setSelectedEntity(null);
+                    setMultiSelectedIds(new Set());
+                    return;
+                }
+
+                const isEnemy = String(char.team || "").toLowerCase() === "enemy";
+                // Use deleteEnemy for enemies (permanent delete), removeCharacter for players (unplace)
+                const eventName = isEnemy ? "campaign_deleteEnemy" : "campaign_removeCharacter";
+                
+                let idToSend = target.id;
+                if (isEnemy) {
+                    if (char.enemyId) {
+                        idToSend = char.enemyId;
+                    } else if (String(target.id).startsWith("enemy_")) {
+                        idToSend = String(target.id).replace("enemy_", "");
+                    }
+                }
+
+                const idParam = isEnemy ? { enemyID: idToSend } : { characterID: target.id };
+
+                const response = await emitWithAck(socket, eventName, {
+                    playerID,
+                    campaignID: gameID,
+                    ...idParam,
+                });
+
+                if (response?.success) {
+                    const snapshot = response?.engineState?.snapshot;
+                    if (snapshot) {
+                        if (snapshot.lightingPolygons) {
+                            latestSnapshotRef.current.lightingPolygons =
+                                snapshot.lightingPolygons;
+                        }
+                        applyingServerStateRef.current = true;
+                        skipNextAutoSaveRef.current = true;
+                        applyLoadedSnapshot(snapshot);
+                    }
+                    setSelectedEntity(null);
+                    setMultiSelectedIds(new Set());
+                } else if (response?.message) {
+                    setGameContextError(response.message);
+                }
+            }
         },
-        [socket, playerID, gameID, loadGameSnapshot]
+        [
+            isDM,
+            deleteMapObject,
+            socket,
+            playerID,
+            gameID,
+            characters,
+            loadGameSnapshot,
+            setGameContextError,
+        ]
     );
 
     const handleContextAction = async (action) => {
+        console.log("[HandleContextAction] Called with action:", action);
         const target = contextMenu?.target;
         const contextWorld =
             contextMenu?.world &&
@@ -2056,6 +3628,27 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                   }
                 : null;
         if (!target?.type) return;
+        
+        // Handle targeting mode for attacks/casts
+        if (pendingAction && target.type === "character") {
+            const targetCharacter = characters.find(
+                (char) => toEntityID(char?.id) === toEntityID(target.id)
+            );
+            if (targetCharacter) {
+                setContextMenu(null);
+                // Execute pending action with target
+                await executeCharacterAction(
+                    pendingAction.characterId,
+                    pendingAction.actionMeta,
+                    {
+                        ...pendingAction.sourceWorld,
+                        targetId: targetCharacter.id,
+                    }
+                );
+                return;
+            }
+        }
+        
         setContextMenu(null);
 
         if (target.type === "character") {
@@ -2070,19 +3663,41 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                     : null;
             if (actionMeta) {
                 if (!isDM && !canControlCharacterId(character.id)) return;
+
+                const actionType = String(actionMeta?.actionType || actionMeta?.tab || "").toLowerCase();
+                const isMovement = actionType === "movement" || String(actionMeta?.path || "").startsWith("movement.");
+                
+                console.log("[HandleContextAction] Movement action check:", { actionType, isMovement, actionPath: actionMeta?.path });
+
+                if (isMovement) {
+                    console.log("[HandleContextAction] Entering movement targeting mode for action:", actionMeta);
+                    setContextMenu(null);
+                    setPendingAction({
+                        characterId: character.id,
+                        actionMeta,
+                        sourceWorld: null,
+                    });
+                    selectEntity({ type: "character", id: character.id });
+                    return;
+                }
+
                 await executeCharacterAction(character.id, actionMeta, contextWorld);
                 return;
             }
 
             if (action === "info") {
                 selectEntity(target);
+                openInfoPanel(target.type, target.id, contextMenu?.x, contextMenu?.y);
                 return;
             }
 
             if (action === "viewSheet") {
+                const ownerEntry =
+                    characterOwnershipById.get(toEntityID(character.id)) || null;
                 const isFriendly =
+                    Boolean(ownerEntry) ||
                     String(character?.team || "").toLowerCase() === "player";
-                if (!(isDM || canControlCharacterId(character.id) || isFriendly)) return;
+                if (!(isDM || canViewCharacterId(character.id) || isFriendly)) return;
                 navigate(`/ISK/${safeSessionID}/character/view/${character.id}`);
                 return;
             }
@@ -2094,13 +3709,19 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 return;
             }
 
-            if (action === "placeHere" && contextWorld) {
+            if (action === "placeHere") {
                 if (!canControlCharacterId(character.id)) return;
-                queueCharacterMove(
-                    character.id,
-                    Math.round(contextWorld.x),
-                    Math.round(contextWorld.y)
-                );
+                setContextMenu(null);
+                // Enter targeting mode
+                setPendingAction({
+                    characterId: character.id,
+                    actionMeta: {
+                        path: "movement.walk",
+                        actionPath: "movement.walk",
+                        actionType: "movement",
+                    },
+                    sourceWorld: null,
+                });
                 selectEntity({ type: "character", id: character.id });
                 return;
             }
@@ -2118,6 +3739,11 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 handleTurnDone();
                 return;
             }
+
+            if (action === "delete" && isDM) {
+                handleDeleteEntity(target);
+                return;
+            }
             return;
         }
 
@@ -2127,6 +3753,7 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
 
             if (action === "inspect") {
                 selectEntity(target);
+                openInfoPanel(target.type, target.id, contextMenu?.x, contextMenu?.y);
                 return;
             }
 
@@ -2191,204 +3818,25 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         }
     };
 
-    const handleInfoPanelMouseDown = useCallback(
-        (event) => {
-            if (event.button !== 0) return;
-            if (!infoPanelPosition) return;
-            event.preventDefault();
-            event.stopPropagation();
-            setInfoPanelDrag({
-                offsetX: event.clientX - infoPanelPosition.x,
-                offsetY: event.clientY - infoPanelPosition.y,
-            });
-        },
-        [infoPanelPosition]
-    );
+    useEffect(() => {
+        const onKeyDown = (event) => {
+            if (isTypingTarget(event.target)) return;
+            if ((event.key === "Backspace" || event.key === "Delete") && isDM) {
+                if (selectedEntity) {
+                    event.preventDefault();
+                    handleDeleteEntity(selectedEntity);
+                }
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [isDM, selectedEntity, handleDeleteEntity]);
 
-    const renderSelectedInfo = () => {
-        if (!selectedEntityData?.type) return null;
-        const panelPos =
-            infoPanelPosition ||
-            clampInfoPanelPosition(
-                window.innerWidth - sideWidth - INFO_PANEL_WIDTH - INFO_PANEL_MIN_LEFT,
-                INFO_PANEL_MIN_TOP
-            );
-
-        if (selectedEntityData.type === "character") {
-            const char = selectedEntityData.entity;
-            return (
-                <div
-                    className="absolute rounded border border-slate-600 bg-slate-900/95 text-white shadow-lg z-[132] w-[320px]"
-                    style={{ left: panelPos.x, top: panelPos.y }}
-                    onMouseDown={(event) => event.stopPropagation()}
-                >
-                    <div
-                        className="px-3 py-2 border-b border-slate-700 flex items-center justify-between cursor-move select-none"
-                        onMouseDown={handleInfoPanelMouseDown}
-                    >
-                        <p className="text-sm font-semibold">Selected Character</p>
-                        <button
-                            type="button"
-                            onMouseDown={(event) => event.stopPropagation()}
-                            onClick={() => selectEntity(null)}
-                            className="text-xs text-slate-300 hover:text-white"
-                        >
-                            Close
-                        </button>
-                    </div>
-                    <div className="px-3 py-2 text-xs space-y-1">
-                        <p className="text-sm font-semibold">{char.name || "Unnamed Character"}</p>
-                        <p>ID: {char.id}</p>
-                        <p>Team: {char.team || "unknown"}</p>
-                        <p>
-                            Position: ({Math.round(Number(char?.position?.x) || 0)},{" "}
-                            {Math.round(Number(char?.position?.y) || 0)})
-                        </p>
-                        <p>Size: {Math.round(Number(char?.size) || 0)}</p>
-                        <p>Vision: {Math.round(Number(char?.visionDistance) || 0)}</p>
-                        <p>Arc: {Math.round(Number(char?.visionArc) || 0)} deg</p>
-                    </div>
-                </div>
-            );
-        }
-
-        if (selectedEntityData.type === "mapObject") {
-            const obj = selectedEntityData.entity;
-            const floorType = selectedEntityData.floorType;
-            return (
-                <div
-                    className="absolute rounded border border-slate-600 bg-slate-900/95 text-white shadow-lg z-[132] w-[320px]"
-                    style={{ left: panelPos.x, top: panelPos.y }}
-                    onMouseDown={(event) => event.stopPropagation()}
-                >
-                    <div
-                        className="px-3 py-2 border-b border-slate-700 flex items-center justify-between cursor-move select-none"
-                        onMouseDown={handleInfoPanelMouseDown}
-                    >
-                        <p className="text-sm font-semibold">Selected Object</p>
-                        <button
-                            type="button"
-                            onMouseDown={(event) => event.stopPropagation()}
-                            onClick={() => selectEntity(null)}
-                            className="text-xs text-slate-300 hover:text-white"
-                        >
-                            Close
-                        </button>
-                    </div>
-                    <div className="px-3 py-2 text-xs space-y-1">
-                        <p className="text-sm font-semibold">
-                            {String(obj?.type || "object")} #{obj?.id}
-                        </p>
-                        <p>
-                            Position: ({Math.round(Number(obj?.x) || 0)},{" "}
-                            {Math.round(Number(obj?.y) || 0)})
-                        </p>
-                        <p>Terrain: {String(obj?.terrainType || "obstacle")}</p>
-                        <p>Z Level: {Math.round(Number(obj?.zLevel) || 0)}</p>
-                        <p>Z Index: {Math.round(Number(obj?.z) || 0)}</p>
-                        <p>Elevation Height: {Math.round(Number(obj?.elevationHeight) || 0)}</p>
-                        {String(obj?.type || "").toLowerCase() === "rect" ? (
-                            <p>
-                                Footprint: {Math.round(Number(obj?.width) || 0)} x{" "}
-                                {Math.round(Number(obj?.height) || 0)}
-                            </p>
-                        ) : (
-                            <p>Footprint Size: {Math.round(Number(obj?.size) || 0)}</p>
-                        )}
-                        <p>Floor Type: {floorType?.name || String(obj?.floorTypeId || "none")}</p>
-                        <p>
-                            HP:{" "}
-                            {obj?.maxHP == null
-                                ? "Indestructible"
-                                : `${Math.round(Number(obj?.hp) || 0)} / ${Math.round(
-                                      Number(obj?.maxHP) || 0
-                                  )}`}
-                        </p>
-                        {isDM && (
-                            <div className="mt-2 pt-2 border-t border-slate-700 space-y-2">
-                                <div className="grid grid-cols-2 gap-2 items-center">
-                                    <label className="text-[11px] text-slate-300">Object Height</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={Math.round(Number(obj?.elevationHeight) || 0)}
-                                        onChange={(event) =>
-                                            updateMapObject(obj.id, {
-                                                elevationHeight: Math.max(
-                                                    0,
-                                                    Number(event.target.value) || 0
-                                                ),
-                                            })
-                                        }
-                                        className="w-full rounded bg-slate-800 border border-slate-600 px-2 py-1 text-xs text-slate-100"
-                                    />
-                                </div>
-                                {String(obj?.type || "").toLowerCase() === "rect" ? (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <input
-                                            type="number"
-                                            min={MIN_RECT_WORLD_SIZE}
-                                            value={Math.round(Number(obj?.width) || 0)}
-                                            onChange={(event) =>
-                                                updateMapObject(obj.id, {
-                                                    width: Math.max(
-                                                        MIN_RECT_WORLD_SIZE,
-                                                        Number(event.target.value) || 0
-                                                    ),
-                                                })
-                                            }
-                                            className="w-full rounded bg-slate-800 border border-slate-600 px-2 py-1 text-xs text-slate-100"
-                                        />
-                                        <input
-                                            type="number"
-                                            min={MIN_RECT_WORLD_SIZE}
-                                            value={Math.round(Number(obj?.height) || 0)}
-                                            onChange={(event) =>
-                                                updateMapObject(obj.id, {
-                                                    height: Math.max(
-                                                        MIN_RECT_WORLD_SIZE,
-                                                        Number(event.target.value) || 0
-                                                    ),
-                                                })
-                                            }
-                                            className="w-full rounded bg-slate-800 border border-slate-600 px-2 py-1 text-xs text-slate-100"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-2 gap-2 items-center">
-                                        <label className="text-[11px] text-slate-300">Footprint Size</label>
-                                        <input
-                                            type="number"
-                                            min={MIN_SHAPE_WORLD_SIZE}
-                                            value={Math.round(Number(obj?.size) || 0)}
-                                            onChange={(event) =>
-                                                updateMapObject(obj.id, {
-                                                    size: Math.max(
-                                                        MIN_SHAPE_WORLD_SIZE,
-                                                        Number(event.target.value) || 0
-                                                    ),
-                                                })
-                                            }
-                                            className="w-full rounded bg-slate-800 border border-slate-600 px-2 py-1 text-xs text-slate-100"
-                                        />
-                                    </div>
-                                )}
-                                <p className="text-[11px] text-slate-400">
-                                    Tip: drag corner handles to resize footprint, and drag the top square handle
-                                    to edit object height.
-                                </p>
-                            </div>
-                        )}
-                        {floorType?.description && (
-                            <p className="text-slate-300">Info: {floorType.description}</p>
-                        )}
-                    </div>
-                </div>
-            );
-        }
-
-        return null;
-    };
+/*
+const renderInfoPanels = () => Object.entries(infoPanels).map(([key, panel]) => {
+    // This function has been moved to the InfoWindows component in infoWindows.jsx
+});
+*/
 
     const mapPlacementPreview = (() => {
         if (!isDM || !mapObjectPlacement) return null;
@@ -2439,7 +3887,7 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
         const sizeWorld =
             Number(placement.overrides.size ?? mapObjectPlacement.size) ||
             MIN_SHAPE_WORLD_SIZE;
-        const size = sizeWorld * zoom;
+        const size = (sizeWorld / 2) * zoom;
         if (type === "triangle") {
             return {
                 type,
@@ -2532,32 +3980,71 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
     const contextCharacter = contextCharacterId
         ? characters.find((char) => toEntityID(char?.id) === toEntityID(contextCharacterId))
         : null;
+    const contextOwnerEntry = contextCharacterId
+        ? characterOwnershipById.get(contextCharacterId) || null
+        : null;
+    const isContextTeammate = Boolean(contextOwnerEntry);
     const canViewCharacterSheet = Boolean(
         contextCharacter &&
             (isDM ||
                 canControlCharacterId(contextCharacter.id) ||
+                isContextTeammate ||
                 String(contextCharacter?.team || "").toLowerCase() === "player")
     );
     const contextActionData = contextCharacterId
         ? characterActionCache[contextCharacterId]
         : null;
-    const contextActionMenu = buildContextActionMenu(contextActionData?.actionTree);
-    const contextActionNode =
-        contextActionMenu && contextActionTrail.length > 0
-            ? contextActionTrail[contextActionTrail.length - 1]
-            : contextActionMenu;
-    const contextActionItems = contextActionNode
-        ? getContextActionItems(contextActionNode, {
-              includeEmpty: contextActionNode.key === "root",
-          })
-        : [];
-    const contextActionGroups = !contextActionMenu
-        ? groupActionsByTab(contextActionData?.actions || [])
-        : [];
+    const contextActionMenu = (() => {
+        const tree = contextActionData?.actionTree;
+        if (!tree && contextCharacterId) {
+            console.log("[ContextMenuDebug] No actionTree for charId:", contextCharacterId, "contextActionData:", contextActionData);
+        } else if (tree && contextCharacterId) {
+            console.log("[ContextMenuDebug] ActionTree keys:", Object.keys(tree), "movement branch:", tree.movement);
+        }
+        return buildContextActionMenu(tree);
+    })();
+    const CONTEXT_TABS = [
+    { key: "action", label: "Action" },
+    { key: "bonus", label: "Bonus" },
+    { key: "movement", label: "Movement" },
+];
+
+const getTabRootNode = (tabKey) => {
+    if (!contextActionMenu) return null;
+    return contextActionMenu.children?.find((c) => c.key === tabKey) || null;
+};
+
+const getActiveTabNode = (tabKey) => {
+    const trail = contextTabTrails[tabKey] || [];
+    if (trail.length === 0) return getTabRootNode(tabKey);
+    return trail[trail.length - 1];
+};
+
+const pushTabTrail = (tabKey, node) => {
+    setContextTabTrails((prev) => ({
+        ...prev,
+        [tabKey]: [...(prev[tabKey] || []), node],
+    }));
+};
+
+const popTabTrail = (tabKey) => {
+    setContextTabTrails((prev) => {
+        const trail = prev[tabKey] || [];
+        return { ...prev, [tabKey]: trail.slice(0, -1) };
+    });
+};
+
+const activeTabNode = getActiveTabNode(activeContextTab);
+const activeTabItems = activeTabNode
+    ? getContextActionItems(activeTabNode, { includeEmpty: activeTabNode.key === activeContextTab })
+    : [];
+const contextActionGroups = !contextActionMenu
+    ? groupActionsByTab(contextActionData?.actions || [])
+    : [];
 
     useEffect(() => {
         if (!contextActionData) return;
-        setContextActionTrail([]);
+        setContextTabTrails({});
     }, [contextActionData]);
 
     return (
@@ -2571,88 +4058,263 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                 onWheel={handleWheel}
                 onContextMenu={(event) => event.preventDefault()}
             >
-                <div className="absolute top-3 left-3 z-[130] flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => navigate(`/ISK/${safeSessionID}/lobby`)}
-                        className="bg-gray-900/85 border border-gray-600 text-white text-xs px-3 py-2 rounded hover:bg-gray-800"
+                {/* Top Info Bar - Compact, Hierarchical & Draggable */}
+                <div
+                    className="absolute z-[130] flex items-center gap-2 max-w-[calc(100vw-2rem)] flex-wrap"
+                    style={{ left: topBarPos.x, top: topBarPos.y }}
+                >
+                    {/* Drag handle */}
+                    <div
+                        className="cursor-move p-1 mr-1 text-website-default-500 select-none"
+                        onMouseDown={(e) => {
+                            if (e.button !== 0) return;
+                            e.preventDefault();
+                            setActiveTopBarDrag({ offsetX: e.clientX - (topBarPos.x || 0), offsetY: e.clientY - (topBarPos.y || 0) });
+                        }}
+                        title="Drag to move"
                     >
-                        Exit to Lobby
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => navigate(`/ISK/${safeSessionID}/home`)}
-                        className="bg-gray-900/85 border border-gray-600 text-white text-xs px-3 py-2 rounded hover:bg-gray-800"
-                    >
-                        Home
-                    </button>
-                    <span
-                        className={`text-xs px-3 py-2 rounded border ${
-                            isDM
-                                ? "bg-emerald-900/70 border-emerald-500 text-emerald-200"
-                                : "bg-slate-900/70 border-slate-500 text-slate-200"
-                        }`}
-                    >
-                        {isDM ? "DM Mode" : "Player Mode"}
-                    </span>
-                    <span className="text-xs px-3 py-2 rounded border bg-slate-900/70 border-slate-500 text-slate-200">
-                        Level {currentZLevel} (Space up, Shift down)
-                    </span>
-                    {isDM && (
+                        |||
+                    </div>
+                    {/* Navigation Group */}
+                    <div className="flex items-center gap-1">
                         <button
                             type="button"
-                            onClick={handleTurnDone}
-                            className="text-xs px-3 py-2 rounded border bg-amber-900/70 border-amber-500 text-amber-200 hover:bg-amber-800/80"
+                            onClick={() => navigate(`/ISK/${safeSessionID}/lobby`)}
+                            className="bg-gradient-to-b from-website-default-900/90 to-website-default-800/80 border border-website-default-700 text-website-default-100 text-[11px] px-2.5 py-1 rounded-md hover:border-website-highlights-400/70 hover:text-website-highlights-200 hover:bg-website-default-800/90 transition-colors whitespace-nowrap shadow-sm"
                         >
-                            End Turn (Auto Save)
+                            Lobby
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => navigate(`/ISK/${safeSessionID}/home`)}
+                            className="bg-gradient-to-b from-website-default-900/90 to-website-default-800/80 border border-website-default-700 text-website-default-100 text-[11px] px-2.5 py-1 rounded-md hover:border-website-highlights-400/70 hover:text-website-highlights-200 hover:bg-website-default-800/90 transition-colors whitespace-nowrap shadow-sm"
+                        >
+                            Home
+                        </button>
+                    </div>
+
+                    {/* Mode & Level Indicator */}
+                    <span
+                        className={`text-[11px] px-2.5 py-1 rounded-md border font-semibold whitespace-nowrap shadow-sm ${
+                            isDM
+                                ? "bg-website-highlights-500/15 border-website-highlights-400/70 text-website-highlights-200"
+                                : "bg-website-default-900/70 border-website-default-700 text-website-default-300"
+                        }`}
+                    >
+                        {isDM ? "DM" : "Player"} - L{currentZLevel}
+                    </span>
+                    {combatActive && (
+                        <span className="text-[11px] px-2.5 py-1 rounded-md border bg-website-specials-500/15 border-website-specials-400 text-website-specials-200 uppercase tracking-[0.2em] shadow-sm">
+                            Combat
+                        </span>
+                    )}
+
+                    {/* DM Combat Controls */}
+                    {isDM && (
+                        <div className="flex items-center gap-1">
+                            {!combatActive && (
+                                <button
+                                    type="button"
+                                    onClick={handleStartCombat}
+                                    className="text-[11px] px-2.5 py-1 rounded-md border bg-website-specials-500/20 border-website-specials-400 text-website-specials-200 hover:bg-website-specials-500/30 font-semibold whitespace-nowrap transition-colors shadow-sm ring-1 ring-website-specials-500/25"
+                                >
+                                    Combat
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={combatActive ? handleEndTurn : handleTurnDone}
+                                className={`text-[11px] px-2.5 py-1 rounded-md border whitespace-nowrap font-semibold transition-colors shadow-sm ${
+                                    combatActive
+                                        ? "bg-website-highlights-500/20 border-website-highlights-400 text-website-highlights-200 hover:bg-website-highlights-500/30 ring-1 ring-website-highlights-500/25"
+                                        : "bg-website-default-800/70 border-website-default-700 text-website-default-200 hover:bg-website-default-800 ring-1 ring-website-default-700/40"
+                                }`}
+                            >
+                                {combatActive ? "End Turn" : "Turn"}
+                            </button>
+                            {(combatActive || turnNumber > 1) && (
+                                <span className="text-[11px] px-2.5 py-1 rounded-md border bg-website-default-900/70 border-website-default-700 text-website-default-300 whitespace-nowrap shadow-sm ring-1 ring-website-highlights-500/15">
+                                    {combatActive ? `R${combatRound}` : `T${turnNumber}`}
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Placement Mode Indicators */}
+                    {(mapObjectPlacement || characterPlacement || lightPlacement) && (
+                        <div className="flex items-center gap-1">
+                            {mapObjectPlacement && (
+                                <span className="text-[11px] px-2.5 py-1 rounded-md border bg-website-highlights-500/15 border-website-highlights-400 text-website-highlights-200 whitespace-nowrap">
+                                    📦 {mapObjectPlacement.type}
+                                </span>
+                            )}
+                            {characterPlacement && (
+                                <span className="text-[11px] px-2.5 py-1 rounded-md border bg-website-default-800/70 border-website-default-700 text-website-default-200 whitespace-nowrap">
+                                    👤 {characterPlacement.name || "Char"}
+                                </span>
+                            )}
+                            {lightPlacement && (
+                                <span className="text-[11px] px-2.5 py-1 rounded-md border bg-website-highlights-500/15 border-website-highlights-400 text-website-highlights-200 whitespace-nowrap">
+                                    💡 Light
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Status Panel Toggle */}
+                    {(loadingGameContext || gameContextError || (isDM && (autoSaveStatus || lastServerUpdate))) && (
+                        <button
+                            type="button"
+                            onClick={() => setShowStatusPanel(!showStatusPanel)}
+                            className={`text-[11px] px-2.5 py-1 rounded-md border whitespace-nowrap transition-colors ${
+                                gameContextError
+                                    ? "bg-website-specials-500/20 border-website-specials-400 text-website-specials-200 animate-pulse ring-1 ring-website-specials-500/30 shadow-sm"
+                                    : "bg-website-default-900/70 border-website-default-700 text-website-default-300 hover:bg-website-default-800/80 ring-1 ring-website-highlights-500/15 shadow-sm"
+                            }`}
+                        >
+                            {gameContextError ? "⚠️ Error" : "ⓘ Status"}
                         </button>
                     )}
+
                     {isDM && (
-                        <span className="text-xs px-3 py-2 rounded border bg-slate-900/70 border-slate-500 text-slate-200">
-                            Turn {turnNumber}
-                        </span>
-                    )}
-                    {mapObjectPlacement && (
-                        <span className="text-xs px-3 py-2 rounded border bg-blue-900/70 border-blue-500 text-blue-200">
-                            Placement: {mapObjectPlacement.type} (click or drag on map)
-                        </span>
-                    )}
-                    {characterPlacement && (
-                        <span className="text-xs px-3 py-2 rounded border bg-emerald-900/70 border-emerald-500 text-emerald-200">
-                            Placing:{" "}
-                            {characterPlacement.name ||
-                                (characterPlacement.kind === "enemy"
-                                    ? "Enemy"
-                                    : "Character")}{" "}
-                            (click map)
-                        </span>
-                    )}
-                    {lightPlacement && (
-                        <span className="text-xs px-3 py-2 rounded border bg-amber-900/70 border-amber-500 text-amber-200">
-                            Placing: Light (click map)
-                        </span>
-                    )}
-                    
-                    {loadingGameContext && (
-                        <span className="text-xs px-3 py-2 rounded border bg-slate-900/70 border-slate-500 text-slate-200">
-                            Loading game context...
-                        </span>
-                    )}
-                    {gameContextError && (
-                        <span className="text-xs px-3 py-2 rounded border bg-red-900/70 border-red-500 text-red-200">
-                            {gameContextError}
-                        </span>
-                    )}
-                    {isDM && autoSaveStatus && (
-                        <span className="text-xs px-3 py-2 rounded border bg-indigo-900/70 border-indigo-500 text-indigo-200">
-                            {autoSaveStatus}
-                        </span>
+                        <div className="flex items-center gap-1 ml-2 border-l border-website-default-700/60 pl-2">
+                            <button
+                                type="button"
+                                onClick={handleExportSave}
+                                className="text-[11px] px-2.5 py-1 rounded-md border bg-website-default-900/70 border-website-default-700 text-website-default-200 hover:bg-website-default-800 transition-colors"
+                                title="Export Save"
+                            >
+                                ⬇️
+                            </button>
+                            <label className="text-[11px] px-2.5 py-1 rounded-md border bg-website-default-900/70 border-website-default-700 text-website-default-200 hover:bg-website-default-800 transition-colors cursor-pointer" title="Import Save">
+                                ⬆️
+                                <input
+                                    type="file"
+                                    accept=".json"
+                                    className="hidden"
+                                    onChange={handleImportSave}
+                                />
+                            </label>
+                        </div>
                     )}
                 </div>
+
+                {/* Staged Action Confirmation UI */}
+                {stagedAction && (
+                    <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[140] bg-website-default-900/95 border border-website-default-700/80 rounded-xl p-4 shadow-2xl backdrop-blur-md flex flex-col items-center gap-3">
+                        <div className="text-website-default-100 font-semibold">Confirm {stagedAction.description}?</div>
+                        <div className="flex gap-3">
+                            <button onClick={handleCommitAction} className="bg-website-highlights-500 hover:bg-website-highlights-400 text-website-default-100 px-4 py-1.5 rounded-md font-semibold transition-colors">
+                                Confirm
+                            </button>
+                            <button onClick={handleCancelAction} className="bg-website-specials-500 hover:bg-website-specials-400 text-website-default-100 px-4 py-1.5 rounded-md font-semibold transition-colors">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Collapsible Status Panel (draggable) */}
+                {showStatusPanel && (isDM || gameContextError || loadingGameContext) && (
+                    <div
+                        className="absolute z-[130] bg-gradient-to-br from-website-default-900/90 to-website-default-800/80 border border-website-default-700/70 rounded-xl p-0 text-website-default-100 min-w-[260px] shadow-2xl backdrop-blur-md overflow-hidden"
+                        style={{ left: statusPanelPos.x, top: statusPanelPos.y }}
+                    >
+                        <div className="flex items-center justify-between px-3 py-2 bg-website-default-900/70 border-b border-website-default-700/60">
+                            <div
+                                className="flex items-center gap-2 cursor-move"
+                                onMouseDown={(e) => {
+                                    if (e.button !== 0) return;
+                                    e.preventDefault();
+                                    setActiveStatusDrag({ offsetX: e.clientX - (statusPanelPos.x || 0), offsetY: e.clientY - (statusPanelPos.y || 0) });
+                                }}
+                                title="Drag to move"
+                            >
+                                <div className="w-6 h-6 flex items-center justify-center rounded bg-website-default-800/60 text-website-default-300">|||</div>
+                                <div className="text-[12px] font-semibold text-website-default-100">Status</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {gameContextError ? (
+                                <div className="text-sm text-website-specials-300 font-semibold">⚠️</div>
+                                ) : loadingGameContext ? (
+                                <div className="text-sm text-website-default-300">⟳</div>
+                                ) : null}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowStatusPanel(false)}
+                                    className="text-[11px] text-website-default-300 hover:text-website-default-100 px-2 py-1 rounded hover:bg-website-default-800/60"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-3 text-xs space-y-2">
+                            {loadingGameContext && (
+                                <div className="text-website-default-300">⟳ Loading game context...</div>
+                            )}
+                            {gameContextError && (
+                                <div className="text-website-specials-300">⚠️ {gameContextError}</div>
+                            )}
+                            {isDM && autoSaveStatus && (
+                                <div className="text-website-highlights-300">💾 {autoSaveStatus}</div>
+                            )}
+                            {isDM && lastServerUpdate && (
+                                <div className="text-website-highlights-200">🔄 Synced: {lastServerUpdate.toLocaleTimeString()}</div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 <div className="absolute bottom-3 left-3 z-[130] text-xs px-2 py-1 rounded bg-slate-900/70 border border-slate-600 text-slate-100 pointer-events-none">
                     FPS: {Number.isFinite(fps) ? fps : 0}
                 </div>
+                {isDM && (
+                    <div className="absolute bottom-3 left-24 z-[130] text-xs px-2 py-1 rounded bg-slate-900/70 border border-slate-600 text-slate-100 pointer-events-none">
+                        Light: {Math.round(cursorLightLevel * 100)}%
+                    </div>
+                )}
+
+                {/* Combat Turn Order Overlay */}
+                {combatActive && combatTurnOrder.length > 0 && (
+                    <div
+                        className="absolute z-[130] bg-gradient-to-tr from-slate-900/95 to-slate-800/85 border border-slate-700 rounded p-2 text-white min-w-[280px] shadow-2xl backdrop-blur-md"
+                        style={{ left: combatPanelPos.x, top: combatPanelPos.y }}
+                    >
+                        <div className="flex items-center justify-between mb-2 px-1">
+                            <div
+                                className="flex items-center gap-2 cursor-move select-none"
+                                onMouseDown={(e) => {
+                                    if (e.button !== 0) return;
+                                    e.preventDefault();
+                                    setActiveCombatDrag({ offsetX: e.clientX - (combatPanelPos.x || 0), offsetY: e.clientY - (combatPanelPos.y || 0) });
+                                }}
+                                title="Drag to move"
+                            >
+                                <div className="w-7 h-7 flex items-center justify-center rounded bg-red-700/30 text-red-200 font-bold">⚔</div>
+                                <div className="text-sm font-bold text-red-300 uppercase tracking-wide">Combat Active</div>
+                            </div>
+                            <div className="text-xs text-slate-300">{combatTurnOrder.length} in order</div>
+                        </div>
+                        <div className="space-y-1 max-h-[220px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                            {combatTurnOrder.map((charId, idx) => {
+                                const char = characters.find(c => toEntityID(c.id) === toEntityID(charId));
+                                const isCurrent = toEntityID(charId) === toEntityID(currentCombatCharacterId);
+                                return (
+                                    <div
+                                        key={charId}
+                                        className={`text-xs flex items-center justify-between px-2 py-1 rounded ${isCurrent ? "bg-yellow-900/40 text-yellow-200 border border-yellow-700/50" : "text-slate-300 hover:bg-slate-800/40"}`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-6 h-6 rounded-full ${isCurrent ? "bg-yellow-500" : "bg-slate-700/40"} flex items-center justify-center text-[10px] font-semibold`}>{idx + 1}</div>
+                                            <span className="truncate max-w-[120px]">{char?.name || "Unknown"}</span>
+                                        </div>
+                                        {isCurrent && <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {GAME_LAYER_REGISTRY.map((layer) => (
                     <canvas
@@ -2668,8 +4330,11 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
 
                 {(mapPlacementPreview ||
                     characterPlacementPreview ||
-                    lightPlacementPreview) && (
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-[25]">
+                    lightPlacementPreview ||
+                    movementPreview ||
+                    selectionBox ||
+                    (activeDragObject && dragTarget?.type === "mapObject")) && (
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-[100]">
                         {mapPlacementPreview && (
                             <g
                                 transform={
@@ -2799,6 +4464,219 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                                 )}
                             </>
                         )}
+
+                        {activeDragObject && dragTarget?.type === 'mapObject' && (() => {
+                            const ghostCenter = worldToScreen(activeDragObject.x, activeDragObject.y);
+                            const startScreen = worldToScreen(dragTarget.originalX, dragTarget.originalY);
+                            const zoom = Number(camera.current?.zoom) || 1;
+                            
+                            const type = String(activeDragObject.hitbox?.type || activeDragObject.type || "circle").toLowerCase();
+                            const scale = Math.max(0.1, Number(activeDragObject.hitbox?.scale) || 1);
+                            const rotation = Number(activeDragObject.rotation) || 0;
+                            const isBlocked = activeDragObject._blocked;
+                            
+                            const color = isBlocked ? "#EF4444" : "#3B82F6";
+                            const fill = color;
+                            const fillOpacity = isBlocked ? "0.1" : "0.15";
+                            const stroke = color;
+                            const strokeOpacity = isBlocked ? "0.6" : "0.5";
+                            const strokeWidth = "2";
+                            const outlineStrokeOpacity = "0.3";
+
+                            let shapeElement = null;
+                            let outlineElement = null;
+
+                            if (type === 'rect') {
+                                const width = Math.max(1, (Number(activeDragObject.width) || 0) * scale) * zoom;
+                                const height = Math.max(1, (Number(activeDragObject.height) || 0) * scale) * zoom;
+                                const x = ghostCenter.x - width / 2;
+                                const y = ghostCenter.y - height / 2;
+                                const transform = rotation ? `rotate(${rotation}, ${ghostCenter.x}, ${ghostCenter.y})` : undefined;
+
+                                shapeElement = <rect x={x} y={y} width={width} height={height} transform={transform} fill={fill} fillOpacity={fillOpacity} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth="2" />;
+                                outlineElement = <rect x={x} y={y} width={width} height={height} transform={transform} fill="none" stroke={stroke} strokeOpacity={outlineStrokeOpacity} strokeWidth="2" strokeDasharray="4 4" />;
+                            } else if (type === 'triangle') {
+                                const size = Math.max(1, (Number(activeDragObject.size) || 0) * scale) * zoom;
+                                const s = size / 2;
+                                const p1 = { x: 0, y: -s };
+                                const p2 = { x: -s, y: s };
+                                const p3 = { x: s, y: s };
+                                const points = `${ghostCenter.x + p1.x},${ghostCenter.y + p1.y} ${ghostCenter.x + p2.x},${ghostCenter.y + p2.y} ${ghostCenter.x + p3.x},${ghostCenter.y + p3.y}`;
+                                const transform = rotation ? `rotate(${rotation}, ${ghostCenter.x}, ${ghostCenter.y})` : undefined;
+
+                                shapeElement = <polygon points={points} transform={transform} fill={fill} fillOpacity={fillOpacity} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth="2" />;
+                                outlineElement = <polygon points={points} transform={transform} fill="none" stroke={stroke} strokeOpacity={outlineStrokeOpacity} strokeWidth="2" strokeDasharray="4 4" />;
+                            } else {
+                                const radius = Math.max(1, (Number(activeDragObject.size) || 0) * scale / 2) * zoom;
+                                shapeElement = <circle cx={ghostCenter.x} cy={ghostCenter.y} r={radius} fill={fill} fillOpacity={fillOpacity} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth="2" />;
+                                outlineElement = <circle cx={ghostCenter.x} cy={ghostCenter.y} r={radius} fill="none" stroke={stroke} strokeOpacity={outlineStrokeOpacity} strokeWidth="2" strokeDasharray="4 4" />;
+                            }
+
+                            return (
+                                <>
+                                    {startScreen && (
+                                        <line
+                                            x1={startScreen.x}
+                                            y1={startScreen.y}
+                                            x2={ghostCenter.x}
+                                            y2={ghostCenter.y}
+                                            stroke={color}
+                                            strokeOpacity="0.5"
+                                            strokeWidth="2"
+                                            strokeDasharray="6 4"
+                                        />
+                                    )}
+                                    {outlineElement}
+                                    {shapeElement}
+                                </>
+                            );
+                        })()}
+
+                        {movementPreview && (() => {
+                            const ghostCenter = worldToScreen(movementPreview.ghostX, movementPreview.ghostY);
+                            const zoom = Number(camera.current?.zoom) || 1;
+                            const draggingChar = characters.find(
+                                (char) => toEntityID(char?.id) === toEntityID(movementPreview.characterId)
+                            );
+                            
+                            if (!draggingChar) return null;
+
+                            const team = String(draggingChar?.team || "player").toLowerCase();
+                            const color = TEAM_PREVIEW_COLORS[team] || TEAM_PREVIEW_COLORS.neutral;
+                            const startScreen = worldToScreen(draggingChar.position.x, draggingChar.position.y);
+                            
+                            const type = String(draggingChar.hitbox?.type || draggingChar.type || "circle").toLowerCase();
+                            const scale = Math.max(0.1, Number(draggingChar.hitbox?.scale) || 1);
+                            const rotation = Number(draggingChar.rotation) || 0;
+
+                            let shapeElement = null;
+                            let outlineElement = null;
+                            let approxRadius = 0;
+
+                            const fill = color;
+                            const fillOpacity = movementPreview.blocked ? "0.1" : "0.15";
+                            const stroke = movementPreview.blocked ? "#ef4444" : color;
+                            const strokeOpacity = movementPreview.blocked ? "0.6" : "0.5";
+                            const outlineStrokeOpacity = "0.3";
+
+                            if (type === 'rect') {
+                                const width = Math.max(1, (Number(draggingChar.width) || 0) * scale) * zoom;
+                                const height = Math.max(1, (Number(draggingChar.height) || 0) * scale) * zoom;
+                                const x = ghostCenter.x - width / 2;
+                                const y = ghostCenter.y - height / 2;
+                                const transform = rotation ? `rotate(${rotation}, ${ghostCenter.x}, ${ghostCenter.y})` : undefined;
+                                approxRadius = Math.max(width, height) / 2;
+
+                                shapeElement = <rect x={x} y={y} width={width} height={height} transform={transform} fill={fill} fillOpacity={fillOpacity} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth="2" />;
+                                outlineElement = <rect x={x} y={y} width={width} height={height} transform={transform} fill="none" stroke={stroke} strokeOpacity={outlineStrokeOpacity} strokeWidth="2" strokeDasharray="4 4" />;
+                            } else if (type === 'triangle') {
+                                const size = Math.max(1, (Number(draggingChar.size) || 0) * scale) * zoom;
+                                const s = size / 2;
+                                const p1 = { x: 0, y: -s };
+                                const p2 = { x: -s, y: s };
+                                const p3 = { x: s, y: s };
+                                const points = `${ghostCenter.x + p1.x},${ghostCenter.y + p1.y} ${ghostCenter.x + p2.x},${ghostCenter.y + p2.y} ${ghostCenter.x + p3.x},${ghostCenter.y + p3.y}`;
+                                const transform = rotation ? `rotate(${rotation}, ${ghostCenter.x}, ${ghostCenter.y})` : undefined;
+                                approxRadius = s;
+
+                                shapeElement = <polygon points={points} transform={transform} fill={fill} fillOpacity={fillOpacity} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth="2" />;
+                                outlineElement = <polygon points={points} transform={transform} fill="none" stroke={stroke} strokeOpacity={outlineStrokeOpacity} strokeWidth="2" strokeDasharray="4 4" />;
+                            } else {
+                                const radius = Math.max(4, movementPreview.walkableRadius * zoom);
+                                approxRadius = radius;
+                                shapeElement = <circle cx={ghostCenter.x} cy={ghostCenter.y} r={radius} fill={fill} fillOpacity={fillOpacity} stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth="2" />;
+                                outlineElement = <circle cx={ghostCenter.x} cy={ghostCenter.y} r={radius} fill="none" stroke={stroke} strokeOpacity={outlineStrokeOpacity} strokeWidth="2" strokeDasharray="4 4" />;
+                            }
+                            
+                            return (
+                                <>
+                                    {startScreen && (
+                                        <line
+                                            x1={startScreen.x}
+                                            y1={startScreen.y}
+                                            x2={ghostCenter.x}
+                                            y2={ghostCenter.y}
+                                            stroke={movementPreview.blocked ? "#ef4444" : color}
+                                            strokeOpacity="0.5"
+                                            strokeWidth="2"
+                                            strokeDasharray="6 4"
+                                        />
+                                    )}
+                                    {outlineElement}
+                                    {shapeElement}
+                                    {(() => {
+                                        const facingRad = (getFacingAngle(draggingChar.rotation) * Math.PI) / 180;
+                                        const dotDistance = approxRadius + 8;
+                                        return (
+                                            <>
+                                                <line
+                                                    x1={ghostCenter.x}
+                                                    y1={ghostCenter.y}
+                                                    x2={ghostCenter.x + Math.cos(facingRad) * dotDistance}
+                                                    y2={ghostCenter.y + Math.sin(facingRad) * dotDistance}
+                                                    stroke={movementPreview.blocked ? "#fca5a5" : "#e0e7ff"}
+                                                    strokeOpacity={movementPreview.blocked ? "0.4" : "0.5"}
+                                                    strokeWidth="1.5"
+                                                />
+                                                <circle
+                                                    cx={ghostCenter.x + Math.cos(facingRad) * dotDistance}
+                                                    cy={ghostCenter.y + Math.sin(facingRad) * dotDistance}
+                                                    r={3}
+                                                    fill={movementPreview.blocked ? "#fca5a5" : "#e0e7ff"}
+                                                    fillOpacity={movementPreview.blocked ? "0.6" : "0.7"}
+                                                />
+                                            </>
+                                        );
+                                    })()}
+                                </>
+                            );
+                        })()}
+
+                        {/* Range circle shown while targeting a movement destination */}
+                        {movementPreview?.isTargeting && (() => {
+                            const movingChar = characters.find(
+                                (c) => toEntityID(c?.id) === toEntityID(movementPreview.characterId)
+                            );
+                            if (!movingChar) return null;
+                            const origin = worldToScreen(
+                                Number(movingChar.position.x) || 0,
+                                Number(movingChar.position.y) || 0
+                            );
+                            const zoom = Number(camera.current?.zoom) || 1;
+                            const rangeR = (movementPreview.maxMoveRadius || 0) * zoom;
+                            const team = String(movingChar?.team || "player").toLowerCase();
+                            const color = TEAM_PREVIEW_COLORS[team] || TEAM_PREVIEW_COLORS.neutral;
+                            return (
+                                <>
+                                    <circle
+                                        cx={origin.x} cy={origin.y} r={rangeR}
+                                        fill={color} fillOpacity="0.06"
+                                        stroke={color} strokeOpacity="0.35"
+                                        strokeWidth="1.5" strokeDasharray="8 5"
+                                    />
+                                    {(() => {
+                                        const ghost = worldToScreen(movementPreview.ghostX, movementPreview.ghostY);
+                                        const blocked = movementPreview.blocked;
+                                        return <circle cx={ghost.x} cy={ghost.y} r={4} fill={blocked ? "#ef4444" : color} />;
+                                    })()}
+                                </>
+                            );
+                        })()}
+
+                        {selectionBox && (() => {
+                            const x = Math.min(selectionBox.startX, selectionBox.currentX);
+                            const y = Math.min(selectionBox.startY, selectionBox.currentY);
+                            const w = Math.abs(selectionBox.currentX - selectionBox.startX);
+                            const h = Math.abs(selectionBox.currentY - selectionBox.startY);
+                            return (
+                                <rect
+                                    x={x} y={y} width={w} height={h}
+                                    fill="rgba(59, 130, 246, 0.1)"
+                                    stroke="rgba(59, 130, 246, 0.6)"
+                                    strokeWidth="1"
+                                />
+                            );
+                        })()}
                     </svg>
                 )}
 
@@ -2806,329 +4684,292 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                     className="absolute bottom-4 z-[132] flex items-center gap-2"
                     style={{ right: Math.max(12, sideWidth + 12) }}
                 >
+                    <div className="relative">
+                        <button
+                            type="button"
+                            onClick={() => setViewMenuOpen(!viewMenuOpen)}
+                            className="h-9 px-3 rounded-md bg-gradient-to-b from-website-default-900/90 to-website-default-800/80 border border-website-default-700 text-website-default-200 text-[11px] flex items-center gap-2 hover:border-website-highlights-400/70 hover:text-website-highlights-200 hover:bg-website-default-800/90 transition-colors shadow-sm focus:outline-none"
+                        >
+                            <span>{MAP_VIEWS[activeViewId]?.label || "View"}</span>
+                            <svg className="w-3 h-3 text-website-default-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                        </button>
+                        
+                        {viewMenuOpen && (
+                            <>
+                                <div className="fixed inset-0 z-[140]" onClick={() => setViewMenuOpen(false)} />
+                                <div className="absolute bottom-full right-0 mb-2 w-40 bg-website-default-900/95 border border-website-highlights-500/20 rounded-lg shadow-[0_12px_30px_rgba(15,52,96,0.35)] overflow-hidden z-[150]">
+                                    {Object.values(MAP_VIEWS).map((view) => (
+                                        <button
+                                            key={view.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setActiveViewId(view.id);
+                                                setViewMenuOpen(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-2 text-[11px] hover:bg-website-highlights-500/10 ${activeViewId === view.id ? "text-website-highlights-300 font-semibold" : "text-website-default-200"}`}
+                                        >
+                                            {view.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
                     <button
                         type="button"
                         onClick={stepZLevelDown}
-                        className="h-9 min-w-9 px-2 rounded bg-gray-900/90 border border-slate-500 text-white text-sm hover:bg-gray-800"
+                        className="h-9 min-w-9 px-2 rounded-md bg-gradient-to-b from-website-default-900/90 to-website-default-800/80 border border-website-default-700 text-website-default-100 text-[11px] hover:border-website-highlights-400/70 hover:bg-website-default-800/90 transition-colors shadow-sm"
                         title="Go down one z-level (Shift)"
                     >
                         Z-
                     </button>
-                    <span className="h-9 px-3 flex items-center rounded bg-slate-900/90 border border-slate-500 text-slate-100 text-xs">
+                    <span className="h-9 px-3 flex items-center rounded-md bg-website-default-900/70 border border-website-highlights-500/20 text-website-default-300 text-[11px]">
                         Level {currentZLevel}
                     </span>
                     <button
                         type="button"
                         onClick={stepZLevelUp}
-                        className="h-9 min-w-9 px-2 rounded bg-gray-900/90 border border-slate-500 text-white text-sm hover:bg-gray-800"
+                        className="h-9 min-w-9 px-2 rounded-md bg-gradient-to-b from-website-default-900/90 to-website-default-800/80 border border-website-default-700 text-website-default-100 text-[11px] hover:border-website-highlights-400/70 hover:bg-website-default-800/90 transition-colors shadow-sm"
                         title="Go up one z-level (Space)"
                     >
                         Z+
                     </button>
                 </div>
 
-                {contextMenu && (
-                    <div
-                        className="absolute bg-gray-800 border border-gray-600 rounded shadow-lg z-50"
-                        style={{ left: contextMenu.x, top: contextMenu.y }}
-                        onMouseLeave={() => setContextMenu(null)}
-                        onContextMenu={(event) => event.preventDefault()}
-                    >
-                        <div className="py-1">
-                            {contextMenu?.target?.type === "character" && (
-                                <>
-                                    {(isDM || canControlCharacterId(contextMenu?.target?.id)) && (
-                                        <>
-                                            {loadingActionCharacterId === contextCharacterId && (
-                                                <div className="px-4 py-2 text-xs text-gray-300">
-                                                    Loading actions...
-                                                </div>
-                                            )}
-                                            {loadingActionCharacterId !== contextCharacterId &&
-                                                !contextActionData && (
-                                                    <button
-                                                        onClick={() =>
-                                                            fetchCharacterActions(
-                                                                contextCharacterId,
-                                                                { force: true }
-                                                            )
-                                                        }
-                                                        className="w-full px-4 py-2 text-left text-emerald-200 hover:bg-gray-700 text-sm"
-                                                    >
-                                                        Load Actions
-                                                    </button>
-                                                )}
-                                            {contextActionMenu && (
-                                                <>
-                                                    {contextActionTrail.length > 0 && (
-                                                        <button
-                                                            onClick={() =>
-                                                                setContextActionTrail((prev) =>
-                                                                    prev.slice(0, -1)
-                                                                )
-                                                            }
-                                                            className="w-full px-4 py-2 text-left text-gray-300 hover:bg-gray-700 text-sm"
-                                                        >
-                                                            {"< Back"}
-                                                        </button>
-                                                    )}
-                                                    {contextActionTrail.length > 0 &&
-                                                        contextActionNode?.label && (
-                                                            <div className="px-4 py-1 text-[10px] uppercase tracking-wide text-gray-400">
-                                                                {contextActionNode.label}
-                                                            </div>
-                                                        )}
-                                                    {contextActionItems.length === 0 && (
-                                                        <div className="px-4 py-2 text-xs text-gray-400">
-                                                            No actions available.
-                                                        </div>
-                                                    )}
-                                                    {contextActionItems.map((item) => {
-                                                        if (item.type === "folder") {
-                                                            return (
-                                                                <button
-                                                                    key={
-                                                                        item.node?.path ||
-                                                                        item.node?.key
-                                                                    }
-                                                                    onClick={() =>
-                                                                        setContextActionTrail(
-                                                                            (prev) => [
-                                                                                ...prev,
-                                                                                item.node,
-                                                                            ]
-                                                                        )
-                                                                    }
-                                                                    disabled={item.disabled}
-                                                                    title={
-                                                                        item.node?.path || ""
-                                                                    }
-                                                                    className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm disabled:text-gray-500 disabled:hover:bg-transparent flex items-center justify-between"
-                                                                >
-                                                                    <span>{item.label}</span>
-                                                                    <span className="text-gray-500">
-                                                                        {">"}
-                                                                    </span>
-                                                                </button>
-                                                            );
-                                                        }
-
-                                                        return (
-                                                            <button
-                                                                key={
-                                                                    item.action?.path ||
-                                                                    item.action?.id
-                                                                }
-                                                                onClick={() =>
-                                                                    handleContextAction(
-                                                                        item.action
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    item.action?.enabled ===
-                                                                    false
-                                                                }
-                                                                title={
-                                                                    item.action?.description ||
-                                                                    item.action?.path ||
-                                                                    ""
-                                                                }
-                                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm disabled:text-gray-500 disabled:hover:bg-transparent"
-                                                            >
-                                                                {item.label}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </>
-                                            )}
-                                            {!contextActionMenu &&
-                                                contextActionGroups.map(
-                                                    (group, groupIndex) => (
-                                                        <div
-                                                            key={group.key}
-                                                            className="py-1"
-                                                        >
-                                                            <div className="px-4 py-1 text-[10px] uppercase tracking-wide text-gray-400">
-                                                                {group.label}
-                                                            </div>
-                                                            {group.actions.map(
-                                                                (action) => (
-                                                                    <button
-                                                                        key={
-                                                                            action.path ||
-                                                                            action.id
-                                                                        }
-                                                                        onClick={() =>
-                                                                            handleContextAction(
-                                                                                action
-                                                                            )
-                                                                        }
-                                                                        disabled={
-                                                                            action.enabled ===
-                                                                            false
-                                                                        }
-                                                                        title={
-                                                                            action.description ||
-                                                                            action.path ||
-                                                                            ""
-                                                                        }
-                                                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm disabled:text-gray-500 disabled:hover:bg-transparent"
-                                                                    >
-                                                                        {action.name ||
-                                                                            action.path}
-                                                                    </button>
-                                                                )
-                                                            )}
-                                                            {groupIndex <
-                                                                contextActionGroups.length -
-                                                                    1 && (
-                                                                <div className="border-t border-gray-700 my-1" />
-                                                            )}
-                                                        </div>
-                                                    )
-                                                )}
-                                            {contextActionData &&
-                                                ((!contextActionMenu &&
-                                                    contextActionGroups.length >
-                                                        0) ||
-                                                    (contextActionMenu &&
-                                                        contextActionTrail.length >
-                                                            0)) && (
-                                                    <button
-                                                        onClick={() =>
-                                                            fetchCharacterActions(
-                                                                contextCharacterId,
-                                                                {
-                                                                    force: true,
-                                                                }
-                                                            )
-                                                        }
-                                                        className="w-full px-4 py-2 text-left text-xs text-gray-300 hover:bg-gray-700"
-                                                    >
-                                                        Refresh Actions
-                                                    </button>
-                                                )}
-                                            <div className="border-t border-gray-600 my-1" />
-                                        </>
-                                    )}
-                                    <button
-                                        onClick={() => handleContextAction("center")}
-                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                    >
-                                        Center Camera
-                                    </button>
-                                    <button
-                                        onClick={() => handleContextAction("info")}
-                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                    >
-                                        Inspect
-                                    </button>
-                                    {canViewCharacterSheet && (
-                                        <button
-                                            onClick={() => handleContextAction("viewSheet")}
-                                            className="w-full px-4 py-2 text-left text-slate-200 hover:bg-gray-700 text-sm"
-                                        >
-                                            View Sheet
-                                        </button>
-                                    )}
-                                    {(isDM || canControlCharacterId(contextMenu?.target?.id)) && (
-                                        <>
-                                            <div className="border-t border-gray-600 my-1" />
-                                            <button
-                                                onClick={() => handleContextAction("placeHere")}
-                                                className="w-full px-4 py-2 text-left text-emerald-200 hover:bg-gray-700 text-sm"
-                                            >
-                                                Place Character Here
-                                            </button>
-                                        </>
-                                    )}
-                                    {isDM && (
-                                        <>
-                                            <button
-                                                onClick={() => handleContextAction("toggleTeam")}
-                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                            >
-                                                Toggle Team
-                                            </button>
-                                            <button
-                                                onClick={() => handleContextAction("endTurn")}
-                                                className="w-full px-4 py-2 text-left text-amber-200 hover:bg-gray-700 text-sm"
-                                            >
-                                                End Turn + Autosave
-                                            </button>
-                                        </>
-                                    )}
-                                </>
-                            )}
-
-                            {contextMenu?.target?.type === "mapObject" && (
-                                <>
-                                    <button
-                                        onClick={() => handleContextAction("inspect")}
-                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                    >
-                                        Inspect
-                                    </button>
-                                    <button
-                                        onClick={() => handleContextAction("center")}
-                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                    >
-                                        Center Camera
-                                    </button>
-                                    {isDM && (
-                                        <>
-                                            <div className="border-t border-gray-600 my-1" />
-                                            <button
-                                                onClick={() => handleContextAction("damage10")}
-                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                            >
-                                                Damage 10
-                                            </button>
-                                            <button
-                                                onClick={() => handleContextAction("heal10")}
-                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                            >
-                                                Heal 10
-                                            </button>
-                                            <button
-                                                onClick={() => handleContextAction("delete")}
-                                                className="w-full px-4 py-2 text-left text-red-300 hover:bg-gray-700 text-sm"
-                                            >
-                                                Delete Object
-                                            </button>
-                                            <button
-                                                onClick={() => handleContextAction("duplicate")}
-                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                            >
-                                                Duplicate
-                                            </button>
-                                            <button
-                                                onClick={() => handleContextAction("bringForward")}
-                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                            >
-                                                Bring Forward (Z+)
-                                            </button>
-                                            <button
-                                                onClick={() => handleContextAction("sendBackward")}
-                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                            >
-                                                Send Backward (Z-)
-                                            </button>
-                                            <button
-                                                onClick={() => handleContextAction("toggleIndestructible")}
-                                                className="w-full px-4 py-2 text-left text-white hover:bg-gray-700 text-sm"
-                                            >
-                                                Toggle Indestructible
-                                            </button>
-                                        </>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    </div>
+                {contextMenu && contextMenuPos && (
+    <div
+        ref={contextMenuRef}
+        className="absolute z-50 min-w-[200px] max-w-[260px] resize overflow-auto rounded-xl border border-website-highlights-500/30 bg-website-default-900/95 text-website-default-100 shadow-[0_16px_40px_rgba(15,52,96,0.35)] ring-1 ring-website-default-700/60 backdrop-blur-md font-body text-[12px]"
+        style={{ left: contextMenuPos.x, top: contextMenuPos.y }}
+        onContextMenu={(event) => event.preventDefault()}
+        onMouseDown={(e) => e.stopPropagation()}
+    >
+        <div
+            className="px-3 py-2 border-b border-website-highlights-500/30 flex items-center justify-between gap-2 cursor-move select-none bg-gradient-to-r from-website-default-900/95 via-website-default-900/85 to-website-highlights-500/15"
+            onMouseDown={(e) => {
+                if (e.button !== 0) return;
+                e.stopPropagation();
+                setContextMenuDragOffset({ x: e.clientX - contextMenuPos.x, y: e.clientY - contextMenuPos.y });
+            }}
+        >
+            <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-[10px] uppercase tracking-[0.22em] text-website-highlights-300">
+                    {contextMenu?.target?.type === "character"
+                        ? "Character Actions"
+                        : "Object Actions"}
+                </span>
+                {contextMenu?.target?.type === "character" && contextCharacter?.name && (
+                    <span className="text-[11px] font-semibold text-website-default-100 truncate max-w-[180px]">
+                        {contextCharacter.name}
+                    </span>
                 )}
+            </div>
+            <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setContextMenu(null)}
+                className="text-website-default-300 hover:text-website-default-100 hover:bg-website-highlights-500/10 rounded-md text-[11px] font-semibold leading-none"
+            >
+                X
+            </button>
+        </div>
+        <div className="py-1">
+            {contextMenu?.target?.type === "character" && (
+                <>
+                    {(isDM || canControlCharacterId(contextMenu?.target?.id)) && contextActionMenu && (
+                        <>
+                            {/* Tabs */}
+                            <div className="flex border-b border-website-highlights-500/20 mb-1 bg-website-default-900/60">
+                                {CONTEXT_TABS.map((tab) => {
+                                    if (tab.key === "movement" && contextActionMenu) {
+                                        console.log("[ContextMenuDebug] Rendering movement tab");
+                                    }
+                                    return (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => {
+                                            setActiveContextTab(tab.key);
+                                            setContextTabTrails((prev) => ({ ...prev, [tab.key]: [] }));
+                                        }}
+                                        className={`flex-1 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] rounded-t transition-colors ${
+                                            activeContextTab === tab.key
+                                                ? "text-website-highlights-200 border-b-2 border-website-highlights-400 bg-website-highlights-500/20"
+                                                : "text-website-default-400 hover:text-website-highlights-200 hover:bg-website-highlights-500/10"
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                    );
+                                })}
+                            </div>
 
-                {renderSelectedInfo()}
+                            
+                                {(contextTabTrails[activeContextTab] || []).length > 0 && activeTabNode?.label && (
+                                <div className="px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-website-highlights-300 bg-website-default-800/40 rounded-md mx-2 mt-1">
+                                    {activeTabNode.label}
+                                </div>
+                            )}
+                            
+                            {/* Tab items */}
+                            {(() => {
+                                if (activeContextTab === "movement" && contextActionMenu) {
+                                    console.log("[ContextMenuDebug] Movement tab - items:", activeTabItems.map(i => ({ label: i.label, type: i.type, actionId: i.action?.id })));
+                                }
+                                return null;
+                            })()}
+                            {loadingActionCharacterId === contextCharacterId && (
+                                <div className="px-3 py-2 text-[11px] text-website-default-300 bg-website-default-800/40 rounded-md mx-2">Loading actions...</div>
+                            )}
+                            {activeTabItems.length === 0 && loadingActionCharacterId !== contextCharacterId && (
+                                <div className="px-3 py-2 text-[11px] text-website-default-400 bg-website-default-800/40 rounded-md mx-2">No actions available.</div>
+                            )}
+                            {activeTabItems.map((item) => {
+                                if (item.type === "folder") {
+                                    return (
+                                        <button
+                                            key={item.node?.path || item.node?.key}
+                                            onClick={() => pushTabTrail(activeContextTab, item.node)}
+                                            disabled={item.disabled}
+                                            className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 disabled:text-website-default-500 flex items-center justify-between border-l-2 border-transparent hover:border-website-highlights-400 transition-colors"
+                                        >
+                                            <span>{item.label}</span>
+                                            <span className="text-website-highlights-300">{">"}</span>
+                                        </button>
+                                    );
+                                }
+                                return (
+                                    <button
+                                        key={item.action?.path || item.action?.id}
+                                        onClick={() => handleContextAction(item.action)}
+                                        disabled={item.action?.enabled === false}
+                                        title={item.action?.description || ""}
+                                        className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 disabled:text-website-default-500 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors"
+                                    >
+                                        {item.label}
+                                    </button>
+                                );
+                            })}
+
+                            {contextActionData && (
+                                <button
+                                    onClick={() => fetchCharacterActions(contextCharacterId, { force: true })}
+                                className="w-full px-3 py-1.5 text-left text-[11px] text-website-highlights-300 hover:text-website-highlights-200 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors"
+                                >
+                                    Refresh Actions
+                                </button>
+                            )}
+                            {/* Breadcrumb back button */}
+                            {(contextTabTrails[activeContextTab] || []).length > 0 && (
+                                <button
+                                    onClick={() => popTabTrail(activeContextTab)}
+                                    className="w-full px-3 py-1.5 text-left text-[11px] text-website-default-300 hover:text-website-highlights-200 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors"
+                                >
+                                    {"< Back"}
+                                </button>
+                            )}
+                            
+                                                <div className="border-t border-website-highlights-500/20 my-1" />
+
+                            
+                        </>
+                    )}
+
+                    {/* Fallback: no action tree yet */}
+                    {(isDM || canControlCharacterId(contextMenu?.target?.id)) && !contextActionMenu && (
+                        <>
+                            {loadingActionCharacterId === contextCharacterId && (
+                                <div className="px-3 py-2 text-[11px] text-website-default-300 bg-website-default-800/40 rounded-md mx-2">Loading actions...</div>
+                            )}
+                            {loadingActionCharacterId !== contextCharacterId && !contextActionData && (
+                                <button
+                                    onClick={() => fetchCharacterActions(contextCharacterId, { force: true })}
+                                    className="w-full px-3 py-1.5 text-left text-[12px] font-semibold text-website-highlights-300 bg-website-highlights-500/10 hover:bg-website-highlights-500/20 border-l-2 border-website-highlights-400 transition-colors"
+                                >
+                                    Load Actions
+                                </button>
+                            )}
+                            {contextActionGroups.map((group, groupIndex) => (
+                                <div key={group.key} className="py-1">
+                                    <div className="px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-website-highlights-300 bg-website-default-800/40 rounded-md mx-2">{group.label}</div>
+                                    {group.actions.map((action) => (
+                                        <button
+                                            key={action.path || action.id}
+                                            onClick={() => handleContextAction(action)}
+                                            disabled={action.enabled === false}
+                                            className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 disabled:text-website-default-500 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors"
+                                        >
+                                            {action.name || action.path}
+                                        </button>
+                                    ))}
+                                    {groupIndex < contextActionGroups.length - 1 && (
+                                                <div className="border-t border-website-highlights-500/20 my-1" />
+                                    )}
+                                </div>
+                            ))}
+                                            <div className="border-t border-website-highlights-500/20 my-1" />
+                        </>
+                    )}
+
+                    <button onClick={() => handleContextAction("center")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Center Camera</button>
+                    <button onClick={() => handleContextAction("info")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Inspect</button>
+                    {canViewCharacterSheet && (
+                        <button onClick={() => handleContextAction("viewSheet")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-200 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">View Sheet</button>
+                    )}
+                    {(isDM || canControlCharacterId(contextMenu?.target?.id)) && (
+                        <>
+                            <div className="border-t border-website-highlights-500/20 my-1" />
+                            <button onClick={() => handleContextAction("placeHere")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-highlights-300 hover:bg-website-highlights-500/20 border-l-2 border-website-highlights-400 transition-colors">Place Character Here</button>
+                        </>
+                    )}
+                    {isDM && (
+                        <>
+                            <button onClick={() => handleContextAction("toggleTeam")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Toggle Team</button>
+                            <button onClick={() => handleContextAction("endTurn")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-highlights-200 hover:bg-website-highlights-500/20 border-l-2 border-website-highlights-400 transition-colors">End Turn + Autosave</button>
+                            <button onClick={() => handleContextAction("delete")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-specials-400 hover:bg-website-specials-500/15 border-l-2 border-website-specials-400 transition-colors">Delete Character</button>
+                        </>
+                    )}
+                </>
+            )}
+
+            {contextMenu?.target?.type === "mapObject" && (
+                <>
+                    <button onClick={() => handleContextAction("inspect")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Inspect</button>
+                    <button onClick={() => handleContextAction("center")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Center Camera</button>
+                    {isDM && (
+                        <>
+                            <div className="border-t border-website-highlights-500/20 my-1" />
+                            <button onClick={() => handleContextAction("damage10")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Damage 10</button>
+                            <button onClick={() => handleContextAction("heal10")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Heal 10</button>
+                            <button onClick={() => handleContextAction("delete")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-specials-400 hover:bg-website-specials-500/15 border-l-2 border-website-specials-400 transition-colors">Delete Object</button>
+                            <button onClick={() => handleContextAction("duplicate")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Duplicate</button>
+                            <button onClick={() => handleContextAction("bringForward")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Bring Forward (Z+)</button>
+                            <button onClick={() => handleContextAction("sendBackward")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Send Backward (Z-)</button>
+                            <button onClick={() => handleContextAction("toggleIndestructible")} className="w-full px-3 py-1.5 text-left text-[12px] font-medium text-website-default-100 hover:bg-website-highlights-500/10 border-l-2 border-transparent hover:border-website-highlights-400 transition-colors">Toggle Indestructible</button>
+                        </>
+                    )}
+                </>
+            )}
+        </div>
+    </div>
+)}
+                <InfoWindows
+                    infoPanels={infoPanels}
+                    setInfoPanels={setInfoPanels}
+                    clampInfoPanelPosition={clampInfoPanelPosition}
+                    closeInfoPanel={closeInfoPanel}
+                    characters={characters}
+                    mapObjects={mapObjects}
+                    floorTypesByID={floorTypesByID}
+                    isDM={isDM}
+                    updateMapObject={updateMapObject}
+                    updateCharacter={updateCharacter}
+                    minRectWorldSize={MIN_RECT_WORLD_SIZE}
+                    minShapeWorldSize={MIN_SHAPE_WORLD_SIZE}
+                    characterOwnershipById={characterOwnershipById}
+                    playerID={playerID}
+                    selectedCharacterId={selectedChar}
+                />
             </div>
 
             <div
@@ -3139,8 +4980,29 @@ const findInteractionTargetAt = (worldX, worldY, includeHiddenCharacters = false
                     className="bg-gray-700 cursor-col-resize hover:bg-gray-500 col-start-2"
                     onMouseDown={handleResizerMouseDown}
                 />
-                <GameSidePanel />
+                <GameSidePanel 
+                    ownedCharacterIds={ownedCharacterIds}
+                    visionRayCount={visionRayCount}
+                    onVisionRayCountChange={handleVisionRayCountChange}
+                    onForceVisionRerender={handleForceVisionRerender}
+                    visionDebug={visionDebug}
+                    journalState={journalState}
+                    onUpdateJournalState={setJournalState}
+                    questState={questState}
+                    onUpdateQuestState={setQuestState}
+                    playerID={playerID}
+                    campaignID={gameID}
+                />
             </div>
+
+            {/* Dice Roll Gallery for combat initiative and actions */}
+            {showDiceGallery && diceRolls.length > 0 && (
+                <DiceRollGallery
+                    rolls={diceRolls}
+                    onClose={closeDiceGallery}
+                    playerCharacterId={primaryCharacterId}
+                />
+            )}
         </div>
     );
 }

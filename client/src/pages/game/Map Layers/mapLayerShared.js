@@ -131,7 +131,7 @@ export const getObjectRadiusLikeValue = (obj) => {
   if (String(obj.type || "circle").toLowerCase() === "rect") {
     return Math.max(20, Math.max(Number(obj.width) || 0, Number(obj.height) || 0) / 2);
   }
-  return Math.max(20, Number(obj.size) || 0);
+  return Math.max(20, (Number(obj.size) || 0) / 2);
 };
 
 export const getObjectBoundsWorld = (obj = {}) => {
@@ -145,7 +145,7 @@ export const getObjectBoundsWorld = (obj = {}) => {
     return { minX: x - halfWidth, maxX: x + halfWidth, minY: y - halfHeight, maxY: y + halfHeight };
   }
 
-  const radius = Math.max(1, Number(obj?.size) || 0);
+  const radius = Math.max(1, (Number(obj?.size) || 0) / 2);
   return { minX: x - radius, maxX: x + radius, minY: y - radius, maxY: y + radius };
 };
 
@@ -206,7 +206,7 @@ const drawHatchOverlay = (ctx, obj, camera) => {
   // Clip to the object's shape
   ctx.beginPath();
   if (objectType === "circle") {
-    const radius = Math.max(1, (Number(obj?.size) || 0) * camera.zoom);
+    const radius = Math.max(1, ((Number(obj?.size) || 0) / 2) * camera.zoom);
     ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
   } else if (objectType === "rect") {
     const w = Math.max(1, (Number(obj?.width)  || 0) * camera.zoom);
@@ -217,7 +217,7 @@ const drawHatchOverlay = (ctx, obj, camera) => {
       ctx.rect(screenX - w / 2, screenY - h / 2, w, h);
     }
   } else {
-    const s = Math.max(1, (Number(obj?.size) || 0) * camera.zoom);
+    const s = Math.max(1, ((Number(obj?.size) || 0) / 2) * camera.zoom);
     if (rotation) {
       ctx.moveTo(0, -s);
       ctx.lineTo(-s, s);
@@ -253,7 +253,7 @@ const drawHatchOverlay = (ctx, obj, camera) => {
       y1 = screenY + h / 2;
     }
   } else {
-    const s = Math.max(1, (Number(obj?.size) || 0) * camera.zoom);
+    const s = Math.max(1, ((Number(obj?.size) || 0) / 2) * camera.zoom);
     if (rotation && objectType !== "circle") {
       x0 = -s;
       x1 = s;
@@ -357,7 +357,7 @@ export const drawShape = (ctx, obj, camera, style = {}) => {
   const rotation   = getObjectRotationRad(obj);
 
   if (objectType === "circle") {
-    const radius = (Number(obj?.size) || 0) * camera.zoom;
+    const radius = ((Number(obj?.size) || 0) / 2) * camera.zoom;
     ctx.beginPath();
     ctx.arc(screenX, screenY, Math.max(1, radius), 0, Math.PI * 2);
     if (fill)   ctx.fill();
@@ -382,7 +382,7 @@ export const drawShape = (ctx, obj, camera, style = {}) => {
     return { screenX, screenY };
   }
 
-  const size = Math.max(1, (Number(obj?.size) || 0) * camera.zoom);
+  const size = Math.max(1, ((Number(obj?.size) || 0) / 2) * camera.zoom);
   if (rotation) {
     ctx.save();
     ctx.translate(screenX, screenY);
@@ -472,7 +472,7 @@ const getObjectSegmentsWorld = (obj, circleSegmentsBase = 16) => {
   }
 
   if (objectType === "circle") {
-    const r = Math.max(1, Number(obj?.size) || 0);
+    const r = Math.max(1, (Number(obj?.size) || 0) / 2);
     const n = Math.min(MAX_CIRCLE_SEGMENTS, Math.max(circleSegmentsBase, Math.ceil(r * 0.15)));
     const pts = [];
     for (let i = 0; i < n; i++) {
@@ -483,7 +483,7 @@ const getObjectSegmentsWorld = (obj, circleSegmentsBase = 16) => {
     return segs;
   }
 
-  const s = Math.max(1, Number(obj?.size) || 0);
+  const s = Math.max(1, (Number(obj?.size) || 0) / 2);
   if (rotation) {
     buildPolySegs([
       rotatePoint(0, -s),
@@ -906,16 +906,28 @@ export const drawBlockedMovePreview = (ctx, obj, camera) => {
 const buildMapRenderData = (state = {}, options = {}) => {
   const mapObjects = Array.isArray(options?.mapObjects)
     ? options.mapObjects
+    : Array.isArray(state?.visibleMapObjects)
+    ? state.visibleMapObjects
     : Array.isArray(state?.mapObjects)
-    ? state.mapObjects
+    ? state.mapObjects // Fallback for contexts without visibleMapObjects
     : [];
   const floorTypes   = Array.isArray(state?.floorTypes)  ? state.floorTypes  : [];
   const floorTypesByID   = buildFloorTypesByID(floorTypes);
   const currentZLevel    = Math.round(Number(state?.currentZLevel) || 0);
   const minVisibleLowerLevel = currentZLevel >= 0 ? 0 : currentZLevel;
   const selectedMapObjectID  = String(state?.selectedMapObjectID ?? "");
+  const hiddenIds = state?.hiddenMapObjectIds;
+  const activeDragObject = state?.activeDragObject;
 
-  const sortedObjects = [...mapObjects].sort((a, b) => {
+  let effectiveObjects = mapObjects;
+  if (hiddenIds || activeDragObject) {
+      effectiveObjects = mapObjects.filter(obj => !hiddenIds?.has(String(obj.id)));
+      if (activeDragObject) {
+          effectiveObjects.push(activeDragObject);
+      }
+  }
+
+  const sortedObjects = [...effectiveObjects].sort((a, b) => {
     const levelDiff = getObjectZLevel(a) - getObjectZLevel(b);
     if (levelDiff !== 0) return levelDiff;
     const zDiff = (Number(a?.z) || 0) - (Number(b?.z) || 0);
@@ -961,6 +973,7 @@ return {
     currentZLevel,
     selectedMapObjectID,
     blockedMovePreview:  state?.blockedMovePreview || null,
+    activeDragObject,
     showResizeHandles:   Boolean(state?.showResizeHandles),
     lowerLevelFloors:    lowerLevelObjects.filter((obj) => normalizeTerrainType(obj?.terrainType) === "floor"),
     lowerLevelSolids:    lowerLevelObjects.filter((obj) => normalizeTerrainType(obj?.terrainType) !== "floor"),
@@ -1005,6 +1018,7 @@ export const shouldRedrawMapLayer = (state, prevState, options = {}) => {
   if (state.currentZLevel !== prevState.currentZLevel) return true;
   if (includeSelection && state.selectedMapObjectID !== prevState.selectedMapObjectID) return true;
   if (includeOverlay) {
+    if (state.activeDragObject !== prevState.activeDragObject) return true;
     if (state.blockedMovePreview !== prevState.blockedMovePreview) return true;
     if (state.showResizeHandles  !== prevState.showResizeHandles)  return true;
   }

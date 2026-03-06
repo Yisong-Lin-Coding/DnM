@@ -7,6 +7,7 @@ import { gridlayer } from "./4Grid";
 import { mapFogLayer } from "./6Fog";
 import { lightingLayer } from "./7lighting";
 import { mapEffectsLayer } from "./8Effects";
+import { visionLayer } from "./9Vision";
 
 export const GAME_LAYER_REGISTRY = [
   { name: "background", component: backgroundLayer, zIndex: 0 },
@@ -15,6 +16,7 @@ export const GAME_LAYER_REGISTRY = [
   { name: "mapShadows", component: mapShadowsLayer, zIndex: 3 },
   { name: "mapSolids", component: mapSolidsLayer, zIndex: 4 },
   { name: "lighting", component: lightingLayer, zIndex: 5 },
+  { name: "vision", component: visionLayer, zIndex: 5.5 },
   { name: "fog", component: mapFogLayer, zIndex: 6 },
   { name: "mapCharacters", component: mapCharactersLayer, zIndex: 7 },
   { name: "mapEffects", component: mapEffectsLayer, zIndex: 8 },

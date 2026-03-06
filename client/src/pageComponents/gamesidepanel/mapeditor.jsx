@@ -84,7 +84,7 @@ function MapEditor() {
     addLightSource,
     updateLightSource,
     removeLightSource,
-    armLightPlacement,  // ADD THIS
+    armLightPlacement,
     mapObjectPlacement,
     armMapObjectPlacement,
     clearMapObjectPlacement,
@@ -227,6 +227,15 @@ function MapEditor() {
         }),
         [directionalLightVector, lightWheelRadius]
     );
+
+    const forceWorldSync = useCallback(() => {
+        if (!isDM) return;
+        // By creating a new object reference for lighting, we trigger the
+        // world sync effect in the main GameComponent.
+        replaceLighting({ ...(lighting || {}) });
+        setStatus("Forcing world sync with server...");
+        setError("");
+    }, [isDM, lighting, replaceLighting]);
 
     const patchLightingGlobal = (updates = {}) => {
         replaceLighting({
@@ -1224,7 +1233,7 @@ const lightPresets = [
                         </div>
                     ) : (
                         <div>
-                            <label className="text-xs">Size</label>
+                            <label className="text-xs">Diameter</label>
                             <input
                                 type="number"
                                 value={creationDraft.size}
@@ -1255,6 +1264,21 @@ const lightPresets = [
                             Cancel Placement
                         </button>
                     )}
+                </div>
+
+                <div className="bg-gray-800 p-3 rounded space-y-2">
+                    <p className="font-semibold text-sm">Debug Tools</p>
+                    <button
+                        type="button"
+                        onClick={forceWorldSync}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded text-sm"
+                    >
+                        Force World Sync (Reload Lighting)
+                    </button>
+                    <p className="text-xs text-gray-400">
+                        Forces a full state sync with the server. Use this to manually recalculate
+                        lighting polygons or fix desync issues.
+                    </p>
                 </div>
 
                 <div className="bg-gray-800 p-3 rounded space-y-2">
@@ -1575,7 +1599,7 @@ const lightPresets = [
                                         </div>
                                     ) : (
                                         <div>
-                                            <label className="text-xs">Size</label>
+                                            <label className="text-xs">Diameter</label>
                                             <input
                                                 type="number"
                                                 value={obj.size}

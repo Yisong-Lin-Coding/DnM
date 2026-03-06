@@ -1,0 +1,213 @@
+/* Dice Roll Gallery Styles */
+
+.dice-roll-gallery {
+    position: relative;
+}
+
+.gallery-controls {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 15px 25px;
+    border-radius: 50px;
+    z-index: 10001;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+/* Navigation Buttons */
+.gallery-nav {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4ecdc4 0%, #44a7c0 100%);
+    color: white;
+    border: none;
+    font-size: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(78, 205, 196, 0.3);
+    line-height: 1;
+    padding: 0;
+}
+
+.gallery-nav:hover {
+    transform: scale(1.1);
+    box-shadow: 0 8px 20px rgba(78, 205, 196, 0.5);
+}
+
+.gallery-nav:active {
+    transform: scale(0.95);
+}
+
+.gallery-nav.prev {
+    margin-right: 10px;
+}
+
+.gallery-nav.next {
+    margin-left: 10px;
+}
+
+/* Roll Indicators */
+.roll-indicators {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    max-width: 500px;
+    overflow-x: auto;
+    padding: 5px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.roll-indicators::-webkit-scrollbar {
+    height: 4px;
+}
+
+.roll-indicators::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.roll-indicators::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+}
+
+.roll-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 80px;
+}
+
+.roll-indicator:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.roll-indicator.active {
+    background: linear-gradient(135deg, rgba(78, 205, 196, 0.3) 0%, rgba(68, 167, 192, 0.3) 100%);
+    border-color: #4ecdc4;
+    box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
+}
+
+.roll-indicator.own {
+    border-color: #ffd700;
+}
+
+.roll-indicator.active.own {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 193, 7, 0.3) 100%);
+    border-color: #ffd700;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+.roll-indicator.viewed .indicator-dot {
+    background: #55efc4;
+}
+
+.indicator-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+}
+
+.roll-indicator.active .indicator-dot {
+    background: #4ecdc4;
+    box-shadow: 0 0 10px rgba(78, 205, 196, 0.8);
+}
+
+.roll-indicator.own .indicator-dot {
+    background: #ffd700;
+}
+
+.indicator-label {
+    font-size: 0.75rem;
+    color: #ffffff;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+}
+
+/* Roll Counter */
+.roll-counter {
+    color: #a0a0c0;
+    font-size: 0.9rem;
+    font-weight: bold;
+    margin-left: 10px;
+    padding-left: 15px;
+    border-left: 2px solid rgba(255, 255, 255, 0.2);
+    white-space: nowrap;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .gallery-controls {
+        bottom: 20px;
+        padding: 10px 15px;
+        gap: 10px;
+        max-width: 90%;
+    }
+
+    .gallery-nav {
+        width: 35px;
+        height: 35px;
+        font-size: 1.5rem;
+    }
+
+    .roll-indicators {
+        max-width: 200px;
+        gap: 5px;
+    }
+
+    .roll-indicator {
+        min-width: 60px;
+        padding: 6px 8px;
+    }
+
+    .indicator-label {
+        font-size: 0.65rem;
+        max-width: 60px;
+    }
+
+    .roll-counter {
+        font-size: 0.8rem;
+        margin-left: 5px;
+        padding-left: 10px;
+    }
+}
+
+/* Animation for new rolls appearing */
+@keyframes slideInBottom {
+    from {
+        transform: translateX(-50%) translateY(100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
+
+.gallery-controls {
+    animation: slideInBottom 0.5s ease-out;
+}

@@ -55,7 +55,12 @@ function SaveRow({ save, activeSaveID, loading, onLoad }) {
   );
 }
 
-function Admin() {
+function Admin({
+  visionRayCount = 256,
+  onVisionRayCountChange = () => {},
+  onForceVisionRerender = () => {},
+  visionDebug = null,
+}) {
   const socket = useContext(SocketContext);
   const { gameID } = useParams();
   const playerID = localStorage.getItem("player_ID");
@@ -434,6 +439,31 @@ function Admin() {
             {fovStatus}
           </div>
         )}
+        <div className="flex items-center justify-between gap-2">
+          <label className="text-xs uppercase tracking-wide text-gray-400">Vision Rays</label>
+          <span className="text-xs text-gray-300">{visionRayCount}</span>
+        </div>
+        <input
+          type="range"
+          min="4"
+          max="256"
+          step="4"
+          value={visionRayCount}
+          onChange={(e) => {
+            const nextValue = Number(e.target.value);
+            onVisionRayCountChange(nextValue);
+          }}
+          className="w-full h-2 bg-slate-700 rounded appearance-none cursor-pointer"
+          title="Vision ray count for fuel-based vision rendering"
+        />
+        <button
+          type="button"
+          onClick={onForceVisionRerender}
+          className="text-xs px-2 py-1 rounded border bg-purple-900/70 border-purple-500 text-purple-200 hover:bg-purple-800/80 whitespace-nowrap"
+          title="Force vision redraw for the selected character"
+        >
+          Rerender Vision
+        </button>
         <label className="text-xs uppercase tracking-wide text-gray-400">FOV Mode</label>
         <select
           value={fovMode}
@@ -448,6 +478,37 @@ function Admin() {
           Party mode shares all player vision. Per-player restricts each player to their own
           vision sources.
         </p>
+        {visionDebug && (
+          <div className="mt-2 rounded border border-slate-700 bg-slate-950/70 p-2 text-[11px] text-slate-200 space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="uppercase tracking-wide text-slate-400">Vision Debug</span>
+              <span className="text-[10px] text-slate-500">
+                {formatDateTime(visionDebug.updatedAt)}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2 text-slate-300">
+              <span>Sources: {visionDebug.sourceCount ?? 0}</span>
+              <span>Chars: {visionDebug.characterCount ?? 0}</span>
+            </div>
+            <div className="flex flex-wrap gap-2 text-slate-300">
+              <span>Explored: {visionDebug.combinedExplored ?? 0}</span>
+              <span>Last Seen: {visionDebug.combinedLastSeen ?? 0}</span>
+              <span>Visible: {visionDebug.combinedVisible ?? 0}</span>
+            </div>
+            {Array.isArray(visionDebug.perCharacter) && visionDebug.perCharacter.length > 0 && (
+              <div className="max-h-28 overflow-y-auto scrollbar-transparent border-t border-slate-800 pt-1 space-y-1">
+                {visionDebug.perCharacter.map((entry) => (
+                  <div key={entry.id || entry.name} className="flex items-center justify-between gap-2">
+                    <span className="truncate text-slate-200">{entry.name || entry.id || "Unknown"}</span>
+                    <span className="text-slate-400 shrink-0">
+                      E:{entry.explored ?? 0} LS:{entry.lastSeen ?? 0} V:{entry.visible ?? 0}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="text-sm space-y-2 rounded border border-gray-700 bg-gray-900/70 p-3">

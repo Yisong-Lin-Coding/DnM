@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Tabs } from "../pageComponents/tabs";
 import {
   Backpack,
@@ -14,22 +15,45 @@ import { useGame } from "../data/gameContext";
 
 import Admin from "./gamesidepanel/admin";
 import MapEditor from "./gamesidepanel/mapeditor";
-import { LightingPanel } from "./gamesidepanel/lighting";
+import InventoryPanel from "./gamesidepanel/inventory";
+import CharacterSheetPanel from "./gamesidepanel/characterSheet";
+import SpellsPanel from "./gamesidepanel/spells";
+import QuestsPanel from "./gamesidepanel/quests";
+import MapInfoPanel from "./gamesidepanel/mapInfo";
+import JournalPanel from "./gamesidepanel/journal";
+import PartyPanel from "./gamesidepanel/party";
+import SettingsPanel from "./gamesidepanel/settings";
 
-function PlaceholderPanel({ title, subtitle, hint }) {
-  return (
-    <div className="h-full min-h-0 overflow-y-auto scrollbar-transparent px-4 py-4">
-      <div className="rounded-xl border border-slate-700/80 bg-slate-900/80 p-4">
-        <h3 className="text-lg font-semibold text-white">{title}</h3>
-        <p className="mt-2 text-sm text-slate-300">{subtitle}</p>
-        <p className="mt-3 text-xs uppercase tracking-wider text-slate-500">{hint}</p>
-      </div>
-    </div>
-  );
-}
+export default function GameSidePanel({
+  ownedCharacterIds = [],
+  visionRayCount = 256,
+  onVisionRayCountChange = () => {},
+  onForceVisionRerender = () => {},
+  visionDebug = null,
+  journalState,
+  onUpdateJournalState,
+  questState,
+  onUpdateQuestState,
+  playerID,
+  campaignID,
+}) {
+  const { isDM, characters, selectedChar } = useGame();
 
-export default function GameSidePanel() {
-  const { isDM } = useGame();
+  const activeCharacter = useMemo(() => {
+    // 1. If DM, show the selected character (if any)
+    if (isDM) {
+      return characters.find(c => String(c.id) === String(selectedChar)) || null;
+    }
+
+    // 2. If Player, show selected IF they own it
+    if (selectedChar && ownedCharacterIds.some(id => String(id) === String(selectedChar))) {
+      return characters.find(c => String(c.id) === String(selectedChar));
+    }
+
+    // 3. Otherwise default to their first owned character
+    const firstOwnedId = ownedCharacterIds[0];
+    return characters.find(c => String(c.id) === String(firstOwnedId)) || null;
+  }, [isDM, selectedChar, ownedCharacterIds, characters]);
 
   return (
     <Tabs className="h-full min-h-0 grid grid-rows-[auto_1fr] border-l border-slate-700 bg-slate-950 text-slate-100">
@@ -72,72 +96,57 @@ export default function GameSidePanel() {
 
       <Tabs.Panels className="h-full min-h-0 overflow-hidden">
         <Tabs.Panel index={0} className="!p-0 h-full min-h-0 overflow-y-auto scrollbar-transparent">
-          <PlaceholderPanel
-            title="Inventory"
-            subtitle="Consumables, equipment, and loot from the current run."
-            hint="Item management tools will render here"
-          />
+          <InventoryPanel character={activeCharacter} />
         </Tabs.Panel>
 
         <Tabs.Panel index={1} className="!p-0 h-full min-h-0 overflow-y-auto scrollbar-transparent">
-          <PlaceholderPanel
-            title="Character Sheet"
-            subtitle="Core stats, passive bonuses, and your active build."
-            hint="Character details panel"
-          />
+          <CharacterSheetPanel character={activeCharacter} />
         </Tabs.Panel>
 
         <Tabs.Panel index={2} className="!p-0 h-full min-h-0 overflow-y-auto scrollbar-transparent">
-          <PlaceholderPanel
-            title="Spells"
-            subtitle="Prepared spells, cooldowns, and casting resources."
-            hint="Spellbook and actions"
-          />
+          <SpellsPanel character={activeCharacter} />
         </Tabs.Panel>
 
         <Tabs.Panel index={3} className="!p-0 h-full min-h-0 overflow-y-auto scrollbar-transparent">
-          <PlaceholderPanel
-            title="Quests"
-            subtitle="Objective chains and current campaign progression."
-            hint="Quest tracker"
+          <QuestsPanel
+            character={activeCharacter}
+            questState={questState}
+            onUpdateQuestState={onUpdateQuestState}
           />
         </Tabs.Panel>
 
         <Tabs.Panel index={4} className="!p-0 h-full min-h-0 overflow-y-auto scrollbar-transparent">
-          <PlaceholderPanel
-            title="Map"
-            subtitle="Quick world summary for the active encounter."
-            hint="Context-only map data"
-          />
+          <MapInfoPanel character={activeCharacter} />
         </Tabs.Panel>
 
         <Tabs.Panel index={5} className="!p-0 h-full min-h-0 overflow-y-auto scrollbar-transparent">
-          <PlaceholderPanel
-            title="Journal"
-            subtitle="Session notes, lore snippets, and reminders."
-            hint="Journal timeline"
+          <JournalPanel
+            journalState={journalState}
+            onUpdateJournalState={onUpdateJournalState}
+            playerID={playerID}
           />
         </Tabs.Panel>
 
-        <Tabs.Panel index={6} className="!p-0 h-full min-h-0 overflow-y-auto scrollbar-transparent">
-          <PlaceholderPanel
-            title="Party"
-            subtitle="Player roster and party role snapshots."
-            hint="Party overview"
+        <Tabs.Panel index={6} className="!p-0 h-full min-h-0 overflow-hidden">
+          <PartyPanel 
+            activeCharacterId={activeCharacter?.id}
+            playerID={playerID}
+            campaignID={campaignID}
           />
         </Tabs.Panel>
 
         <Tabs.Panel index={7} className="!p-0 h-full min-h-0 overflow-y-auto scrollbar-transparent">
-          <PlaceholderPanel
-            title="Settings"
-            subtitle="Camera, controls, and personal game preferences."
-            hint="Session settings"
-          />
+          <SettingsPanel character={activeCharacter} />
         </Tabs.Panel>
 
         {isDM && (
           <Tabs.Panel index={8} className="!p-0 h-full min-h-0 overflow-y-auto scrollbar-transparent">
-            <Admin />
+            <Admin
+              visionRayCount={visionRayCount}
+              onVisionRayCountChange={onVisionRayCountChange}
+              onForceVisionRerender={onForceVisionRerender}
+              visionDebug={visionDebug}
+            />
           </Tabs.Panel>
         )}
 

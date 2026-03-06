@@ -23,9 +23,6 @@ class Spell {
     this.rarity = data.rarity || (this.level === 0 ? 'cantrip' : 'common');
   }
 
-  /**
-   * Check if spell is a cantrip
-   */
   isCantrip() {
     return this.level === 0;
   }

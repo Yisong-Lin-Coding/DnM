@@ -67,9 +67,6 @@ const normalizeDirectionalVector = (value = {}) => {
 const normalizeTerrainType = (value) =>
   String(value || "obstacle").trim().toLowerCase();
 
-const getObjectRotationRad = (obj) =>
-  (Number(obj?.rotation) || 0) * (Math.PI / 180);
-
 // ─── LIGHT SOURCE NORMALIZATION ───────────────────
 const normalizeLightingSource = (raw = {}, fallbackIndex = 0) => {
   const source =
@@ -125,140 +122,15 @@ const normalizeLighting = (lighting = {}) => {
   };
 };
 
-// ─── RAYCAST / VISIBILITY HELPERS ────────────────
-const cross2d = (ax, ay, bx, by) => ax * by - ay * bx;
-
-const raySegmentT = (ox, oy, dx, dy, ax, ay, bx, by) => {
-  const rx = bx - ax, ry = by - ay;
-  const denom = cross2d(dx, dy, rx, ry);
-  if (Math.abs(denom) < 1e-10) return Infinity;
-  const tx = ax - ox, ty = ay - oy;
-  const t = cross2d(tx, ty, rx, ry) / denom;
-  const u = cross2d(tx, ty, dx, dy) / denom;
-  if (t < -1e-8 || u < -1e-8 || u > 1 + 1e-8) return Infinity;
-  return Math.max(0, t);
-};
-
-const castRay = (ox, oy, dx, dy, segments, maxRange) => {
-  let nearest = maxRange;
-  for (const [a, b] of segments) {
-    const t = raySegmentT(ox, oy, dx, dy, a.x, a.y, b.x, b.y);
-    if (t < nearest) nearest = t;
+const isPointInPolygon = (x, y, poly) => {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y;
+    const xj = poly[j].x, yj = poly[j].y;
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
   }
-  return { x: ox + dx * nearest, y: oy + dy * nearest };
-};
-
-export const getObjectSegmentsWorld = (obj, circleSegments = 16) => {
-  const objectType = String(obj?.type || "circle").toLowerCase();
-  const cx = Number(obj?.x) || 0;
-  const cy = Number(obj?.y) || 0;
-  const rotation = getObjectRotationRad(obj);
-  const cos = rotation ? Math.cos(rotation) : 1;
-  const sin = rotation ? Math.sin(rotation) : 0;
-  const segs = [];
-
-  const buildPolySegs = (pts) => {
-    for (let i = 0; i < pts.length; i++)
-      segs.push([pts[i], pts[(i + 1) % pts.length]]);
-  };
-
-  const rotatePoint = (x, y) => ({
-    x: cx + x * cos - y * sin,
-    y: cy + x * sin + y * cos,
-  });
-
-  if (objectType === "rect") {
-    const hw = Math.max(1, Number(obj?.width)  || 0) / 2;
-    const hh = Math.max(1, Number(obj?.height) || 0) / 2;
-    if (rotation) {
-      buildPolySegs([
-        rotatePoint(-hw, -hh),
-        rotatePoint(hw, -hh),
-        rotatePoint(hw, hh),
-        rotatePoint(-hw, hh),
-      ]);
-    } else {
-      buildPolySegs([
-        { x: cx - hw, y: cy - hh }, { x: cx + hw, y: cy - hh },
-        { x: cx + hw, y: cy + hh }, { x: cx - hw, y: cy + hh },
-      ]);
-    }
-    return segs;
-  }
-
-  if (objectType === "circle") {
-    const r   = Math.max(1, Number(obj?.size) || 0);
-    const pts = [];
-    for (let i = 0; i < circleSegments; i++) {
-      const a = (i / circleSegments) * Math.PI * 2;
-      pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
-    }
-    buildPolySegs(pts);
-    return segs;
-  }
-
-  const s = Math.max(1, Number(obj?.size) || 0);
-  if (rotation) {
-    buildPolySegs([
-      rotatePoint(0, -s),
-      rotatePoint(-s, s),
-      rotatePoint(s, s),
-    ]);
-  } else {
-    buildPolySegs([
-      { x: cx, y: cy - s }, { x: cx - s, y: cy + s }, { x: cx + s, y: cy + s },
-    ]);
-  }
-  return segs;
-};
-
-// Returns world-space {angle, x, y} points — camera transform applied at draw time.
-export const computeVisibilityPolygon = (lx, ly, segments, range) => {
-  const ANGLE_EPSILON = 0.0001;
-  const pad = 2;
-
-  const bx0 = lx - range - pad, by0 = ly - range - pad;
-  const bx1 = lx + range + pad, by1 = ly + range + pad;
-
-  const boundary = [
-    [{ x: bx0, y: by0 }, { x: bx1, y: by0 }],
-    [{ x: bx1, y: by0 }, { x: bx1, y: by1 }],
-    [{ x: bx1, y: by1 }, { x: bx0, y: by1 }],
-    [{ x: bx0, y: by1 }, { x: bx0, y: by0 }],
-  ];
-
-  const allSegs = [...segments, ...boundary];
-  const angles  = [];
-
-  for (const [a, b] of allSegs) {
-    for (const pt of [a, b]) {
-      const dx = pt.x - lx, dy = pt.y - ly;
-      if (dx * dx + dy * dy > range * range * 2.1) continue;
-      const base = Math.atan2(dy, dx);
-      angles.push(base - ANGLE_EPSILON, base, base + ANGLE_EPSILON);
-    }
-  }
-
-  angles.sort((a, b) => a - b);
-
-  const points = [];
-  for (const angle of angles) {
-    const hit = castRay(lx, ly, Math.cos(angle), Math.sin(angle), allSegs, range + pad);
-    points.push({ angle, x: hit.x, y: hit.y });
-  }
-
-  return points; // world-space {angle, x, y}[]
-};
-
-const buildObjectsByZLevel = (objects = []) => {
-  const byZ = new Map();
-  for (const obj of objects) {
-    if (normalizeTerrainType(obj?.terrainType) === "floor") continue;
-    const zl = Math.round(Number(obj?.zLevel) || 0);
-    if (!byZ.has(zl)) byZ.set(zl, []);
-    byZ.get(zl).push(obj);
-  }
-  return byZ;
+  return inside;
 };
 
 // ─── POINT LIGHT ─────────────────────────────────
@@ -358,6 +230,47 @@ const drawPointLight = (ctx, width, height, source, worldPoints, camera) => {
   }
 };
 
+// ─── DIRECTIONAL LIGHT ───────────────────────────
+const drawDirectionalLight = (ctx, width, height, source, shadowPolygons, camera) => {
+  const { off } = getScratchCanvases(width, height);
+  const oc = off.getContext("2d");
+  oc.setTransform(1, 0, 0, 1, 0, 0);
+  
+  // 1. Fill with light color (intensity determines alpha)
+  oc.globalCompositeOperation = "source-over";
+  const rgb = hexToRgb(source.color);
+  // Directional light intensity usually acts as a base lift. 
+  // We map intensity to alpha: 0.8 intensity -> 0.8 alpha removal from darkness.
+  const alpha = clamp(source.intensity * 0.8, 0, 1);
+  oc.fillStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
+  oc.fillRect(0, 0, width, height);
+
+  // 2. Cut out shadows (destination-out)
+  // Shadows preserve the underlying darkness (by removing the light we just drew)
+  oc.globalCompositeOperation = "destination-out";
+  oc.fillStyle = "rgba(0,0,0,1)";
+  (shadowPolygons || []).forEach(poly => {
+    oc.beginPath();
+    const start = worldToScreen(camera, poly[0].x, poly[0].y);
+    oc.moveTo(start.x, start.y);
+    for (let i = 1; i < poly.length; i++) {
+      const p = worldToScreen(camera, poly[i].x, poly[i].y);
+      oc.lineTo(p.x, p.y);
+    }
+    oc.closePath();
+    oc.fill();
+  });
+
+  // 3. Apply to main canvas (remove darkness where lit)
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.drawImage(off, 0, 0);
+};
+
+// Helper for worldToScreen inside this file if not imported
+const worldToScreen = (camera, wx, wy) => ({
+  x: wx * camera.zoom - camera.x,
+  y: wy * camera.zoom - camera.y
+});
 
 // ─── LIGHTING LAYER ──────────────────────────────
 export const lightingLayer = {
@@ -395,48 +308,8 @@ export const lightingLayer = {
     ctx.fillStyle = `rgba(0,0,0,${ambientAlpha})`;
     ctx.fillRect(0, 0, width, height);
 
-    // ── Build obstacle segments ───────────────────────────────────────────
-    const cache =
-      state?.lightingCache && typeof state.lightingCache === "object"
-        ? state.lightingCache
-        : null;
-    const hasPointLights = lighting.sources.some(
-      (source) => source.enabled && source.type === "point"
-    );
-
-    let objectsByZLevel = new Map();
-    let segmentsByZLevel = new Map();
-    let polygonCache = cache?.polygons || null;
-    let objectsVersion = 0;
-
-    if (hasPointLights) {
-      const objects = Array.isArray(state?.mapGeometry)
-        ? state.mapGeometry
-        : state?.mapObjects || [];
-
-      if (cache) {
-        if (cache.objectsRef !== objects) {
-          cache.objectsRef = objects;
-          cache.objectsVersion = (cache.objectsVersion || 0) + 1;
-          cache.objectsByZLevel = null;
-          cache.segmentsByZLevel = null;
-          cache.polygons = new Map();
-        }
-        objectsVersion = cache.objectsVersion || 0;
-        if (!cache.objectsByZLevel) {
-          cache.objectsByZLevel = buildObjectsByZLevel(objects);
-        }
-        objectsByZLevel = cache.objectsByZLevel;
-        if (!cache.segmentsByZLevel) cache.segmentsByZLevel = new Map();
-        segmentsByZLevel = cache.segmentsByZLevel;
-        if (!cache.polygons) cache.polygons = new Map();
-        polygonCache = cache.polygons;
-      } else {
-        objectsByZLevel = buildObjectsByZLevel(objects);
-        segmentsByZLevel = new Map();
-      }
-    }
-
+    // ── Draw Point Lights (using server polygons) ─────────────────────────
+    const lightingPolygons = state?.lightingPolygons || {};
     const currentZLevel = Math.round(Number(state?.currentZLevel) || 0);
 
     lighting.sources.forEach((source) => {
@@ -445,49 +318,19 @@ export const lightingLayer = {
       const lightZLevel = Math.round(Number(source.zLevel) || 0);
       if (lightZLevel !== currentZLevel) return;
 
-      const zLevelObjs = objectsByZLevel.get(lightZLevel) || [];
-      let lightSegments = segmentsByZLevel.get(lightZLevel);
-      if (!lightSegments) {
-        lightSegments = [];
-        for (const obj of zLevelObjs) lightSegments.push(...getObjectSegmentsWorld(obj));
-        segmentsByZLevel.set(lightZLevel, lightSegments);
-      }
-
-      const cacheKey = `${source.worldX}|${source.worldY}|${source.range}|${lightZLevel}|${objectsVersion}`;
-      const cached = polygonCache ? polygonCache.get(source.id) : null;
-      let worldPoints = cached && cached.key === cacheKey ? cached.points : null;
-      if (!worldPoints) {
-        worldPoints = computeVisibilityPolygon(
-          source.worldX, source.worldY, lightSegments, source.range
-        );
-        if (polygonCache) polygonCache.set(source.id, { key: cacheKey, points: worldPoints });
-      }
+      const worldPoints = lightingPolygons[source.id];
       if (!worldPoints || worldPoints.length < 3) return;
-
       drawPointLight(ctx, width, height, source, worldPoints, camera);
     });
 
-
-
-    // ── Directional lights ────────────────────────────────────────────────
-    ctx.globalCompositeOperation = "lighten";
+    // ── Directional lights (using server shadow polygons) ─────────────────
     lighting.sources.forEach((source) => {
       if (!source.enabled || source.type !== "directional") return;
 
-      const rgb      = hexToRgb(source.color);
-      const strength = clamp(source.intensity * source.blend * 0.4, 0, 1);
-      const cx       = width / 2, cy = height / 2;
-      const dist     = Math.max(width, height) * 0.8;
-      const gradient = ctx.createLinearGradient(
-        cx + source.x * dist, cy + source.y * dist,
-        cx - source.x * dist, cy - source.y * dist
-      );
-      const maxLift = clamp(strength, 0.02, 0.9);
-      gradient.addColorStop(0,   `rgba(${rgb.r},${rgb.g},${rgb.b},${maxLift})`);
-      gradient.addColorStop(0.6, `rgba(${rgb.r},${rgb.g},${rgb.b},${maxLift * 0.4})`);
-      gradient.addColorStop(1,   `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, width, height);
+      // Directional lights store an array of polygons (one per obstacle)
+      const shadowPolygons = lightingPolygons[source.id];
+      // Even if no shadows (empty array), we still draw the light
+      drawDirectionalLight(ctx, width, height, source, shadowPolygons, camera);
     });
 
     // ── Vignette ──────────────────────────────────────────────────────────
@@ -503,4 +346,58 @@ export const lightingLayer = {
 
     ctx.restore();
   },
+};
+
+// ─── LIGHT CALCULATION UTILITY ────────────────────
+export const calculateLightAtPoint = (worldX, worldY, state) => {
+  const lighting = normalizeLighting(state?.lighting || {});
+  if (!lighting.enabled) return 1.0;
+
+  const lightingPolygons = state?.lightingPolygons || {};
+  const currentZLevel = Math.round(Number(state?.currentZLevel) || 0);
+  // Base brightness from ambient (1 - ambientAlpha)
+  let brightness = 1 - clamp(lighting.ambient, 0, 1);
+
+  // 1. Point Lights (with shadow checks)
+  for (const source of lighting.sources) {
+    if (!source.enabled || source.type !== "point") continue;
+    if (Math.round(Number(source.zLevel) || 0) !== currentZLevel) continue;
+
+    const dx = worldX - source.worldX;
+    const dy = worldY - source.worldY;
+    const dist = Math.hypot(dx, dy);
+    if (dist > source.range) continue;
+
+    // Check if point is inside the pre-computed visibility polygon
+    const polygon = lightingPolygons[source.id];
+    if (!polygon || !isPointInPolygon(worldX, worldY, polygon)) continue;
+
+    // Calculate intensity falloff (approximating the visual gradient stops)
+    const t = dist / source.range;
+    let falloff = 0;
+    if (t < 0.25) falloff = 1.0 - (t / 0.25) * 0.25;
+    else if (t < 0.55) falloff = 0.75 - ((t - 0.25) / 0.3) * 0.45;
+    else if (t < 0.8) falloff = 0.3 - ((t - 0.55) / 0.25) * 0.22;
+    else falloff = 0.08 - ((t - 0.8) / 0.2) * 0.08;
+
+    const lightAlpha = clamp(source.intensity * falloff, 0, 1);
+    // "Screen" blend mode logic: Brightness increases asymptotically to 1
+    brightness = 1 - (1 - brightness) * (1 - lightAlpha);
+  }
+
+  // 2. Directional Lights (Global illumination)
+  for (const source of lighting.sources) {
+    if (!source.enabled || source.type !== "directional") continue;
+    
+    // Check if point is inside any shadow polygon for this light
+    const shadows = lightingPolygons[source.id] || [];
+    const inShadow = shadows.some(poly => isPointInPolygon(worldX, worldY, poly));
+
+    if (!inShadow) {
+      const lightAlpha = clamp(source.intensity * 0.8, 0, 1);
+      brightness = 1 - (1 - brightness) * (1 - lightAlpha);
+    }
+  }
+
+  return clamp(brightness, 0, 1);
 };

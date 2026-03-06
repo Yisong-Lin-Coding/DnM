@@ -21,14 +21,18 @@ import CharacterMenu from './pages/characters/characterMenu';
 import CharacterCreation from './pages/characters/characterCreation'
 import CharacterViewer from './pages/characters/characterViewer';
 
-import { SocketContext, socket } from './socket.io/context';
-import { useEffect, useState } from 'react';
+import { SocketContext, createSocket, getSocketUrls } from './socket.io/context';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 
 
 function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
+  const socketUrls = useMemo(() => getSocketUrls(), []);
+  const [socket, setSocket] = useState(() => createSocket(socketUrls[0]));
+  const socketRef = useRef(socket);
+  const urlIndexRef = useRef(0);
 
   function GameWrapper() {
   return (
@@ -40,56 +44,92 @@ function App() {
 
 
   useEffect(() => {
-    console.log('Attempting to connect to socket...');
+    let disposed = false;
 
-    socket.on("connect", () => {
-      console.log("Connected with ID:", socket.id);
-      const existingSessionID = sessionStorage.getItem("session_ID");
-      const stableSessionID = existingSessionID || socket.id.toString();
-      if (!existingSessionID) {
-        sessionStorage.setItem("session_ID", stableSessionID);
-      }
+    const disposeSocket = (activeSocket) => {
+      if (!activeSocket) return;
+      activeSocket.off("connect");
+      activeSocket.off("disconnect");
+      activeSocket.off("welcome");
+      activeSocket.off("connect_error");
+      activeSocket.disconnect();
+    };
 
-      const playerID = localStorage.getItem("player_ID");
-      if (playerID) {
-        socket.emit("login_tokenSave", { playerID, sessionID: stableSessionID }, () => {});
-        socket.emit("playerData_logOn", { playerID });
-      }
-      setIsConnected(true);
-      setConnectionError(null);
-    });
+    const attachSocketListeners = (activeSocket, activeUrl) => {
+      if (!activeSocket) return;
 
-    socket.on("disconnect", (reason) => {
-      console.log("Disconnected:", reason);
-      setIsConnected(false);
-    });
+      console.log(`Attempting to connect to socket at ${activeUrl}...`);
 
-    socket.on("welcome", (data) => {
-      console.log("Server says:", data.message);
-    });
+      activeSocket.on("connect", () => {
+        console.log("Connected with ID:", activeSocket.id);
+        const existingSessionID = sessionStorage.getItem("session_ID");
+        const stableSessionID = existingSessionID || activeSocket.id.toString();
+        if (!existingSessionID) {
+          sessionStorage.setItem("session_ID", stableSessionID);
+        }
 
-    socket.on("connect_error", (err) => {
-      console.error("Socket connection error:", err.message);
-      setConnectionError(err.message);
-      setIsConnected(false);
-    });
+        const playerID = localStorage.getItem("player_ID");
+        if (playerID) {
+          activeSocket.emit("login_tokenSave", { playerID, sessionID: stableSessionID }, () => {});
+          activeSocket.emit("playerData_logOn", { playerID });
+        }
+        setIsConnected(true);
+        setConnectionError(null);
+      });
 
-    // Manually connect if not already connected
-    if (!socket.connected) {
-      socket.connect();
+      activeSocket.on("disconnect", (reason) => {
+        console.log("Disconnected:", reason);
+        setIsConnected(false);
+      });
+
+      activeSocket.on("welcome", (data) => {
+        console.log("Server says:", data.message);
+      });
+
+      activeSocket.on("connect_error", (err) => {
+        if (disposed) return;
+        const currentIndex = urlIndexRef.current;
+        const nextIndex = currentIndex + 1;
+        if (nextIndex < socketUrls.length) {
+          const nextUrl = socketUrls[nextIndex];
+          console.warn(`Socket error on ${activeUrl}:`, err.message);
+          setConnectionError(`Failed to connect to ${activeUrl}. Trying ${nextUrl}...`);
+
+          disposeSocket(activeSocket);
+          const nextSocket = createSocket(nextUrl);
+          urlIndexRef.current = nextIndex;
+          socketRef.current = nextSocket;
+          setSocket(nextSocket);
+          attachSocketListeners(nextSocket, nextUrl);
+          nextSocket.connect();
+          return;
+        }
+
+        console.error("Socket connection error:", err.message);
+        setConnectionError(err.message);
+        setIsConnected(false);
+      });
+    };
+
+    const initialUrl = socketUrls[0];
+    const initialSocket = socketRef.current || createSocket(initialUrl);
+    socketRef.current = initialSocket;
+    setSocket(initialSocket);
+    attachSocketListeners(initialSocket, initialUrl);
+
+    if (!initialSocket.connected) {
+      initialSocket.connect();
     }
 
     return () => {
-      if(localStorage.getItem("player_ID")){
-        socket.emit("playerData_logOff", { playerID: localStorage.getItem("player_ID") });
+      disposed = true;
+      const activeSocket = socketRef.current;
+      if (activeSocket?.connected && localStorage.getItem("player_ID")) {
+        activeSocket.emit("playerData_logOff", { playerID: localStorage.getItem("player_ID") });
       }
-
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("welcome");
-      socket.off("connect_error");
+      disposeSocket(activeSocket);
     };
-  }, []);
+  }, [socketUrls]);
 
   return (
     <SocketContext.Provider value={socket}>

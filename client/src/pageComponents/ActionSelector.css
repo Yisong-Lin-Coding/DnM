@@ -1,0 +1,372 @@
+/* Action Selector Styles */
+
+.action-selector {
+    background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    border: 2px solid #4a4a6e;
+    max-width: 600px;
+    width: 100%;
+}
+
+.action-selector.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.waiting-message {
+    text-align: center;
+    padding: 40px 20px;
+    color: #a0a0c0;
+}
+
+.waiting-message h3 {
+    color: #ffffff;
+    margin: 0 0 10px 0;
+    font-size: 1.5rem;
+}
+
+.waiting-message p {
+    margin: 0;
+    font-size: 1rem;
+}
+
+/* Header */
+.action-selector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.action-selector-header h3 {
+    color: #ffffff;
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.selected-indicator {
+    color: #4ecdc4;
+    font-size: 0.9rem;
+    font-weight: bold;
+    background: rgba(78, 205, 196, 0.2);
+    padding: 5px 15px;
+    border-radius: 20px;
+    border: 1px solid #4ecdc4;
+}
+
+/* Tabs */
+.action-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.action-tabs::-webkit-scrollbar {
+    height: 4px;
+}
+
+.action-tabs::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+}
+
+.tab {
+    flex: 1;
+    min-width: 120px;
+    padding: 10px 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid transparent;
+    border-radius: 10px;
+    color: #a0a0c0;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.tab:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tab.active {
+    background: linear-gradient(135deg, rgba(78, 205, 196, 0.3) 0%, rgba(68, 167, 192, 0.3) 100%);
+    border-color: #4ecdc4;
+    color: #ffffff;
+    box-shadow: 0 5px 15px rgba(78, 205, 196, 0.3);
+}
+
+/* Actions List */
+.actions-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 5px;
+    scrollbar-width: thin;
+}
+
+.actions-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.actions-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.actions-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.no-actions {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px 20px;
+    color: #a0a0c0;
+    font-style: italic;
+}
+
+/* Action Button */
+.action-button {
+    position: relative;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-height: 120px;
+}
+
+.action-button:hover:not(.disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.action-button.selected {
+    background: linear-gradient(135deg, rgba(78, 205, 196, 0.3) 0%, rgba(68, 167, 192, 0.3) 100%);
+    border-color: #4ecdc4;
+    box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
+}
+
+.action-button.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(1);
+}
+
+.action-icon {
+    font-size: 2.5rem;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+}
+
+.action-info {
+    text-align: center;
+    width: 100%;
+}
+
+.action-name {
+    color: #ffffff;
+    font-weight: bold;
+    font-size: 1rem;
+    margin-bottom: 5px;
+}
+
+.action-cost {
+    color: #a0a0c0;
+    font-size: 0.85rem;
+}
+
+.requires-target-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: #ff6b6b;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+/* Confirmation Panel */
+.confirmation-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.confirmation-content {
+    background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 3px solid #4a4a6e;
+    animation: slideUp 0.4s ease-out;
+}
+
+.confirmation-content h4 {
+    color: #ffffff;
+    margin: 0 0 20px 0;
+    font-size: 1.8rem;
+    text-align: center;
+}
+
+.action-details {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.action-details p {
+    color: #ffffff;
+    margin: 10px 0;
+}
+
+.action-description {
+    color: #a0a0c0 !important;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.confirmation-buttons {
+    display: flex;
+    gap: 15px;
+}
+
+.confirmation-buttons button {
+    flex: 1;
+    padding: 15px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-confirm {
+    background: linear-gradient(135deg, #4ecdc4 0%, #44a7c0 100%);
+    color: white;
+    box-shadow: 0 5px 15px rgba(78, 205, 196, 0.3);
+}
+
+.btn-confirm:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(78, 205, 196, 0.4);
+}
+
+.btn-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-cancel {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    color: white;
+    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.3);
+}
+
+.btn-cancel:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(255, 107, 107, 0.4);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .action-selector {
+        padding: 15px;
+        max-width: 100%;
+    }
+
+    .action-selector-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .actions-list {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+        max-height: 300px;
+    }
+
+    .action-button {
+        min-height: 100px;
+        padding: 12px;
+    }
+
+    .action-icon {
+        font-size: 2rem;
+        width: 50px;
+        height: 50px;
+    }
+
+    .action-name {
+        font-size: 0.9rem;
+    }
+
+    .confirmation-content {
+        padding: 20px;
+        width: 95%;
+    }
+
+    .confirmation-buttons {
+        flex-direction: column;
+    }
+}

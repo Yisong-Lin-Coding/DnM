@@ -21,6 +21,15 @@ const lobbyCharacterAssignmentSchema = new mongoose.Schema(
     { _id: false }
 );
 
+const chatGroupSchema = new mongoose.Schema(
+    {
+        name: { type: String, required: true, trim: true },
+        members: [{ type: mongoose.Schema.Types.ObjectId, ref: "Player", required: true }],
+        createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Player", required: true },
+        createdAt: { type: Date, default: Date.now },
+    }
+);
+
 const campaignCharacterStateSchema = new mongoose.Schema(
     {
         playerId: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
@@ -45,6 +54,7 @@ const campaignSchema = new mongoose.Schema({
     activeLobby: { type: lobbySchema, default: () => ({}) },
     characterAssignments: { type: [lobbyCharacterAssignmentSchema], default: [] },
     characterStates: { type: [campaignCharacterStateSchema], default: [] },
+    chatGroups: { type: [chatGroupSchema], default: [] },
     createdAt: { type: Date, default: Date.now },
     settings: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
     maps: [{ type: String, default: [] }],
