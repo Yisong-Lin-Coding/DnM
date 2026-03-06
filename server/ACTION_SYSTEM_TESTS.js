@@ -9,7 +9,7 @@
 // Test 1: Dice Roller Functions
 // ============================================================================
 
-const DiceRoller = require('./server/worldEngine/diceRoller');
+const DiceRoller = require('./worldEngine/diceRoller');
 
 // Test basic die rolling
 console.log('Test: Roll single d20');
@@ -94,7 +94,7 @@ console.log('\n✓ All dice roller tests passed!');
 // Test 2: Action Processor
 // ============================================================================
 
-const ActionProcessor = require('./server/worldEngine/actionProcessor');
+const ActionProcessor = require('./worldEngine/actionProcessor');
 
 const testTarget = {
     id: 'char-2',
